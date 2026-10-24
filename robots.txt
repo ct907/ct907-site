@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://ct907.com/sitemap.xml
+Sitemap: https://about.ct907.com/sitemap.xml
