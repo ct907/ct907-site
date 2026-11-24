@@ -4,191 +4,415 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- ============================================================
-       BEFORE YOU PUBLISH: search this file for the word REPLACE
-       and fix every one. This page is set up to live at the root domain, https://about.ct907.com/
-       and your Readymag site at https://ct907.com/ .
-       ============================================================ -->
+  <!-- ==========================================================
+       Static home page for https://ct907.com/
+       Plan: this page lives at the root domain; the Readymag site
+       (album page, portfolio, project pages) lives at
+       https://hello.ct907.com/ . Do NOT publish this at the root
+       until hello.ct907.com is serving Readymag.
+       Search this file for TODO before publishing.
+       ========================================================== -->
 
   <title>Chris Tan – Singer-Songwriter &amp; UX Designer, Singapore</title>
-  <meta name="description" content="Chris Tan is a Singapore singer-songwriter and UX designer. Stream the album Slow Food on Spotify and explore design work in AI and public services.">
-  <link rel="canonical" href="https://about.ct907.com/">
-  <meta name="robots" content="index, follow">
+  <meta name="description" content="Chris Tan is a Singapore singer-songwriter and UX designer. Listen to the album Slow Food, explore design work in AI and public services.">
+  <link rel="canonical" href="https://ct907.com/">
+  <meta name="robots" content="index, follow, max-image-preview:large">
 
-  <!-- Link previews (WhatsApp, Slack, iMessage, social) -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Chris Tan">
   <meta property="og:title" content="Chris Tan – Singer-Songwriter &amp; UX Designer">
   <meta property="og:description" content="Design by day, music by night. Singapore.">
-  <meta property="og:url" content="https://about.ct907.com/">
-  <meta property="og:image" content="https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-41f6e057-8121-4ccd-add8-30006bf1a3f5_readyscr_1024.jpg">
+  <meta property="og:url" content="https://ct907.com/">
+  <meta property="og:image" content="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-7588466e-5b89-4e79-8390-ba535d88e1e3.webp?w=877&e=webp">
   <meta name="twitter:card" content="summary_large_image">
 
-  <!-- Structured data: tells Google and AI tools, in a machine-readable way,
-       who you are and which profiles are yours. -->
+  <!-- Structured data: who you are and which profiles are yours. -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "WebSite",
+        "@id": "https://ct907.com/#website",
+        "url": "https://ct907.com/",
+        "name": "Chris Tan",
+        "inLanguage": "en"
+      },
+      {
         "@type": "Person",
-        "@id": "https://about.ct907.com/#chris",
+        "@id": "https://ct907.com/#chris",
         "name": "Chris Tan",
         "alternateName": "ct907",
-        "url": "https://about.ct907.com/",
+        "url": "https://ct907.com/",
+        "image": "https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-7588466e-5b89-4e79-8390-ba535d88e1e3.webp?w=877&e=webp",
         "jobTitle": "UX Designer and Singer-Songwriter",
-        "description": "Singapore-based singer-songwriter and UX designer with experience in AI interaction design and government digital services.",
+        "description": "Singapore-based singer-songwriter and UX designer working on AI interaction design and digital public services.",
         "address": { "@type": "PostalAddress", "addressCountry": "SG" },
         "sameAs": [
-          "https://ct907.com/",
-          "https://open.spotify.com/artist/6e3tHPF6Ldf7jeV8Fr9Oe1?si=hyaqf17vSuGQtZNUJ5a7RA",
           "https://www.instagram.com/ct907/",
-          "https://www.linkedin.com/in/tan-guan-yi-a28878103/"
+          "https://linktr.ee/ct907",
+          "https://hello.ct907.com/"
         ]
       },
       {
         "@type": "MusicAlbum",
         "name": "Slow Food",
-        "byArtist": { "@id": "https://about.ct907.com/#chris" },
-        "numTracks": 12,
-        "description": "Slow Food is the second album by singer-songwriter Chris Tan: a four-course meal of 12 songs, from Salty to Sweet."
+        "datePublished": "2026",
+        "byArtist": { "@id": "https://ct907.com/#chris" },
+        "url": "https://hello.ct907.com/slow-food-album/"
       }
     ]
   }
   </script>
+  <!-- TODO: once you have them, add your Spotify artist page, YouTube and
+       LinkedIn URLs to "sameAs" above. -->
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Josefin+Sans:wght@300;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Josefin+Sans:wght@100..700&display=swap" rel="stylesheet">
+
+  <script>document.documentElement.classList.add('js');</script>
 
   <style>
     :root {
-      --bg: #dddcdb;
-      --ink: #111;
-      --muted: #555;
-      --accent: #d9553a;
+      --bg: #dcdad8;
+      --ink: #0b0b0b;
+      --muted: #55524f;
+      --accent: #ff6546;
+      --green: #2c8a3d;
+      --pad: clamp(1.25rem, 8vw, 5.25rem);
+      --display: "Josefin Sans", "Avenir Next", "Century Gothic", system-ui, sans-serif;
+      --text: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
     }
     * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; overflow-x: clip; }
+    @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
     body {
       margin: 0;
       background: var(--bg);
       color: var(--ink);
-      font: 400 1.0625rem/1.65 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      font: 400 1rem/1.6 var(--text);
+      overflow-x: clip;
     }
-    main { max-width: 46rem; margin: 0 auto; padding: 4rem 1.25rem 3rem; }
+    a { color: inherit; }
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+    img { display: block; max-width: 100%; height: auto; }
+    .wrap { max-width: 68rem; margin: 0 auto; padding: 0 var(--pad); }
+    section { scroll-margin-top: 1rem; }
+
+    /* ---------- hero ---------- */
+    .hero { position: relative; padding-block: .6rem 4.5rem; }
+    .hello { font: 300 1.25rem/1.4 var(--display); margin: 0; }
+    .hello .wave { display: inline-block; transform: rotate(35deg); margin-left: .35rem; }
     h1 {
-      font: 600 clamp(3rem, 12vw, 5.5rem)/1 "Josefin Sans", "Inter", sans-serif;
-      letter-spacing: .02em;
+      font: 300 clamp(3.4rem, 12vw, 5.25rem)/1.1 var(--display);
+      letter-spacing: -.06em;
       text-transform: uppercase;
-      margin: 0 0 .5rem;
+      margin: 1.7rem 0 0;
     }
-    .tagline {
-      font: 300 clamp(1.4rem, 4.5vw, 2rem)/1.3 "Josefin Sans", "Inter", sans-serif;
-      margin: 0 0 2.5rem;
+    @media (prefers-reduced-motion: no-preference) {
+      h1 { animation: weight 6s infinite; }
     }
+    @keyframes weight {
+      0%   { font-weight: 100; }
+      50%  { font-weight: 700; }
+      100% { font-weight: 100; }
+    }
+    .lede {
+      font: 400 clamp(1.7rem, 5.6vw, 3rem)/1.2 var(--display);
+      letter-spacing: -.05em;
+      margin: 0;
+    }
+    .caret {
+      display: inline-block; width: 0; height: 0; margin-left: .5rem; vertical-align: .9em;
+      border-left: .42rem solid transparent; border-right: .42rem solid transparent; border-top: .7rem solid #444;
+    }
+    .arrows { list-style: none; margin: 4.6rem 0 0; padding: 0; font-size: .95rem; }
+    .arrows li { position: relative; padding-left: 2rem; margin: .55rem 0; }
+    .arrows li::before {
+      content: ""; position: absolute; left: 0; top: .72em; width: 1.15rem; height: 2px; background: var(--accent);
+    }
+    .arrows li::after {
+      content: ""; position: absolute; left: .55rem; top: calc(.72em - 4px); width: .6rem; height: .6rem;
+      border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); transform: rotate(45deg);
+    }
+    .arrows a { text-decoration: none; }
+    .arrows a:hover, .arrows a:focus-visible { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: .25em; }
+    /* Hover: arrow turns black at once; the words after the link drift in
+       (from slightly lower-right and tilted) and drift out again on leave. */
+    .arrows li { width: max-content; }
+    .arrows li::before, .arrows li::after { transition: background-color .05s, border-color .05s; }
+    .arrows li:hover::before, .arrows li:focus-within::before { background: var(--ink); }
+    .arrows li:hover::after, .arrows li:focus-within::after { border-color: var(--ink); }
+    .aside {
+      display: inline-block; margin-left: .15rem; color: var(--ink);
+      opacity: 0; transform: translate(.9rem, .6rem) rotate(-8deg); transform-origin: left center;
+      transition: opacity .25s ease-in, transform .25s ease-in;
+      pointer-events: none;
+    }
+    .arrows li:hover .aside, .arrows li:focus-within .aside {
+      opacity: 1; transform: none; transition: opacity .22s ease-out, transform .22s ease-out;
+    }
+    @media (hover: none) { .aside { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .aside { transform: none; transition: opacity .15s; }
+    }
+
+    .portrait {
+      position: absolute; right: calc(-1 * var(--pad) - 1.5rem); bottom: 1.2rem;
+      width: min(40vw, 21rem); aspect-ratio: 334 / 250;
+      transform: rotate(10deg); transform-origin: center;
+    }
+    .portrait img { width: 100%; height: 100%; object-fit: cover; border-radius: 1rem; }
+    @media (max-width: 720px) {
+      .hero { padding-bottom: 1rem; }
+      .arrows { margin-top: 2.2rem; }
+      .portrait { position: relative; right: auto; bottom: auto; width: min(78vw, 19rem); margin: 2rem 0 .5rem auto; }
+    }
+
+    /* ---------- dividers, icons, headings ---------- */
+    /* Dots are ~2px, pitch ~10.3px. --dot-shift is set from scrollY by the script
+       below; the dots slide LEFT as you scroll down. Tune --dot-ratio in the JS
+       (1 = dots move as far as the page scrolls). */
+    .dots {
+      border: 0; margin: 0; height: 3px;
+      background-image: radial-gradient(circle at center, var(--ink) 0 1px, transparent 1.25px);
+      background-size: 10.27px 3px;
+      background-repeat: repeat-x;
+      background-position-x: calc(var(--dot-shift, 0) * -1px);
+    }
+    .block { padding-block: 2.6rem 3.4rem; }
+    .badge {
+      display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem;
+      background: #4a4846; color: #fff; font-size: .8rem; line-height: 1;
+    }
+    .badge.sq { border-radius: 3px; }
+    .badge.round { border-radius: 50%; }
+    .badge.hex { clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); width: 1.5rem; height: 1.5rem; }
     h2 {
-      font: 600 1.35rem/1.3 "Josefin Sans", "Inter", sans-serif;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      margin: 3rem 0 .75rem;
-      padding-top: 1.5rem;
-      border-top: 2px dotted var(--ink);
+      font: 400 clamp(2.2rem, 7vw, 3rem)/1.25 var(--display);
+      letter-spacing: -.05em;
+      margin: 1.1rem 0 1.6rem;
     }
-    p { margin: 0 0 1rem; }
-    a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: .2em; text-decoration-thickness: 2px; }
-    a:hover, a:focus-visible { color: var(--accent); }
-    ul.arrows { list-style: none; padding: 0; margin: 0 0 1rem; }
-    ul.arrows li { padding-left: 1.6rem; position: relative; margin: .35rem 0; }
-    ul.arrows li::before { content: "→"; color: var(--accent); position: absolute; left: 0; font-weight: 500; }
-    ol.tracks { margin: 0 0 1rem; padding-left: 1.5rem; }
-    footer { margin-top: 4rem; font-size: .9rem; color: var(--muted); }
+    .ux { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 2rem 3rem; align-items: start; }
+    .ux p { margin: 0 0 1.4rem; }
+    .ux .big { font-size: 1.25rem; line-height: 1.55; max-width: 34rem; }
+    .ux .small { font-size: .95rem; line-height: 1.5; max-width: 34rem; }
+    .ux .art { width: 15rem; }
+    @media (max-width: 720px) {
+      .ux { grid-template-columns: 1fr; }
+      .ux .art { width: 11rem; order: -1; }
+    }
+    .links { list-style: none; margin: 1.6rem 0 0; padding: 0; font-size: .95rem; }
+    .links li { position: relative; padding-left: 2rem; margin: .7rem 0; }
+    .links li::before { content: ""; position: absolute; left: 0; top: .72em; width: 1.15rem; height: 2px; background: var(--accent); }
+    .links li::after {
+      content: ""; position: absolute; left: .55rem; top: calc(.72em - 4px); width: .6rem; height: .6rem;
+      border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); transform: rotate(45deg);
+    }
+    .links a { text-decoration: none; }
+    .links a:hover { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: .25em; }
+
+    /* ---------- music ---------- */
+    .label { font: 500 .78rem/1 var(--text); letter-spacing: .18em; text-transform: uppercase; margin: 2.2rem 0 .8rem; }
+    .music-intro { max-width: 40rem; margin: 0 0 .4rem; }
+    .release {
+      position: relative; display: grid; grid-template-columns: minmax(0, 11.7rem) 1fr;
+      border: 1px solid #6a6764; border-radius: .4rem; overflow: hidden; max-width: 44rem;
+      transition: transform .25s, box-shadow .25s;
+    }
+    .release:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,.14); }
+    .release img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 1; }
+    .release .body { padding: 1rem 1.2rem; display: flex; flex-direction: column; justify-content: space-between; min-height: 11.7rem; position: relative; }
+    .release h3 { font: 600 1.4rem/1.2 var(--display); letter-spacing: .1em; margin: 0; }
+    .release h3 a { text-decoration: none; }
+    .release h3 a::after { content: ""; position: absolute; inset: 0; }   /* whole card is the link */
+    .release .meta { font: 500 .72rem/1.4 var(--display); letter-spacing: .2em; text-transform: uppercase; margin: .3rem 0 0; }
+    .release .latest { font: 500 .62rem/1 var(--display); letter-spacing: .22em; text-transform: uppercase; margin: 0; }
+    .release .play {
+      position: absolute; right: 1.1rem; bottom: .9rem; width: 1.4rem; height: 1.4rem;
+      border: 1.5px solid var(--ink); border-radius: 50%;
+    }
+    .release .play::after {
+      content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-35%, -50%);
+      border-left: .42rem solid var(--ink); border-top: .28rem solid transparent; border-bottom: .28rem solid transparent;
+    }
+    .tiles { list-style: none; margin: 1.1rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; max-width: 44rem; }
+    .tiles a { display: block; border-radius: .3rem; overflow: hidden; transition: transform .25s, box-shadow .25s; }
+    .tiles a:hover, .tiles a:focus-visible { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,.2); }
+    .tiles img { width: 100%; aspect-ratio: 1; object-fit: cover; }
+    .earlier { font-size: .9rem; color: var(--muted); margin: .9rem 0 0; max-width: 40rem; }
+    .pill {
+      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+      min-width: 17rem; padding: .45rem 1.4rem; border: 1px solid var(--green); border-radius: .5rem;
+      color: var(--green); font-size: .8rem; font-weight: 500; text-decoration: none; transition: background .25s, color .25s, border-color .25s;
+    }
+    .pill:hover, .pill:focus-visible { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ---------- in between ---------- */
+    .between { text-align: center; padding-bottom: 1.6rem; }
+    .between h2 { display: inline-block; border-bottom: 2px dotted var(--ink); padding-bottom: .1rem; margin-bottom: 2.4rem; }
+    .strip-outer { margin: 0 calc(-1 * var(--pad)); overflow-x: auto; overflow-y: hidden; padding: 1rem 0 1.4rem; scrollbar-width: none; }
+    .strip-outer::-webkit-scrollbar { display: none; }
+    .strip { display: flex; align-items: flex-end; width: max-content; min-width: 100%; padding: 0 1rem; justify-content: safe center; }
+    .strip figure { margin: 0 -.9rem 0 0; flex: none; filter: drop-shadow(1px 5px 1px rgba(0, 14, 37, .58)); transition: transform .25s; }
+    .strip figure:hover { transform: translateY(-6px) scale(1.03); z-index: 5; position: relative; }
+    .strip img { height: 100%; width: 100%; object-fit: cover; border-radius: .4rem; }
+    .strip .rot { transform: rotate(10deg); }
+    .strip .rot:hover { transform: rotate(10deg) translateY(-6px) scale(1.03); }
+
+    footer { text-align: center; padding-block: 1.6rem 3rem; }
+    footer .name { font: 400 1.1rem/1.3 var(--display); letter-spacing: .02em; margin: 0; }
+    footer .year { font-size: .8rem; margin: .2rem 0 0; color: var(--muted); }
+    footer nav { margin-top: .9rem; font-size: .85rem; }
+    footer nav a { margin: 0 .6rem; text-underline-offset: .2em; }
+    .strip-line { border: 0; border-top: 1px dotted #555; margin: 0 auto; max-width: 56rem; }
+
+    /* ---------- reveal on scroll (content stays visible without JS) ---------- */
+    @media (prefers-reduced-motion: no-preference) {
+      .js .reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s ease; }
+      .js .reveal.in { opacity: 1; transform: none; }
+      .js .portrait { opacity: 0; animation: portrait-in .9s .2s ease forwards; }
+      @keyframes portrait-in {
+        from { opacity: 0; transform: rotate(-12deg) scale(.96); }
+        to   { opacity: 1; transform: rotate(10deg); }
+      }
+    }
   </style>
 </head>
 <body>
+
+<header class="wrap hero">
+  <p class="hello">hello there, <span class="wave" aria-hidden="true">👋</span></p>
+  <h1>Chris Tan</h1>
+  <p class="lede">is currently doing some <span class="caret" aria-hidden="true"></span></p>
+
+  <ul class="arrows">
+    <li><a href="#ux-portfolio">Design</a> <span class="aside">by day,</span></li>
+    <li><a href="#music-projects">Music</a> <span class="aside">by night,</span></li>
+    <li><a href="#in-between">and Everything</a> <span class="aside">in Between.</span></li>
+  </ul>
+
+  <div class="portrait">
+    <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-7588466e-5b89-4e79-8390-ba535d88e1e3.webp?w=877&e=webp"
+         alt="Portrait of Chris Tan among cherry blossoms" width="334" height="250" fetchpriority="high">
+  </div>
+</header>
+
+<hr class="dots">
+
 <main>
-
-  <header>
-    <h1>Chris Tan</h1>
-    <p class="tagline">Singer-songwriter and UX designer based in Singapore.</p>
-  </header>
-
-  <section aria-labelledby="about">
-    <h2 id="about">About</h2>
-    <p>
-      Chris Tan is a singer-songwriter and UX designer in Singapore, also known online as ct907.
-      By day, Chris designs digital products, with
-      experience in vehicle AI interaction design and Heritage themed Gamification projects. By night, Chris writes and records chill  songs on Spotify. 
-    </p>
+  <section id="ux-portfolio" class="block wrap reveal" aria-labelledby="ux-h">
+    <span class="badge sq" aria-hidden="true">✎</span>
+    <h2 id="ux-h">UX Portfolio</h2>
+    <div class="ux">
+      <div>
+        <p class="big">I have over 3 years of experience in UX, starting from UX Research on AI Interactions. I'm currently designing a Gamification Platform for gov agencies.</p>
+        <p class="small">A lot of what I do is confidential, please reach out to me to find out more about my experience :)</p>
+        <ul class="links">
+          <li><a href="https://hello.ct907.com/portfolio/">View Portfolio</a></li>
+          <li><a href="mailto:gax907@gmail.com">Send me an Email</a></li>
+        </ul>
+      </div>
+      <img class="art" src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-c66018e2-a29d-4ebc-91ce-e490ece6d167.jpg?w=638&e=webp&cX=0&cY=1&cW=1200&cH=1197"
+           alt="" width="243" height="242" loading="lazy">
+    </div>
   </section>
 
-  <section aria-labelledby="music">
-    <h2 id="music">Music</h2>
-    <p>
-      <strong>Slow Food</strong> is the second album by Chris Tan: food for the ears, a four-course
-      meal of 12 songs, from Salty to Sweet.
-      <a href="https://open.spotify.com/artist/6e3tHPF6Ldf7jeV8Fr9Oe1?si=hyaqf17vSuGQtZNUJ5a7RA">Stream Slow Food on Spotify</a>
-      or on all major platforms. Learn more on the
-      <a href="https://ct907.com/slow-food-album/">Slow Food album page</a>.
-    </p>
+  <hr class="dots">
 
-    <h3>Slow Food tracklist</h3>
-    <!-- REPLACE: put your 12 real track titles here, in order. -->
-    <ol class="tracks">
-      <li>Part 1: Salty</li>
-      <li>Talk About You</li>
-      <li>Midnight Calling</li>
-      <li>Read Your Mind</li>
-      <li>Fakecation</li>
-      <li>doyourememberwhen</li>
-      <li>Nostalgic</li>
-      <li>keepmovingorthesaltwillkillyou</li>
-      <li>Sail Away, Nomad!</li>
-      <li>Part 2: Sweet</li>
-      <li>Keep Warm</li>
-      <li>Dessert Tummy</li>
-      <li>youneedahike</li>
-      <li>Fade</li>
-      <li>The Lives of Dogs</li>
-      <li>Flower Girl</li>
-      <li>Obituary(Ordinary)</li>
-    </ol>
+  <section id="music-projects" class="block wrap reveal" aria-labelledby="music-h">
+    <span class="badge round" aria-hidden="true">♪</span>
+    <h2 id="music-h">Music Projects</h2>
 
-    <p>
-      Earlier release: <strong>CHRISPY FM</strong> (2022).
-      <!-- REPLACE: check this is right, or delete this paragraph. -->
-    </p>
-  </section>
+    <p class="music-intro">By night, Chris Tan writes and produces chill, meditative indie-pop in Singapore. The latest release is the album <strong>Slow Food</strong> (2026).</p>
 
-  <section aria-labelledby="design">
-    <h2 id="design">Design</h2>
-    <p>
-      Chris Tan is a UX designer. He worked on AI interaction design, web accessibility
-      and public-sector digital services. Selected work:
-    </p>
-    <ul class="arrows">
-      <li><a href="https://ct907.com/ai-interaction-design/">AI driver interaction design</a></li>
-      <li><a href="https://ct907.com/ai-visual-identity/">AI visual identity</a></li>
-      <li><a href="https://ct907.com/aria-driverless-car-app/">ARIA rideshare app</a></li>
-      <li><a href="https://ct907.com/nhb-games/">NHB gamification web app</a></li>
-      <li><a href="https://ct907.com/research-gateway-design/">Statboard research gateway</a></li>
-      <li><a href="https://ct907.com/private-capital-management-website/">Investment firm website</a></li>
+    <p class="label">Releases</p>
+    <article class="release">
+      <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-429b9fc6-4a84-4e59-a96f-bab12e0c140d.webp?w=491&e=webp&cX=0&cY=8.655695661466098&cW=3000&cH=2982.688608677068"
+           alt="Slow Food album cover" width="187" height="186" loading="lazy">
+      <div class="body">
+        <div>
+          <h3><a href="https://hello.ct907.com/slow-food-album/">Slow Food</a></h3>
+          <p class="meta">2026 • Album</p>
+        </div>
+        <p class="latest">Latest release</p>
+        <span class="play" aria-hidden="true"></span>
+      </div>
+    </article>
+
+    <!-- TODO: confirm each title below matches the right Spotify link and cover. -->
+    <ul class="tiles">
+      <li><a href="https://open.spotify.com/album/40mTSMRbQ554zVkkR2ZemC?si=8L2VKAW2QMeWpD94gkjgAA" aria-label="Listen to Midnight Calling (With You) on Spotify">
+        <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-15a1968c-40d3-441f-8e3c-d27717c31ca5.png?w=452&e=webp&nll=true" alt="Midnight Calling (With You) cover" width="172" height="172" loading="lazy"></a></li>
+      <li><a href="https://open.spotify.com/album/6DDhpnjuEbivihNY3JJk0W?si=gfdtxCfySgO70rCTg78KZA" aria-label="Listen to Chrispy FM on Spotify">
+        <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-59a8e599-0782-4061-931e-8750f250dca8.jpg?w=457&e=webp" alt="Chrispy FM cover" width="172" height="172" loading="lazy"></a></li>
+      <li><a href="https://open.spotify.com/album/75hRglgp51MfsgSzodvz59?si=loLEOeY3QlOtIYOJd7A1aA" aria-label="Listen to Solid State on Spotify">
+        <img src="https://v-p.rmcdn1.net/63b5401ad11b3f0729779879/63b54039295b5500199e0757/6871da624511d4f464c77b7e/sj1korlzHJLzDJAIRkfic/poster.jpg" alt="Solid State cover" width="172" height="172" loading="lazy"></a></li>
+      <li><a href="https://open.spotify.com/album/2h6r1jTk9FyczIZ4N9BWyU?si=giPYSb_4QTS18gu-y8l_7g" aria-label="Listen to Karen on Spotify">
+        <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-6f90d524-e4cd-4739-9d45-5d394a5516b0.png?w=452&e=webp&nll=true" alt="Karen cover" width="172" height="172" loading="lazy"></a></li>
     </ul>
-    <p>See everything on the <a href="https://ct907.com/">full portfolio site</a>.</p>
+    <p class="earlier">Earlier releases: Midnight Calling (With You), Chrispy FM, Solid State and Karen.</p>
+
+    <p class="label">Links</p>
+    <a class="pill" href="https://linktr.ee/ct907">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M19 8v6M16 11h6"/></svg>
+      Artist Pages
+    </a>
   </section>
 
-  <section aria-labelledby="elsewhere">
-    <h2 id="elsewhere">Elsewhere</h2>
-    <ul class="arrows">
-      <li><a rel="me" href="https://open.spotify.com/artist/6e3tHPF6Ldf7jeV8Fr9Oe1?si=hyaqf17vSuGQtZNUJ5a7RA">Spotify</a></li>
-      <li><a rel="me" href="https://www.instagram.com/ct907/">Instagram</a></li>
-      <li><a rel="me" href="https://www.linkedin.com/in/tan-guan-yi-a28878103/">LinkedIn</a></li>
-    </ul>
+  <hr class="dots">
+
+  <section id="in-between" class="block between wrap reveal" aria-labelledby="between-h">
+    <span class="badge hex" aria-hidden="true"></span><br>
+    <h2 id="between-h">And Everything In Between.</h2>
+    <div class="strip-outer">
+      <!-- TODO: replace alt text with a short description of each photo, and add the rest of your photos. -->
+      <div class="strip">
+        <figure class="rot" style="width:15.4rem;height:11.25rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-3a6a48c7-c715-4aeb-8dc9-fb385e139126.png?w=809&e=webp&nll=true&cX=0&cY=634&cW=2749&cH=2008" alt="Photograph by Chris Tan" width="308" height="225" loading="lazy"></figure>
+        <figure style="width:16rem;height:7.75rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-3423a7ee-0076-43fc-ac3f-ad99b9ff8f0a.jpg?w=841&e=webp&cX=1&cY=19&cW=1597&cH=773" alt="Photograph by Chris Tan" width="320" height="155" loading="lazy"></figure>
+        <figure style="width:8.25rem;height:5rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-07e9e6a1-5f14-44b8-9fe8-4c9bbe317614.webp?w=434&e=webp&cX=64&cY=64&cW=889&cH=538" alt="Photograph by Chris Tan" width="165" height="100" loading="lazy"></figure>
+        <figure style="width:6rem;height:6rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-294de637-1cac-43b5-a982-a0c87fc9c54f.jpg?w=315&e=webp&cX=0&cY=2&cW=1080&cH=1076" alt="Photograph by Chris Tan" width="120" height="120" loading="lazy"></figure>
+        <figure style="width:7.7rem;height:9.55rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-505bbaff-72d6-4b28-97bd-fe4bdc99622f.webp?w=404&e=webp&cX=0&cY=87&cW=667&cH=827" alt="Photograph by Chris Tan" width="154" height="191" loading="lazy"></figure>
+        <figure style="width:7.9rem;height:5.25rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-96077cd0-817b-41d7-ae48-15446a45243b.jpg?w=415&e=webp&cX=0&cY=6&cW=5874&cH=3905" alt="Photograph by Chris Tan" width="158" height="105" loading="lazy"></figure>
+      </div>
+    </div>
+    <hr class="strip-line">
   </section>
-
-  <footer>
-    <p>© Chris Tan, Singapore.</p>
-  </footer>
-
 </main>
+
+<footer class="wrap">
+  <p class="name">Chris Tan</p>
+  <p class="year">2026</p>
+  <nav aria-label="Elsewhere">
+    <a href="https://www.instagram.com/ct907/">Instagram</a>
+    <a href="https://linktr.ee/ct907">Linktree</a>
+    <a href="https://hello.ct907.com/portfolio/">Portfolio</a>
+    <a href="mailto:gax907@gmail.com">Email</a>
+  </nav>
+</footer>
+
+<script>
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window)) { els.forEach(function (e) { e.classList.add('in'); }); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, { threshold: 0.12 });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+
+  /* Dotted dividers drift sideways with scroll. */
+  (function () {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var ratio = 1;            // dot movement per pixel scrolled (tune to taste)
+    var root = document.documentElement, ticking = false;
+    function update() { root.style.setProperty('--dot-shift', (window.scrollY * ratio).toFixed(1)); ticking = false; }
+    window.addEventListener('scroll', function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    update();
+  })();
+</script>
 </body>
 </html>
