@@ -1,0 +1,125 @@
+/* ==========================================================================
+   Pages migrated from Readymag (hello.ct907.com).
+   Generated markup comes from _tools/readymag-port/port.py; edit the generator,
+   not the pages, for anything structural.
+
+   Desktop (>= 900px): the page is Readymag's 1024-unit canvas, scaled to the
+   window width with container units, exactly like the Readymag viewer.
+   Every widget carries its canvas geometry as --x/--y/--w/--h/--z, and every
+   pixel value inside a widget is written as
+       calc(N * var(--u) * var(--d) + M px * var(--m))
+   so it scales on desktop (--d:1) and switches to a readable phone size on
+   mobile (--m:1).
+
+   Mobile (< 900px): the same markup reflows into one column. Widgets are
+   already in reading order inside .rm-band wrappers, which carry the colour of
+   the section they sit on. Decorative shapes are hidden.
+   ========================================================================== */
+
+:root { --u: calc(100cqw / 1024); --d: 1; --m: 0; }
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+body.rm { margin: 0; background: var(--page-bg, #fff); color: #111; font-family: Inter, system-ui, sans-serif; }
+body.rm * { box-sizing: border-box; }
+
+.rm-skip { position: absolute; left: -9999px; top: 0; z-index: 2000; background: #111; color: #fff; padding: 10px 14px; }
+.rm-skip:focus { left: 8px; top: 8px; }
+
+.rm-page { container-type: inline-size; max-width: 2560px; margin: 0 auto; }
+.rm-canvas {
+  position: relative; overflow: hidden;
+  height: calc(var(--H) * 100cqw / 1024);
+  background: var(--page-bg, transparent);
+}
+.rm-band, .rm-drawer { display: contents; }
+
+/* ---------- widgets ---------- */
+.w {
+  position: absolute;
+  left: calc(var(--x) * var(--u)); top: calc(var(--y) * var(--u));
+  width: calc(var(--w) * var(--u)); height: calc(var(--h) * var(--u));
+  z-index: var(--z, 1);
+}
+.w-text { overflow: visible; }
+.w-text > * { margin: 0; }
+:where(.w-text) :where(h1, h2, h3, h4, h5, h6, p, ul, ol, li) { margin: 0; padding: 0; font-size: inherit; font-weight: inherit; }
+:where(.w-text) :where(p, h1, h2, h3, h4, h5, h6) { white-space: pre-wrap; overflow-wrap: break-word; }
+.w-picture img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.w-shape svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.w-button {
+  display: flex; align-items: center; justify-content: center;
+  color: #1d1d1d; text-decoration: none; white-space: pre;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: calc(16 * var(--u) * var(--d) + 16px * var(--m));
+  letter-spacing: calc(0.6 * var(--u) * var(--d) + 0.4px * var(--m));
+  border-radius: calc(8 * var(--u) * var(--d) + 8px * var(--m));
+  transition: opacity .2s, background-color .2s;
+}
+a.w-button:hover { opacity: .65; }
+.w-placeholder {
+  display: grid; place-items: center; text-align: center;
+  background: repeating-linear-gradient(45deg, #2a2a2a 0 12px, #303030 12px 24px); color: #ddd;
+  font: 500 calc(14 * var(--u) * var(--d) + 14px * var(--m)) / 1.4 Inter, system-ui, sans-serif;
+  padding: 1em; border-radius: 6px;
+}
+.rm-anchor { position: absolute; left: 0; top: calc(var(--y) * var(--u)); width: 1px; height: 1px; }
+[data-drawer-toggle] { cursor: pointer; }
+:focus-visible { outline: 2px solid #ff6546; outline-offset: 2px; }
+
+/* ---------- "Browse Projects" drawer (desktop: slides in from the right) ---------- */
+.rm-drawer .w { transition: translate .55s cubic-bezier(.4, 0, .2, 1); }
+html.rm-drawer-open .rm-drawer .w { translate: calc(var(--dx, 0) * var(--u)) calc(var(--dy, 0) * var(--u)); }
+.rm-drawer-close { display: none; }
+
+/* ---------- floating jump-back button ---------- */
+.rm-fixed {
+  position: fixed; left: 50%; bottom: 18px; z-index: 900; translate: -50% 160%;
+  background: rgba(20, 20, 20, .82); color: #fff; text-decoration: none; border-radius: 8px;
+  font: 500 13px/1 Inter, system-ui, sans-serif; padding: 10px 14px; letter-spacing: .02em;
+  transition: translate .3s ease;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+html.rm-scrolled .rm-fixed { translate: -50% 0; }
+
+/* ---------- mobile: one readable column ---------- */
+@media (max-width: 899px) {
+  :root { --d: 0; --m: 1; }
+  .rm-canvas { height: auto; overflow: visible; }
+  .rm-band {
+    display: flow-root; background: var(--band, transparent);
+    padding: 22px max(18px, env(safe-area-inset-right, 0px)) 8px max(18px, env(safe-area-inset-left, 0px));
+  }
+  .w { position: relative; left: auto; top: auto; width: auto; height: auto; margin: 0 0 16px; }
+  .w-shape, .w.is-deco { display: none; }
+  .w-picture { width: 100%; aspect-ratio: var(--w) / var(--h); }
+  .w-picture.is-small { width: calc(var(--w) * 1px); max-width: 100%; }
+  .w-button { display: inline-flex; padding: 6px 12px 6px 0; height: auto; margin: 0 0 6px; }
+  .w-button + .w-button { margin-left: 0; }
+  .w-placeholder { aspect-ratio: var(--w) / var(--h); }
+  .rm-anchor { position: static; display: block; height: 0; }
+  .w[style*="rotate"] { rotate: none; }
+
+  .rm-drawer { display: none; }
+  html.rm-drawer-open .rm-drawer {
+    display: block; position: fixed; inset: 0 0 0 auto; z-index: 1000; overflow: auto;
+    width: min(88vw, 360px); background: var(--drawer-bg, #1900ff);
+    padding: calc(56px + env(safe-area-inset-top, 0px)) 22px 32px;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, .35);
+  }
+  html.rm-drawer-open .rm-drawer .w { translate: none; }
+  html.rm-drawer-open .rm-drawer-close {
+    display: block; position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px;
+    background: none; border: 1px solid currentColor; color: #fff; border-radius: 6px; padding: 6px 10px; font: 500 14px Inter, sans-serif;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-drawer .w, .rm-fixed { transition: none; }
+  .w-text span { animation: none !important; }
+}
+
+/* labels with a box (Readymag text-widget background), e.g. "Browse Projects" */
+@media (max-width: 899px) {
+  .w-text.is-label { display: inline-block; padding: 2px 8px; margin-right: 8px; }
+}

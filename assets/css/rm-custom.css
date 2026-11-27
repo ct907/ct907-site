@@ -1,0 +1,43 @@
+/* Custom CSS carried over from the Readymag project (keyed to widget ids). */
+@keyframes font-weight { 0% { font-variation-settings: "wght" 100; } 50% { font-variation-settings: "wght" 700; } 100% { font-variation-settings: "wght" 100; } }
+[data-id="6634f806fe0df1002f7b1761"] :is(p, h1, h2) span {
+animation: font-weight 6s infinite;
+}
+
+[data-id="66496c717030240044c0614f"] :is(p, h1, h2) span {
+animation: font-weight 6s infinite;
+}
+
+[data-id="66b9f7ee3bd0965a5cb0fcb2"] :is(p, h1, h2) span {
+animation: font-weight 6s infinite;
+}
+
+[data-id="66382c636a406600131e41ec"] {
+  background: linear-gradient(270deg, #B7BCC1 0%, #FF6546 100%);
+}
+
+
+[data-id="663a3829a05cd700627b3805"] {
+  background: linear-gradient(270deg, #B7BCC1 0%, #FF6546 100%);
+}
+
+[data-id="664402ac5c783f0052deb898"] {
+  background: linear-gradient(270deg, #B7BCC1 0%, #FF6546 100%);
+}
+
+[data-id="66496c717030240044c0614f"] {
+  background: linear-gradient(270deg, #B8B7C1 0%, #FF6546 100%);
+}
+
+[data-id="68c53fa1bcff02f4d56a69cb"] {
+    pointer-events: none;
+  }
+
+[data-id="68c548df2d516466ae8bc0fd"] {
+    pointer-events: none;
+  }
+
+[data-id="68c549e00a7f8256bcbd4905"] {
+    pointer-events: none;
+  }
+@media (prefers-reduced-motion: reduce) { [data-id] p span { animation: none !important; } }
