@@ -636,7 +636,10 @@ function renderLive() {
     if (node && want && node.getAttribute('src') !== want) { node.removeAttribute('srcset'); node.setAttribute('src', want); }
   }
   updateOverlay(); schedulePanelSync();
+  // The page draws each frosted plate's soft-edge mask in script: ask it to redo them (once per frame) after a plate, --blur or --edge changed.
+  if (win.ct907Feather && !featherQueued) { featherQueued = true; win.requestAnimationFrame(() => { featherQueued = false; try { win.ct907Feather(); } catch {} }); }
 }
+let featherQueued = false;
 function setProp(prop, value, scope = scopeKey(), el = sel) {
   if (!el) return;
   setTweak(state.css, scope, selectorFor(el), prop, value); renderLive();
@@ -910,7 +913,7 @@ function revealSel() { if (!sel) return; const r = sel.getBoundingClientRect(); 
 
 function bindFrameEvents() {
   const EVENTS = ['pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'mouseover', 'mouseenter', 'mouseleave', 'mousemove', 'mousedown', 'mouseup', 'click', 'auxclick', 'contextmenu', 'dragstart'];
-  // Capture everything first so the page's own scripts (cursor effects, read state, links) never see editor
+  // Capture everything first so the page's own scripts (cursor effects, links) never see editor
   // interactions. While text is being edited the browser's default behaviour (caret, selection) is left alone.
   const inEdit = (e) => !!(editing && editing.el.contains(e.target));
   for (const t of EVENTS) win.addEventListener(t, (e) => { e.stopImmediatePropagation(); if (!inEdit(e) && e.cancelable) e.preventDefault(); }, true);
