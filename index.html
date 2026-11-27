@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f2eeea">
 
   <!-- ==========================================================
        Static home page for https://ct907.com/
@@ -75,40 +76,95 @@
 
   <style>
     :root {
-      --bg: #dcdad8;
+      /* palette */
+      --bg: #f2eeea;
       --ink: #0b0b0b;
       --muted: #55524f;
       --accent: #ff6546;
-      --green: #2c8a3d;
+      --green: #1f6b2d;            /* was #2c8a3d; darkened so the label stays >= 4.5:1 on the tinted hover/press plates */
+      --grid-line: #adcedd;
+
+      /* Graph-paper grid. One cell is 2.25rem, so it grows and shrinks with the
+         text (the root font-size below is fluid). */
+      --cell: 2.25rem;
+      --line: 1px;
+
+      /* Frosted plates behind text, images and buttons.
+         Figma "background blur 8" = CSS blur(4px): Figma's number is twice the CSS radius. */
+      --blur: 4px;
+      --blur-hover: 12px;                    /* non-clickable plates on hover: Figma 24 */
+      --glass: rgb(242 238 234 / .05);       /* #F2EEEA @ 5%  */
+      --glass-hover: rgb(255 129 3 / .2);    /* #FF8103 @ 20% */
+      --glass-press: rgb(0 180 255 / .2);    /* #00B4FF @ 20% */
+
+      --arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M0 7h22M16 1l6 6-6 6' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
       --pad: clamp(1.25rem, 8vw, 5.25rem);
       --display: "Josefin Sans", "Avenir Next", "Century Gothic", system-ui, sans-serif;
       --text: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
     }
+    /* Whole-pixel grid where round() is supported: keeps the lines crisp at any root size. */
+    @supports (width: round(1px, 1px)) {
+      :root {
+        --cell: round(2.25rem, 1px);
+        --line: round(max(1px, calc(var(--cell) * .04)), 1px);
+      }
+    }
     * { box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; overflow-x: clip; }
+    html {
+      -webkit-text-size-adjust: 100%;
+      overflow-x: clip;
+      /* Fluid type scale: the root size glides from 14px on phones, through ~16px at
+         1440px wide, up to 24px on very large displays. Everything below is in rem/em,
+         so layout, grid cell and glass padding all scale together. The rem term keeps
+         the browser's text-size setting and page zoom working. */
+      font-size: clamp(.875rem, .775rem + .25vw, 1.5rem);
+    }
     @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
     body {
       margin: 0;
-      background: var(--bg);
+      background-color: var(--bg);
+      background-image:
+        linear-gradient(to right,  var(--grid-line) var(--line), transparent 0),
+        linear-gradient(to bottom, var(--grid-line) var(--line), transparent 0);
+      background-size: var(--cell) var(--cell);
       color: var(--ink);
       font: 400 1rem/1.6 var(--text);
       overflow-x: clip;
     }
-    a { color: inherit; }
-    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+    a { color: inherit; -webkit-tap-highlight-color: transparent; }
+    /* Solid ink ring: the orange accent is only ~2.5:1 on this background. */
+    a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
     img { display: block; max-width: 100%; height: auto; }
     .wrap { max-width: 68rem; margin: 0 auto; padding: 0 var(--pad); }
     section { scroll-margin-top: 1rem; }
+    p { text-wrap: pretty; }
+
+    /* ---------- frosted glass ----------
+       Add class="glass" to give an element a blurred plate. Shape it with
+       --gx / --gy (padding) and --gr (corner radius) on the element. Plates hug
+       their content; text pads are in em, so they scale with the text. */
+    .glass {
+      width: fit-content; max-width: 100%;
+      padding: var(--gy, .25em) var(--gx, .5em);
+      border-radius: var(--gr, 1em);
+      background-color: var(--fill, var(--glass));
+      -webkit-backdrop-filter: blur(var(--blur));
+      backdrop-filter: blur(var(--blur));
+      transition: background-color .18s ease, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
+    }
 
     /* ---------- hero ---------- */
     .hero { position: relative; padding-block: .6rem 4.5rem; }
-    .hello { font: 300 1.25rem/1.4 var(--display); margin: 0; }
+    .hello { --gx: .5em; --gy: .15em; --gr: .7em; font: 300 1.25rem/1.4 var(--display); margin: 0; }
     .hello .wave { display: inline-block; transform: rotate(35deg); margin-left: .35rem; }
     h1 {
+      --gx: .2em; --gy: .06em; --gr: .22em;
       font: 300 clamp(3.4rem, 12vw, 5.25rem)/1.1 var(--display);
+      /* short windows (landscape phones): let the height cap the size too */
+      font-size: clamp(3.4rem, min(12vw, 18svh), 5.25rem);
       letter-spacing: -.06em;
       text-transform: uppercase;
-      margin: 1.7rem 0 0;
+      margin: 1.4rem 0 0;
     }
     @media (prefers-reduced-motion: no-preference) {
       h1 { animation: weight 6s infinite; }
@@ -119,33 +175,34 @@
       100% { font-weight: 100; }
     }
     .lede {
+      --gx: .3em; --gy: .12em; --gr: .35em;
       font: 400 clamp(1.7rem, 5.6vw, 3rem)/1.2 var(--display);
       letter-spacing: -.05em;
-      margin: 0;
+      margin: .7rem 0 0;
     }
     .caret {
       display: inline-block; width: 0; height: 0; margin-left: .5rem; vertical-align: .9em;
       border-left: .42rem solid transparent; border-right: .42rem solid transparent; border-top: .7rem solid #444;
     }
-    .arrows { list-style: none; margin: 4.6rem 0 0; padding: 0; font-size: .95rem; }
-    .arrows li { position: relative; padding-left: 2rem; margin: .55rem 0; }
-    .arrows li::before {
-      content: ""; position: absolute; left: 0; top: .72em; width: 1.15rem; height: 2px; background: var(--accent);
+    .arrows { list-style: none; margin: 4.2rem 0 0; padding: 0; font-size: .95rem; }
+    .arrows li { display: flex; align-items: center; gap: .15rem; width: max-content; margin: .3rem 0; }
+
+    /* Arrow link: the arrow sits inside the pill, so the hover/press tint covers arrow + label. */
+    .arrow-link {
+      --gx: 1.1em; --gy: .5em; --gr: 999px;
+      display: inline-flex; align-items: center; gap: .7em; text-decoration: none;
     }
-    .arrows li::after {
-      content: ""; position: absolute; left: .55rem; top: calc(.72em - 4px); width: .6rem; height: .6rem;
-      border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); transform: rotate(45deg);
+    .arrow-link::before {
+      content: ""; flex: none; width: 1.6em; height: .95em; background: var(--accent);
+      -webkit-mask: var(--arrow) center / contain no-repeat;
+              mask: var(--arrow) center / contain no-repeat;
     }
-    .arrows a { text-decoration: none; }
-    .arrows a:hover, .arrows a:focus-visible { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: .25em; }
-    /* Hover: arrow turns black at once; the words after the link drift in
-       (from slightly lower-right and tilted) and drift out again on leave. */
-    .arrows li { width: max-content; }
-    .arrows li::before, .arrows li::after { transition: background-color .05s, border-color .05s; }
-    .arrows li:hover::before, .arrows li:focus-within::before { background: var(--ink); }
-    .arrows li:hover::after, .arrows li:focus-within::after { border-color: var(--ink); }
+
+    /* The words after a link drift in (from slightly lower-right and tilted) on hover/focus
+       and drift out again on leave. On touch screens they are simply always shown. */
     .aside {
-      display: inline-block; margin-left: .15rem; color: var(--ink);
+      --gx: .8em; --gy: .3em; --gr: 999px;
+      display: inline-block; color: var(--ink);
       opacity: 0; transform: translate(.9rem, .6rem) rotate(-8deg); transform-origin: left center;
       transition: opacity .25s ease-in, transform .25s ease-in;
       pointer-events: none;
@@ -159,6 +216,7 @@
     }
 
     .portrait {
+      --gx: .5rem; --gy: .5rem; --gr: 1.5rem;
       position: absolute; right: calc(-1 * var(--pad) - 1.5rem); bottom: 1.2rem;
       width: min(40vw, 21rem); aspect-ratio: 334 / 250;
       transform: rotate(10deg); transform-origin: center;
@@ -168,6 +226,10 @@
       .hero { padding-bottom: 1rem; }
       .arrows { margin-top: 2.2rem; }
       .portrait { position: relative; right: auto; bottom: auto; width: min(78vw, 19rem); margin: 2rem 0 .5rem auto; }
+    }
+    @media (orientation: landscape) and (max-height: 32rem) {
+      .hero { padding-bottom: 2rem; }
+      .arrows { margin-top: 2rem; }
     }
 
     /* ---------- dividers, icons, headings ---------- */
@@ -190,40 +252,38 @@
     .badge.round { border-radius: 50%; }
     .badge.hex { clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); width: 1.5rem; height: 1.5rem; }
     h2 {
+      --gx: .4em; --gy: .1em; --gr: .3em;
       font: 400 clamp(2.2rem, 7vw, 3rem)/1.25 var(--display);
       letter-spacing: -.05em;
-      margin: 1.1rem 0 1.6rem;
+      margin: .9rem 0 1.4rem;
+      text-wrap: balance;
     }
     .ux { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 2rem 3rem; align-items: start; }
+    .copy { --gx: 1.3rem; --gy: 1.1rem; --gr: 1.2rem; }
     .ux p { margin: 0 0 1.4rem; }
+    .copy > :last-child { margin-bottom: 0; }
     .ux .big { font-size: 1.25rem; line-height: 1.55; max-width: 34rem; }
     .ux .small { font-size: .95rem; line-height: 1.5; max-width: 34rem; }
-    .ux .art { width: 15rem; }
+    .ux .art { --gx: .5rem; --gy: .5rem; --gr: 1rem; width: 15rem; }
     @media (max-width: 720px) {
       .ux { grid-template-columns: 1fr; }
       .ux .art { width: 11rem; order: -1; }
     }
-    .links { list-style: none; margin: 1.6rem 0 0; padding: 0; font-size: .95rem; }
-    .links li { position: relative; padding-left: 2rem; margin: .7rem 0; }
-    .links li::before { content: ""; position: absolute; left: 0; top: .72em; width: 1.15rem; height: 2px; background: var(--accent); }
-    .links li::after {
-      content: ""; position: absolute; left: .55rem; top: calc(.72em - 4px); width: .6rem; height: .6rem;
-      border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); transform: rotate(45deg);
-    }
-    .links a { text-decoration: none; }
-    .links a:hover { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: .25em; }
+    .links { list-style: none; margin: 1.2rem 0 0; padding: 0; font-size: .95rem; }
+    .links li { margin: .35rem 0; }
 
     /* ---------- music ---------- */
-    .label { font: 500 .78rem/1 var(--text); letter-spacing: .18em; text-transform: uppercase; margin: 2.2rem 0 .8rem; }
-    .music-intro { max-width: 40rem; margin: 0 0 .4rem; }
+    .label { --gx: .8em; --gy: .5em; --gr: 999px; font: 500 .78rem/1 var(--text); letter-spacing: .18em; text-transform: uppercase; margin: 2rem 0 .8rem; }
+    .music-intro { --gx: 1.1rem; --gy: .8rem; --gr: 1rem; max-width: 40rem; margin: 0 0 .4rem; }
     .release {
+      --gx: 0; --gy: 0; --gr: .4rem;
       position: relative; display: grid; grid-template-columns: minmax(0, 11.7rem) 1fr;
-      border: 1px solid #6a6764; border-radius: .4rem; overflow: hidden; max-width: 44rem;
-      transition: transform .25s, box-shadow .25s;
+      border: 1px solid #6a6764; overflow: hidden; width: auto; max-width: 44rem;
+      transition: transform .25s, box-shadow .25s, background-color .18s;
     }
     .release:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,.14); }
     .release img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 1; }
-    .release .body { padding: 1rem 1.2rem; display: flex; flex-direction: column; justify-content: space-between; min-height: 11.7rem; position: relative; }
+    .release .body { padding: 1rem 1.2rem; display: flex; flex-direction: column; justify-content: space-between; min-height: 11.7rem; }
     .release h3 { font: 600 1.4rem/1.2 var(--display); letter-spacing: .1em; margin: 0; }
     .release h3 a { text-decoration: none; }
     .release h3 a::after { content: ""; position: absolute; inset: 0; }   /* whole card is the link */
@@ -232,68 +292,115 @@
     .release .play {
       position: absolute; right: 1.1rem; bottom: .9rem; width: 1.4rem; height: 1.4rem;
       border: 1.5px solid var(--ink); border-radius: 50%;
+      pointer-events: none;   /* clicks fall through to the card link */
     }
     .release .play::after {
       content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-35%, -50%);
       border-left: .42rem solid var(--ink); border-top: .28rem solid transparent; border-bottom: .28rem solid transparent;
     }
-    .tiles { list-style: none; margin: 1.1rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; max-width: 44rem; }
-    .tiles a { display: block; border-radius: .3rem; overflow: hidden; transition: transform .25s, box-shadow .25s; }
-    .tiles a:hover, .tiles a:focus-visible { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,.2); }
-    .tiles img { width: 100%; aspect-ratio: 1; object-fit: cover; }
-    .earlier { font-size: .9rem; color: var(--muted); margin: .9rem 0 0; max-width: 40rem; }
-    .pill {
-      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
-      min-width: 17rem; padding: .45rem 1.4rem; border: 1px solid var(--green); border-radius: .5rem;
-      color: var(--green); font-size: .8rem; font-weight: 500; text-decoration: none; transition: background .25s, color .25s, border-color .25s;
+    .tiles { list-style: none; margin: 1.1rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; max-width: 44rem; }
+    .tiles a {
+      --gx: .4rem; --gy: .4rem; --gr: .8rem;
+      display: block; width: auto;
+      transition: transform .25s, box-shadow .25s, background-color .18s;
     }
-    .pill:hover, .pill:focus-visible { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .tiles a:hover, .tiles a:focus-visible { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,.2); }
+    .tiles img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: .4rem; }
+    .earlier { --gx: 1rem; --gy: .55rem; --gr: .9rem; font-size: .9rem; color: var(--muted); margin: .9rem 0 0; max-width: 40rem; }
+    .pill {
+      --gx: 1.4rem; --gy: .5rem; --gr: .5rem;
+      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+      min-width: 17rem; border: 1px solid var(--green);
+      color: var(--green); font-size: .8rem; font-weight: 500; text-decoration: none;
+    }
 
     /* ---------- in between ---------- */
     .between { text-align: center; padding-bottom: 1.6rem; }
-    .between h2 { display: inline-block; border-bottom: 2px dotted var(--ink); padding-bottom: .1rem; margin-bottom: 2.4rem; }
+    .between h2 {
+      display: inline-block; margin-bottom: 2.4rem;
+      text-decoration: underline dotted 2px; text-underline-offset: .2em; text-decoration-skip-ink: none;
+    }
     .strip-outer { margin: 0 calc(-1 * var(--pad)); overflow-x: auto; overflow-y: hidden; padding: 1rem 0 1.4rem; scrollbar-width: none; }
     .strip-outer::-webkit-scrollbar { display: none; }
     .strip { display: flex; align-items: flex-end; width: max-content; min-width: 100%; padding: 0 1rem; justify-content: safe center; }
-    .strip figure { margin: 0 -.9rem 0 0; flex: none; filter: drop-shadow(1px 5px 1px rgba(0, 14, 37, .58)); transition: transform .25s; }
+    .strip figure {
+      --gx: .35rem; --gy: .35rem; --gr: .85rem; margin: 0 -.9rem 0 0; flex: none;
+      transition: transform .25s, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
+    }
     .strip figure:hover { transform: translateY(-6px) scale(1.03); z-index: 5; position: relative; }
-    .strip img { height: 100%; width: 100%; object-fit: cover; border-radius: .4rem; }
+    .strip img { height: 100%; width: 100%; object-fit: cover; border-radius: .5rem; filter: drop-shadow(1px 5px 1px rgba(0, 14, 37, .58)); }
     .strip .rot { transform: rotate(10deg); }
     .strip .rot:hover { transform: rotate(10deg) translateY(-6px) scale(1.03); }
 
     footer { text-align: center; padding-block: 1.6rem 3rem; }
-    footer .name { font: 400 1.1rem/1.3 var(--display); letter-spacing: .02em; margin: 0; }
-    footer .year { font-size: .8rem; margin: .2rem 0 0; color: var(--muted); }
-    footer nav { margin-top: .9rem; font-size: .85rem; }
-    footer nav a { margin: 0 .6rem; text-underline-offset: .2em; }
+    footer .name { --gx: .9em; --gy: .2em; --gr: .6em; font: 400 1.1rem/1.3 var(--display); letter-spacing: .02em; margin: 0 auto; }
+    footer .year { --gx: .9em; --gy: .15em; --gr: .8em; font-size: .8rem; margin: .4rem auto 0; color: var(--muted); }
+    footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; margin-top: .9rem; font-size: .85rem; }
+    footer nav a { --gx: 1em; --gy: .45em; --gr: 999px; text-underline-offset: .2em; }
     .strip-line { border: 0; border-top: 1px dotted #555; margin: 0 auto; max-width: 56rem; }
 
-    /* ---------- reveal on scroll (content stays visible without JS) ---------- */
+    /* ---------- hover / press / keyboard focus ----------
+       The plate itself changes colour. Hover is only applied where a real hover exists
+       (not on touch, where it would stick after a tap). */
+    @media (hover: hover) {
+      a.glass:hover, .release:hover { --fill: var(--glass-hover); }
+    }
+    a.glass:focus-visible { --fill: var(--glass-hover); }
+    a.glass:active, .release:active { --fill: var(--glass-press); }
+    /* Plates that aren't clickable don't take the orange/blue tint (that would suggest they're
+       links). Instead the blur deepens on hover, so the grid seems to vanish behind them. */
+    @media (hover: hover) {
+      .glass:not(a, .release, .aside):hover { --blur: var(--blur-hover); }
+    }
+    /* Whole-card link: ring the card instead of just the title. */
+    @supports selector(:has(*)) {
+      .release:has(a:focus-visible) { --fill: var(--glass-hover); outline: 2px solid var(--ink); outline-offset: 3px; }
+      .release a:focus-visible { outline: none; }
+    }
+
+    /* ---------- reveal on scroll (content stays visible without JS) ----------
+       Each glass item fades in on its own. Fading a whole section with opacity would stop
+       backdrop-filter from seeing the grid behind it until the fade finished. */
     @media (prefers-reduced-motion: no-preference) {
-      .js .reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s ease; }
-      .js .reveal.in { opacity: 1; transform: none; }
+      .js .reveal:not(.in) :is(.glass, .badge) { opacity: 0; }
+      .js .reveal.in :is(.glass, .badge) { animation: rise .7s ease backwards; }
+      @keyframes rise { from { opacity: 0; translate: 0 16px; } }
       .js .portrait { opacity: 0; animation: portrait-in .9s .2s ease forwards; }
       @keyframes portrait-in {
         from { opacity: 0; transform: rotate(-12deg) scale(.96); }
         to   { opacity: 1; transform: rotate(10deg); }
       }
     }
+
+    /* ---------- accessibility fallbacks ---------- */
+    /* Increased contrast / reduced transparency: solid plates, no blur, calmer grid. */
+    @media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+      :root { --glass: rgb(242 238 234 / .92); --glass-hover: #f5d8bc; --glass-press: #c2e2ee; }
+      .glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
+    }
+    @media (prefers-contrast: more) { :root { --grid-line: #d3e4ec; } }
+    /* Forced colours (Windows high contrast): system colours; hover/focus get an outline instead of a tint. */
+    @media (forced-colors: active) {
+      body { background-image: none; }
+      .glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
+      a.glass:hover, a.glass:focus-visible { outline: 2px solid Highlight; }
+    }
   </style>
 </head>
 <body>
 
 <header class="wrap hero">
-  <p class="hello">hello there, <span class="wave" aria-hidden="true">👋</span></p>
-  <h1>Chris Tan</h1>
-  <p class="lede">is currently doing some <span class="caret" aria-hidden="true"></span></p>
+  <p class="hello glass">hello there, <span class="wave" aria-hidden="true">👋</span></p>
+  <h1 class="glass">Chris Tan</h1>
+  <p class="lede glass">is currently doing some <span class="caret" aria-hidden="true"></span></p>
 
   <ul class="arrows">
-    <li><a href="#ux-portfolio">Design</a> <span class="aside">by day,</span></li>
-    <li><a href="#music-projects">Music</a> <span class="aside">by night,</span></li>
-    <li><a href="#in-between">and Everything</a> <span class="aside">in Between.</span></li>
+    <li><a class="glass arrow-link" href="#ux-portfolio">Design</a><span class="aside glass">by day,</span></li>
+    <li><a class="glass arrow-link" href="#music-projects">Music</a><span class="aside glass">by night,</span></li>
+    <li><a class="glass arrow-link" href="#in-between">and Everything</a><span class="aside glass">in Between.</span></li>
   </ul>
 
-  <div class="portrait">
+  <div class="portrait glass">
     <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-7588466e-5b89-4e79-8390-ba535d88e1e3.webp?w=877&e=webp"
          alt="Portrait of Chris Tan among cherry blossoms" width="334" height="250" fetchpriority="high">
   </div>
@@ -304,17 +411,19 @@
 <main>
   <section id="ux-portfolio" class="block wrap reveal" aria-labelledby="ux-h">
     <span class="badge sq" aria-hidden="true">✎</span>
-    <h2 id="ux-h">UX Portfolio</h2>
+    <h2 id="ux-h" class="glass">UX Portfolio</h2>
     <div class="ux">
       <div>
-        <p class="big">I have over 3 years of experience in UX, starting from UX Research on AI Interactions. I'm currently designing a Gamification Platform for gov agencies.</p>
-        <p class="small">A lot of what I do is confidential, please reach out to me to find out more about my experience :)</p>
+        <div class="copy glass">
+          <p class="big">I have over 3 years of experience in UX, starting from UX Research on AI Interactions. I'm currently designing a Gamification Platform for gov agencies.</p>
+          <p class="small">A lot of what I do is confidential, please reach out to me to find out more about my experience :)</p>
+        </div>
         <ul class="links">
-          <li><a href="https://hello.ct907.com/portfolio/">View Portfolio</a></li>
-          <li><a href="mailto:gax907@gmail.com">Send me an Email</a></li>
+          <li><a class="glass arrow-link" href="https://hello.ct907.com/portfolio/">View Portfolio</a></li>
+          <li><a class="glass arrow-link" href="mailto:gax907@gmail.com">Send me an Email</a></li>
         </ul>
       </div>
-      <img class="art" src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-c66018e2-a29d-4ebc-91ce-e490ece6d167.jpg?w=638&e=webp&cX=0&cY=1&cW=1200&cH=1197"
+      <img class="art glass" src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-c66018e2-a29d-4ebc-91ce-e490ece6d167.jpg?w=638&e=webp&cX=0&cY=1&cW=1200&cH=1197"
            alt="" width="243" height="242" loading="lazy">
     </div>
   </section>
@@ -323,12 +432,12 @@
 
   <section id="music-projects" class="block wrap reveal" aria-labelledby="music-h">
     <span class="badge round" aria-hidden="true">♪</span>
-    <h2 id="music-h">Music Projects</h2>
+    <h2 id="music-h" class="glass">Music Projects</h2>
 
-    <p class="music-intro">By night, Chris Tan writes and produces chill, meditative indie-pop in Singapore. The latest release is the album <strong>Slow Food</strong> (2026).</p>
+    <p class="music-intro glass">By night, Chris Tan writes and produces chill, meditative indie-pop in Singapore. The latest release is the album <strong>Slow Food</strong> (2026).</p>
 
-    <p class="label">Releases</p>
-    <article class="release">
+    <p class="label glass">Releases</p>
+    <article class="release glass">
       <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-429b9fc6-4a84-4e59-a96f-bab12e0c140d.webp?w=491&e=webp&cX=0&cY=8.655695661466098&cW=3000&cH=2982.688608677068"
            alt="Slow Food album cover" width="187" height="186" loading="lazy">
       <div class="body">
@@ -343,19 +452,19 @@
 
     <!-- TODO: confirm each title below matches the right Spotify link and cover. -->
     <ul class="tiles">
-      <li><a href="https://open.spotify.com/album/40mTSMRbQ554zVkkR2ZemC?si=8L2VKAW2QMeWpD94gkjgAA" aria-label="Listen to Midnight Calling (With You) on Spotify">
+      <li><a class="glass" href="https://open.spotify.com/album/40mTSMRbQ554zVkkR2ZemC?si=8L2VKAW2QMeWpD94gkjgAA" aria-label="Listen to Midnight Calling (With You) on Spotify">
         <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-15a1968c-40d3-441f-8e3c-d27717c31ca5.png?w=452&e=webp&nll=true" alt="Midnight Calling (With You) cover" width="172" height="172" loading="lazy"></a></li>
-      <li><a href="https://open.spotify.com/album/6DDhpnjuEbivihNY3JJk0W?si=gfdtxCfySgO70rCTg78KZA" aria-label="Listen to Chrispy FM on Spotify">
+      <li><a class="glass" href="https://open.spotify.com/album/6DDhpnjuEbivihNY3JJk0W?si=gfdtxCfySgO70rCTg78KZA" aria-label="Listen to Chrispy FM on Spotify">
         <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-59a8e599-0782-4061-931e-8750f250dca8.jpg?w=457&e=webp" alt="Chrispy FM cover" width="172" height="172" loading="lazy"></a></li>
-      <li><a href="https://open.spotify.com/album/75hRglgp51MfsgSzodvz59?si=loLEOeY3QlOtIYOJd7A1aA" aria-label="Listen to Solid State on Spotify">
+      <li><a class="glass" href="https://open.spotify.com/album/75hRglgp51MfsgSzodvz59?si=loLEOeY3QlOtIYOJd7A1aA" aria-label="Listen to Solid State on Spotify">
         <img src="https://v-p.rmcdn1.net/63b5401ad11b3f0729779879/63b54039295b5500199e0757/6871da624511d4f464c77b7e/sj1korlzHJLzDJAIRkfic/poster.jpg" alt="Solid State cover" width="172" height="172" loading="lazy"></a></li>
-      <li><a href="https://open.spotify.com/album/2h6r1jTk9FyczIZ4N9BWyU?si=giPYSb_4QTS18gu-y8l_7g" aria-label="Listen to Karen on Spotify">
+      <li><a class="glass" href="https://open.spotify.com/album/2h6r1jTk9FyczIZ4N9BWyU?si=giPYSb_4QTS18gu-y8l_7g" aria-label="Listen to Karen on Spotify">
         <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-6f90d524-e4cd-4739-9d45-5d394a5516b0.png?w=452&e=webp&nll=true" alt="Karen cover" width="172" height="172" loading="lazy"></a></li>
     </ul>
-    <p class="earlier">Earlier releases: Midnight Calling (With You), Chrispy FM, Solid State and Karen.</p>
+    <p class="earlier glass">Earlier releases: Midnight Calling (With You), Chrispy FM, Solid State and Karen.</p>
 
-    <p class="label">Links</p>
-    <a class="pill" href="https://linktr.ee/ct907">
+    <p class="label glass">Links</p>
+    <a class="pill glass" href="https://linktr.ee/ct907">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M19 8v6M16 11h6"/></svg>
       Artist Pages
     </a>
@@ -365,16 +474,16 @@
 
   <section id="in-between" class="block between wrap reveal" aria-labelledby="between-h">
     <span class="badge hex" aria-hidden="true"></span><br>
-    <h2 id="between-h">And Everything In Between.</h2>
+    <h2 id="between-h" class="glass">And Everything In Between.</h2>
     <div class="strip-outer">
       <!-- TODO: replace alt text with a short description of each photo, and add the rest of your photos. -->
       <div class="strip">
-        <figure class="rot" style="width:15.4rem;height:11.25rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-3a6a48c7-c715-4aeb-8dc9-fb385e139126.png?w=809&e=webp&nll=true&cX=0&cY=634&cW=2749&cH=2008" alt="Photograph by Chris Tan" width="308" height="225" loading="lazy"></figure>
-        <figure style="width:16rem;height:7.75rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-3423a7ee-0076-43fc-ac3f-ad99b9ff8f0a.jpg?w=841&e=webp&cX=1&cY=19&cW=1597&cH=773" alt="Photograph by Chris Tan" width="320" height="155" loading="lazy"></figure>
-        <figure style="width:8.25rem;height:5rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-07e9e6a1-5f14-44b8-9fe8-4c9bbe317614.webp?w=434&e=webp&cX=64&cY=64&cW=889&cH=538" alt="Photograph by Chris Tan" width="165" height="100" loading="lazy"></figure>
-        <figure style="width:6rem;height:6rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-294de637-1cac-43b5-a982-a0c87fc9c54f.jpg?w=315&e=webp&cX=0&cY=2&cW=1080&cH=1076" alt="Photograph by Chris Tan" width="120" height="120" loading="lazy"></figure>
-        <figure style="width:7.7rem;height:9.55rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-505bbaff-72d6-4b28-97bd-fe4bdc99622f.webp?w=404&e=webp&cX=0&cY=87&cW=667&cH=827" alt="Photograph by Chris Tan" width="154" height="191" loading="lazy"></figure>
-        <figure style="width:7.9rem;height:5.25rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-96077cd0-817b-41d7-ae48-15446a45243b.jpg?w=415&e=webp&cX=0&cY=6&cW=5874&cH=3905" alt="Photograph by Chris Tan" width="158" height="105" loading="lazy"></figure>
+        <figure class="rot glass" style="width:15.4rem;height:11.25rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-3a6a48c7-c715-4aeb-8dc9-fb385e139126.png?w=809&e=webp&nll=true&cX=0&cY=634&cW=2749&cH=2008" alt="Photograph by Chris Tan" width="308" height="225" loading="lazy"></figure>
+        <figure class="glass" style="width:16rem;height:7.75rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-3423a7ee-0076-43fc-ac3f-ad99b9ff8f0a.jpg?w=841&e=webp&cX=1&cY=19&cW=1597&cH=773" alt="Photograph by Chris Tan" width="320" height="155" loading="lazy"></figure>
+        <figure class="glass" style="width:8.25rem;height:5rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-07e9e6a1-5f14-44b8-9fe8-4c9bbe317614.webp?w=434&e=webp&cX=64&cY=64&cW=889&cH=538" alt="Photograph by Chris Tan" width="165" height="100" loading="lazy"></figure>
+        <figure class="glass" style="width:6rem;height:6rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-294de637-1cac-43b5-a982-a0c87fc9c54f.jpg?w=315&e=webp&cX=0&cY=2&cW=1080&cH=1076" alt="Photograph by Chris Tan" width="120" height="120" loading="lazy"></figure>
+        <figure class="glass" style="width:7.7rem;height:9.55rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-505bbaff-72d6-4b28-97bd-fe4bdc99622f.webp?w=404&e=webp&cX=0&cY=87&cW=667&cH=827" alt="Photograph by Chris Tan" width="154" height="191" loading="lazy"></figure>
+        <figure class="glass" style="width:7.9rem;height:5.25rem"><img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-96077cd0-817b-41d7-ae48-15446a45243b.jpg?w=415&e=webp&cX=0&cY=6&cW=5874&cH=3905" alt="Photograph by Chris Tan" width="158" height="105" loading="lazy"></figure>
       </div>
     </div>
     <hr class="strip-line">
@@ -382,13 +491,13 @@
 </main>
 
 <footer class="wrap">
-  <p class="name">Chris Tan</p>
-  <p class="year">2026</p>
+  <p class="name glass">Chris Tan</p>
+  <p class="year glass">2026</p>
   <nav aria-label="Elsewhere">
-    <a href="https://www.instagram.com/ct907/">Instagram</a>
-    <a href="https://linktr.ee/ct907">Linktree</a>
-    <a href="https://hello.ct907.com/portfolio/">Portfolio</a>
-    <a href="mailto:gax907@gmail.com">Email</a>
+    <a class="glass" href="https://www.instagram.com/ct907/">Instagram</a>
+    <a class="glass" href="https://linktr.ee/ct907">Linktree</a>
+    <a class="glass" href="https://hello.ct907.com/portfolio/">Portfolio</a>
+    <a class="glass" href="mailto:gax907@gmail.com">Email</a>
   </nav>
 </footer>
 
