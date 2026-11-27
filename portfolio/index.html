@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#dbdad8">
+  <meta name="theme-color" content="#f2eeea">
 
   <title>Chris Tan's UX Portfolio</title>
   <meta name="description" content="UX portfolio of Chris Tan: AI interaction design research and website revamps for government agencies.">
@@ -20,6 +20,14 @@
   <meta property="og:image:height" content="600">
   <meta name="twitter:card" content="summary_large_image">
 
+  <!-- ==========================================================
+       The look of this page is the homepage's (index.html): same palette, riso graph paper and grain, frosted plates,
+       off-register heading plates, arrow links, badges, footer and motion setting. The CSS below is copied from there
+       (tokens, .glass, riso headings, arrow-link, label, badge, footer) with the homepage's live values, so when one of
+       those changes in index.html, change it here too (see CLAUDE.md). What is NOT copied: the liquid cursor effect
+       (hover/press tints use the plain CSS fallback the homepage uses on touch) and the page editor's per-element nudges.
+       ========================================================== -->
+
   <!-- Type (site-wide rule, see CLAUDE.md): Signika for headings and display text, Lora for body text, and
        Merriweather for body text from 1100px up. Same two font roles as index.html (--display, --text). -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,205 +36,515 @@
   <!-- Desktop body font. The media attribute keeps it from blocking the first paint on phones and tablets. -->
   <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300..900&display=swap" rel="stylesheet" media="(min-width: 1100px)">
 
+  <!-- Runs before first paint: marks the page as JS-enabled and resolves the motion setting (saved choice, else the OS
+       "reduce motion" preference) into <html data-motion="full|reduced">. Same key as the homepage, so a visitor's
+       choice carries over between the two pages. -->
+  <script>
+    (function () {
+      var d = document.documentElement, m = null;
+      d.classList.add('js');
+      try { m = localStorage.getItem('ct907-motion'); } catch (e) {}
+      if (m !== 'full' && m !== 'reduced') {
+        m = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'full';
+      }
+      d.setAttribute('data-motion', m);
+    })();
+  </script>
+
   <style>
     :root {
-      --bg: #dbdad8;
-      --ink: #171612;
-      --accent: #ff6546;        /* shapes and icons, as on the Readymag page */
-      --accent-text: #ab300e;   /* the same orange, darkened to 4.8:1 on --bg for text (#ff6546 is only 2.1:1) */
+      /* palette (as index.html) */
+      --bg: #f2eeea;
+      --ink: #0b0b0b;
+      --muted: #55524f;
+      --accent: #ff6546;           /* arrows and shapes */
+      --accent-text: #c2370f;      /* the same orange darkened to 4.7:1 on --bg, for text (#ff6546 is only 2.5:1) */
+      --rule: #117b9a;
 
+      /* Risograph paper + inks (live values from index.html: grain 8%, pale cyan and magenta grid) */
+      --paper: #fffdf8;
+      --ink-c: #cdf6ff;
+      --ink-m: #f6ecf5;
+      --grain: .08;
+      --grain-size: 1126px;        /* the 563px grain tile shown at 2x on purpose: coarse and soft like a riso print */
+
+      /* Riso misregistration on headings: yellow plate up-left, magenta plate down-right (per-heading overrides below) */
+      --riso-yellow: #ffe600;
+      --riso-magenta: #ff3d9a;
+      --riso-yellow-shift: 2px;
+      --riso-magenta-shift: 4px;
+      --riso-text: .2;
+
+      /* Graph-paper grid: one cell is 2.25rem, so it scales with the text */
+      --cell: 2.25rem;
+      --lv: 1px;
+      --lc: 2px;
+
+      /* Frosted plates: clickable ones blur a little, everything else a lot */
+      --blur: 4px;
+      --blur-static: 24px;
+      --edge: 4px;                            /* the blur fades out over this width at the plate's border */
+      --glass: rgb(242 238 234 / .05);
+      --glass-hover: rgb(255 129 3 / .2);
+      --glass-press: rgb(0 180 255 / .2);
+
+      --arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M0 7h22M16 1l6 6-6 6' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+      --pad: clamp(1.25rem, 5.5vw, 5.25rem);
+
+      /* Type: Signika for headings and display text, Lora for body text (site-wide rule) */
       --display: "Signika", "Segoe UI", system-ui, -apple-system, sans-serif;
       --text: "Lora", Georgia, "Times New Roman", serif;
-
-      --gutter: clamp(1.25rem, 6vw, 3.75rem);
     }
-    /* Merriweather is the body font from 1100px up, so it is the token here (index.html applies it with editor rules instead). */
-    @media (min-width: 1100px) { :root { --text: "Merriweather", Georgia, "Times New Roman", serif; } }
-
+    @supports (width: round(1px, 1px)) {
+      :root {
+        --cell: round(2.25rem, 1px);
+        --lv: round(max(1px, calc(var(--cell) * .036)), 1px);
+        --lc: round(max(1px, calc(var(--cell) * .044)), 1px);
+      }
+    }
+    @media (min-width: 1100px) {
+      :root { --pad: 5.25rem; }
+      /* Merriweather is the body font from 1100px up, so it is the token here (index.html applies it with editor rules instead). */
+      :root { --text: "Merriweather", Georgia, "Times New Roman", serif; }
+    }
     * { box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; }
+    html {
+      -webkit-text-size-adjust: 100%;
+      overflow-x: clip;
+      /* Fluid scale, as on the homepage: everything is in rem, so the whole composition grows with the screen */
+      font-size: clamp(.875rem, max(.775rem + .25vw, .1rem + 1.25vw), 1.75rem);
+    }
+    @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+    :root[data-motion="full"] { scroll-behavior: smooth; }
+    :root[data-motion="reduced"] { scroll-behavior: auto; }
     body {
+      position: relative;
+      min-height: 100vh; min-height: 100svh;
       margin: 0;
-      background: var(--bg);
+      background-color: var(--bg);
       color: var(--ink);
       font: 400 1rem/1.6 var(--text);
-      -webkit-font-smoothing: antialiased;
-      overflow-x: clip;               /* the dotted rules are wider than the screen while they slide */
+      overflow-x: clip;
     }
-    h1, h2, h3, p { margin: 0; }
-    svg { display: block; }
-
-    .wrap { width: 100%; max-width: 64rem; margin-inline: auto; padding-inline: var(--gutter); }
-
-    a { color: inherit; }
-    a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
-
-    /* ---------- greeting strip ---------- */
-    .top {
-      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
-      column-gap: 1.5rem; padding-block: .75rem 0;
-      font: 300 1.25rem/1.5 var(--display);
+    /* The printed grid: cyan and magenta plates multiplied onto the paper, behind all content. */
+    body::before {
+      content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      background-color: var(--paper);
+      background-image:
+        linear-gradient(to bottom, var(--ink-m) var(--lv), transparent 0),
+        linear-gradient(to right,  var(--ink-m) var(--lv), transparent 0),
+        linear-gradient(to bottom, var(--ink-c) var(--lc), transparent 0),
+        linear-gradient(to right,  var(--ink-c) var(--lv), transparent 0);
+      background-size: var(--cell) var(--cell);
+      background-position: 0 calc(var(--lv) * -1), 0 0, 0 0, 0 0;
+      background-blend-mode: multiply;
     }
-    .hello { display: flex; align-items: center; gap: .5rem; }
-    .hello svg { width: 1.5rem; height: 1.5rem; transform: rotate(8deg); }
-    .welcome { margin-left: auto; color: var(--accent-text); }
+    /* Paper grain over everything, overlay-blended (see CLAUDE.md for the look and the cost). */
+    body::after {
+      content: ""; position: absolute; inset: 0; z-index: 9999; pointer-events: none;
+      opacity: var(--grain);
+      mix-blend-mode: overlay;
+      background-image: url("/assets/images/paper-texture.webp");
+      background-size: var(--grain-size) var(--grain-size);
+    }
+    /* Riso shift on headings: a yellow and a magenta ghost of the text, off-register in opposite directions and carrying
+       the paper grain. The script at the bottom writes each heading's text into data-riso and measures --riso-dy.
+       Browsers without the CSS the ghosts need (and no-JS) keep flat text-shadow plates instead. */
+    :is(h1, h2, .lede):not([data-riso]) {
+      text-shadow:
+        var(--riso-yellow-x, calc(var(--riso-yellow-shift) * -1)) var(--riso-yellow-y, calc(var(--riso-yellow-shift) * -1)) 0 rgb(from var(--riso-yellow) r g b / var(--riso-yellow-a, var(--riso-text))),
+        var(--riso-magenta-x, var(--riso-magenta-shift)) var(--riso-magenta-y, var(--riso-magenta-shift)) 0 rgb(from var(--riso-magenta) r g b / var(--riso-magenta-a, var(--riso-text)));
+    }
+    @supports (color: rgb(from red r g b)) and ((mask-image: url(x)) or (-webkit-mask-image: url(x))) {
+      [data-riso] { position: relative; isolation: isolate; }
+      [data-riso]::before, [data-riso]::after {
+        content: attr(data-riso); content: attr(data-riso) / "";
+        position: absolute; inset: 0; z-index: -1; box-sizing: border-box; padding: inherit; pointer-events: none; user-select: none;
+        -webkit-mask-image: url("/assets/images/paper-texture.webp"); mask-image: url("/assets/images/paper-texture.webp"); mask-mode: luminance;
+        -webkit-mask-size: var(--grain-size) var(--grain-size); mask-size: var(--grain-size) var(--grain-size);
+      }
+      [data-riso]::before {
+        color: rgb(from var(--riso-yellow) r g b / var(--riso-yellow-a, var(--riso-text)));
+        translate: var(--riso-yellow-x, calc(var(--riso-yellow-shift) * -1)) calc(var(--riso-yellow-y, calc(var(--riso-yellow-shift) * -1)) + var(--riso-dy, 0px));
+      }
+      [data-riso]::after {
+        color: rgb(from var(--riso-magenta) r g b / var(--riso-magenta-a, var(--riso-text)));
+        translate: var(--riso-magenta-x, var(--riso-magenta-shift)) calc(var(--riso-magenta-y, var(--riso-magenta-shift)) + var(--riso-dy, 0px));
+      }
+    }
+    a { color: inherit; -webkit-tap-highlight-color: transparent; }
+    /* Solid ink ring: the orange accent is only ~2.5:1 on this background. */
+    a:focus-visible, button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+    img { display: block; max-width: 100%; height: auto; }
+    .wrap { max-width: 68rem; margin: 0 auto; padding: 0 var(--pad); }
+    section { scroll-margin-top: 1rem; }
+    p { text-wrap: pretty; }
+    h1, h2, h3 { margin: 0; }
+
+    /* ---------- frosted glass ----------
+       class="glass" gives an element a blurred plate. Shape it with --gx / --gy (padding) and --gr (corner radius). */
+    .glass {
+      width: fit-content; max-width: 100%;
+      padding: var(--gy, .25em) var(--gx, .5em);
+      border-radius: var(--gr, 1em);
+      background-color: var(--fill, var(--glass));
+      -webkit-backdrop-filter: blur(var(--blur));
+      backdrop-filter: blur(var(--blur));
+      -webkit-mask-image: var(--edge-mask, none); mask-image: var(--edge-mask, none);   /* soft edge, drawn by the script */
+      -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      transition: background-color .18s ease;
+    }
+    .glass:focus-visible { -webkit-mask-image: none; mask-image: none; }
+    .glass:not(a, button, .release) { --blur: var(--blur-static); }
 
     /* ---------- hero ---------- */
-    .hero { display: grid; row-gap: 2rem; padding-block: clamp(2.5rem, 9vw, 6rem) 3.5rem; }
+    /* Two columns: the text stack on the left, the portrait bottom-right beside the sub-headline and copy (single column on phones). */
+    .hero { position: relative; padding-block: .6rem 4.5rem; display: grid; grid-template-columns: minmax(0, 1fr) min(34vw, 20rem); column-gap: 3rem; align-items: end; }
+    .greet { display: grid; justify-items: start; gap: .35rem; }
+    .hello, .welcome { --gx: .5em; --gy: .15em; --gr: .7em; font: 300 1.25rem/1.4 var(--display); margin: 0; }
+    .hello .wave { display: inline-block; transform: rotate(35deg); margin-left: .35rem; }
+    .welcome { color: var(--accent-text); }
     h1 {
-      font: 300 clamp(3.25rem, 14vw, 4.5rem)/1.125 var(--display);
-      letter-spacing: -.015em; text-transform: uppercase;
+      --gx: .2em; --gy: .06em; --gr: .22em;
+      font: 300 clamp(3.4rem, 12vw, 5.25rem)/1.1 var(--display);
+      font-size: clamp(3.4rem, min(12vw, 18svh), 5.25rem);
+      letter-spacing: -.015em;
+      text-transform: uppercase;
+      margin: 1.4rem 0 0;
+    }
+    /* The title animates its weight, 300 <-> 700, as on the homepage. */
+    :root:not([data-motion="reduced"]) h1 { animation: weight 6s infinite; }
+    @media (prefers-reduced-motion: reduce) { :root:not(.js) h1 { animation: none; } }
+    @keyframes weight {
+      0%   { font-weight: 300; }
+      50%  { font-weight: 700; }
+      100% { font-weight: 300; }
     }
     .lede {
-      font: 400 clamp(1.6rem, 6.5vw, 2.125rem)/1.3 var(--display);
-      letter-spacing: -.01em; margin: -.6rem 0 .6rem;     /* tucked up under the title, as on the Readymag page */
+      --gx: .3em; --gy: .12em; --gr: .35em;
+      font: 400 clamp(1.7rem, 5.6vw, 3rem)/1.2 var(--display);
+      letter-spacing: -.01em;
+      margin: .7rem 0 0;
     }
-    .lede .caret { display: inline-block; width: .6875rem; height: .5625rem; margin-left: .4rem; vertical-align: .4em; }
-    .lede .caret svg { width: 100%; height: 100%; }
-    .intro p:not(.lede) { max-width: 28.5rem; font-size: .9375rem; line-height: 1.7; text-wrap: pretty; }
-    .intro p:not(.lede) + p { margin-top: 1.4rem; }
-
-    .photo { position: relative; z-index: 2; margin: 0; justify-self: end; width: min(100%, 17.25rem); transform: rotate(6deg); }
-    .photo img { display: block; width: 100%; height: auto; border-radius: .875rem; }
-
-    @media (min-width: 52rem) {
-      /* Fixed photo column: a percentage width inside an auto column would size it from the image's own 696px. */
-      .hero { grid-template-columns: minmax(0, 1fr) 18rem; align-items: end; column-gap: 2rem; }
-      /* The photo ends 2.25rem below the dotted rule (which runs behind it): the hero's 3.5rem bottom padding plus 2.25rem.
-         The small right margin keeps the tilted corner inside the content edge. */
-      .photo { justify-self: stretch; width: auto; margin: 0 .75rem -5.75rem 0; }
+    .caret {
+      display: inline-block; width: 0; height: 0; margin-left: .5rem; vertical-align: .9em;
+      border-left: .42rem solid transparent; border-right: .42rem solid transparent; border-top: .7rem solid #444;
     }
 
-    /* ---------- dotted rules (they slide sideways as the page scrolls; see the script) ---------- */
-    .rule {
-      position: relative; z-index: 1; height: 4px;
-      background: radial-gradient(circle, var(--ink) .75px, transparent 1px) 0 0 / 4px 4px repeat-x;
+    .copy { --gx: 1.3rem; --gy: 1.1rem; --gr: 1.2rem; margin-top: 2.6rem; }
+    .copy p { margin: 0 0 1.4rem; }
+    .copy > :last-child { margin-bottom: 0; }
+    .copy .big { font-size: 1.25rem; line-height: 1.55; max-width: 34rem; }
+    .copy .small { font-size: .95rem; line-height: 1.5; max-width: 34rem; }
+
+    .portrait {
+      --gx: .5rem; --gy: .5rem; --gr: 1.5rem;
+      position: relative; justify-self: end; width: 100%; aspect-ratio: 696 / 600;
+      transform: rotate(10deg); transform-origin: center;
+      margin-right: calc(-.5 * var(--pad));
     }
+    .portrait img { width: 100%; height: 100%; object-fit: cover; border-radius: 1rem; }
+    /* Pictures that aren't links have no frosted plate (as on the homepage). */
+    .portrait.glass { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: transparent; }
+    /* Stacked up to 960px (the homepage stacks at 720px): beside the portrait the title would wrap on a tablet. */
+    @media (max-width: 960px) {
+      .hero { grid-template-columns: 1fr; padding-bottom: 1rem; }
+      .copy { margin-top: 2rem; }
+      .portrait { width: min(78vw, 19rem); margin: 2rem 0 .5rem auto; }
+    }
+    @media (max-width: 40rem) { .hero { padding-top: 3.6rem; } }   /* room for the motion toggle */
+
+    /* ---------- reduce-motion toggle (top right; first thing in the tab order) ---------- */
+    .motion-toggle {
+      --gx: .9em; --gy: .55em; --gr: 999px;
+      position: absolute; top: .9rem; right: max(.9rem, calc(var(--pad) * .5)); z-index: 3;
+      display: inline-flex; align-items: center; gap: .6em;
+      border: 0; margin: 0; font: 500 .8rem/1 var(--text); color: var(--ink); cursor: pointer;
+    }
+    :root:not(.js) .motion-toggle { display: none; }
+    .motion-toggle .sw { position: relative; flex: none; width: 1.9em; height: 1.05em; border: 1.5px solid var(--ink); border-radius: 999px; }
+    .motion-toggle .sw::after {
+      content: ""; position: absolute; top: 50%; left: .14em; width: .65em; height: .65em;
+      border-radius: 50%; background: var(--ink); transform: translateY(-50%);
+      transition: left .2s ease, background-color .2s ease;
+    }
+    .motion-toggle[aria-pressed="true"] .sw { background: var(--ink); }
+    .motion-toggle[aria-pressed="true"] .sw::after { left: calc(100% - .79em); background: var(--bg); }
+    :root[data-motion="reduced"] .motion-toggle .sw::after { transition: none; }
 
     /* ---------- sections ---------- */
-    .badge { display: grid; place-items: center; width: 1.375rem; height: 1.375rem; background: var(--accent); color: var(--ink); }
-    .badge svg { width: .8125rem; height: .8125rem; }
-    .badge.round { border-radius: 50%; }
-    h2 { font: 600 clamp(2.25rem, 9vw, 3rem)/1.23 var(--display); letter-spacing: -.015em; margin-top: .6rem; }
-
-    .work { padding-block: 3rem 3.25rem; }
-    .period { font: 600 .8125rem/1.6 var(--display); letter-spacing: .02em; margin-top: 1.75rem; }
-    h2 + .period { margin-top: 1.25rem; }
-    .projects { list-style: none; margin: 0; padding: 0; }
-    .projects a {
-      display: inline-block; padding-block: .3rem;
-      font: 400 1.0625rem/1.4 var(--text); letter-spacing: .01em; text-decoration: none;
+    .block { padding-block: 2.6rem 3.4rem; }
+    .badge {
+      display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem;
+      background: #4a4846; color: #fff; font-size: .8rem; line-height: 1;
     }
-    .projects a:hover { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: .25em; }
+    .badge.sq { border-radius: 3px; }
+    .badge.round { border-radius: 50%; }
+    /* From 1100px the homepage shows a small grey riso shape above each heading instead of the badge. */
+    .deco { display: none; }
+    @media (min-width: 1100px) {
+      .badge { display: none; }
+      .deco { display: block; width: 6.6rem; height: auto; opacity: .25; mix-blend-mode: hard-light; filter: brightness(.35); pointer-events: none; user-select: none; }
+    }
+    h2 {
+      --gx: .4em; --gy: .1em; --gr: .3em;
+      font: 400 clamp(2.2rem, 7vw, 3rem)/1.25 var(--display);
+      letter-spacing: -.01em;
+      margin: .9rem 0 1.4rem;
+      text-wrap: balance;
+    }
+    .label { --gx: .8em; --gy: .5em; --gr: 999px; font: 500 .78rem/1 var(--text); letter-spacing: .18em; text-transform: uppercase; margin: 2rem 0 .8rem; }
+    .links { list-style: none; margin: 1.2rem 0 0; padding: 0; font-size: .95rem; }
+    .links li { margin: .35rem 0; }
+    .label + .links { margin-top: .2rem; }
+    .note { --gx: 1.1rem; --gy: .8rem; --gr: 1rem; max-width: 40rem; margin: 0 0 .4rem; }
 
-    .contact { padding-block: 3rem 5rem; }
-    .contact p { font-size: .9375rem; }
-    .contact h2 + p { margin-top: .75rem; }
-    .mail { display: flex; align-items: center; gap: .5rem; margin-top: .25rem; }
-    .mail svg { width: 1.1875rem; height: 1.1875rem; color: var(--accent); }
-    .mail a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .2em; }
-    .mail a:hover { text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
+    /* Arrow link: the arrow sits inside the pill, so the hover/press tint covers arrow + label. */
+    .arrow-link {
+      --gx: 1.1em; --gy: .5em; --gr: 999px;
+      display: inline-flex; align-items: center; gap: .7em; text-decoration: none;
+    }
+    .arrow-link::before {
+      content: ""; flex: none; width: 1.6em; height: .95em; background: var(--accent);
+      -webkit-mask: var(--arrow) center / contain no-repeat;
+              mask: var(--arrow) center / contain no-repeat;
+    }
+
+    .strip-line { border: 0; height: 2px; background: var(--rule); margin: 0 auto; max-width: 56rem; }
+
+    footer { text-align: center; padding-block: 1.6rem 3rem; }
+    footer .name { --gx: .9em; --gy: .2em; --gr: .6em; font: 400 1.1rem/1.3 var(--display); letter-spacing: .02em; margin: 0 auto; }
+    footer .year { --gx: .9em; --gy: .15em; --gr: .8em; font-size: .8rem; margin: .4rem auto 0; color: var(--muted); }
+    footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; margin-top: .9rem; font-size: .85rem; }
+    footer nav a { --gx: 1em; --gy: .45em; --gr: 999px; text-underline-offset: .2em; }
+
+    /* ---------- desktop values (the homepage's live ones, set there by the page editor) ---------- */
+    @media (min-width: 1100px) {
+      h1 { --riso-yellow-x: -3px; --riso-yellow-y: -2px; --riso-yellow-a: 1; --riso-magenta-x: 4px; --riso-magenta-y: 3px; --riso-magenta-a: .4; }
+      .lede { font-weight: 300; --riso-yellow-x: -2px; --riso-yellow-y: -.5px; --riso-yellow-a: 1; --riso-magenta-x: 2px; --riso-magenta-y: 2px; --riso-magenta-a: .4; }
+      h2 { --riso-yellow-x: -2px; --riso-yellow-y: -1px; --riso-yellow-a: 1; --riso-magenta-x: 2px; --riso-magenta-y: 2.5px; --riso-magenta-a: .4; }
+      .hello, .welcome { font-family: var(--text); font-size: 1.02rem; }
+      .copy p { font-weight: 300; }
+      .arrow-link { font-weight: 600; }
+      .block { --blur: 2px; }
+      .strip-line { background-color: #94cce1; }
+    }
+
+    /* ---------- hover / press / keyboard focus ----------
+       Clickable plates tint orange on hover and blue on press (only where a real hover exists). */
+    @media (hover: hover) {
+      :is(a, button).glass:hover { --fill: var(--glass-hover); }
+    }
+    :is(a, button).glass:focus-visible { --fill: var(--glass-hover); }
+    :is(a, button).glass:active { --fill: var(--glass-press); }
+
+    /* ---------- reveal on scroll (content stays visible without JS) ---------- */
+    :root.js:not([data-motion="reduced"]) .reveal:not(.in) :is(.glass, .badge) { opacity: 0; }
+    :root.js:not([data-motion="reduced"]) .reveal.in :is(.glass, .badge) { animation: rise .7s ease backwards; }
+    :root.js:not([data-motion="reduced"]) .portrait { opacity: 0; animation: portrait-in .9s .2s ease forwards; }
+    @keyframes rise { from { opacity: 0; translate: 0 16px; } }
+    @keyframes portrait-in {
+      from { opacity: 0; transform: rotate(-12deg) scale(.96); }
+      to   { opacity: 1; transform: rotate(10deg); }
+    }
+
+    /* ---------- accessibility fallbacks (as on the homepage) ---------- */
+    @media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+      :root { --glass: rgb(242 238 234 / .92); --glass-hover: #f5d8bc; --glass-press: #c2e2ee; }
+      .glass { -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask-image: none; mask-image: none; }
+    }
+    @media (prefers-contrast: more) {
+      :root { --ink-c: #e1f6fd; --ink-m: #f6eef3; --paper: var(--bg); }
+      body::after { display: none; }
+      :root :is(h1, h2, .lede) { text-shadow: none; }
+      [data-riso]::before, [data-riso]::after { display: none; }
+    }
+    @media print { body::after { display: none; } :root { --paper: var(--bg); } :root :is(h1, h2, .lede) { text-shadow: none; } [data-riso]::before, [data-riso]::after { display: none; } }
+    @media (forced-colors: active) {
+      body::before, body::after { display: none; }
+      :root :is(h1, h2, .lede) { text-shadow: none; }
+      [data-riso]::before, [data-riso]::after { display: none; }
+      .glass { -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask-image: none; mask-image: none; }
+      a.glass:hover, a.glass:focus-visible { outline: 2px solid Highlight; }
+    }
   </style>
 </head>
 <body>
 
-  <header class="top wrap">
-    <p class="hello">Hello there,
-      <svg viewBox="0 0 28 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <path d="M9 15 7.4 6.2Q7 3.6 9 3.6q1.9 0 2.2 2.4L12.4 13"/>
-        <path d="M12.4 13 12.8 3.8Q12.9 1.6 14.7 1.7q1.7.1 1.8 2.3L16 13"/>
-        <path d="M16 13 18 5.6Q18.6 3.6 20.2 4.2q1.5.6.9 2.6L19.6 14"/>
-        <path d="M9 15Q4.2 12.6 3.6 15.3 3.4 17 8.4 19"/>
-        <path d="M8.4 19 9.6 30M19.6 14 17.2 30"/>
-        <path d="M23 7.2q2.3 2.6.4 5.4M25.6 5q3.2 3.8.6 8.6"/>
-      </svg>
-    </p>
-    <p class="welcome">welcome to my portfolio page.</p>
-  </header>
+<button type="button" id="motion-toggle" class="glass motion-toggle" aria-pressed="false">
+  <span class="sw" aria-hidden="true"></span>Reduce Motion
+</button>
 
-  <main>
-    <section class="hero wrap">
-      <div class="intro">
-        <h1>Chris Tan</h1>
-        <p class="lede">is a UX Designer.
-          <span class="caret" aria-hidden="true"><svg viewBox="0 0 11 9" preserveAspectRatio="none"><path d="M0 0h11L5.5 9z" fill="#ff6546"/></svg></span>
-        </p>
-        <p>I have over 3 years of experience in UX, starting from UX Research on AI Interaction Design. I moved on to doing website revamps for gov agencies.</p>
-        <p>A lot of what I do is confidential, please reach out to me to find out more about my experience :)</p>
-      </div>
-      <figure class="photo">
-        <img src="/assets/images/chris-tan-profile.webp" width="696" height="600" decoding="async" fetchpriority="high"
-             alt="Chris Tan smiling and looking off to one side in soft golden light, wearing a grey-blue hoodie, with misty hills behind him.">
-      </figure>
-    </section>
+<header class="wrap hero">
+  <div class="hero-text">
+    <div class="greet">
+      <p class="hello glass">Hello there, <span class="wave" aria-hidden="true">👋</span></p>
+      <p class="welcome glass">welcome to my portfolio page.</p>
+    </div>
+    <h1 class="glass">Chris Tan</h1>
+    <p class="lede glass">is a UX Designer. <span class="caret" aria-hidden="true"></span></p>
+    <div class="copy glass">
+      <p class="big">I have over 3 years of experience in UX, starting from UX Research on AI Interaction Design. I moved on to doing website revamps for gov agencies.</p>
+      <p class="small">A lot of what I do is confidential, please reach out to me to find out more about my experience :)</p>
+    </div>
+  </div>
+  <div class="portrait glass">
+    <img src="/assets/images/chris-tan-profile.webp" width="696" height="600" fetchpriority="high"
+         alt="Chris Tan smiling and looking off to one side in soft golden light, wearing a grey-blue hoodie, with misty hills behind him.">
+  </div>
+</header>
 
-    <div class="rule" aria-hidden="true"></div>
 
-    <section class="work wrap" aria-labelledby="work-title">
-      <span class="badge" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="currentColor"><g transform="rotate(45 12 12)"><rect x="9.6" y="1.5" width="4.8" height="15.5" rx=".8"/><path d="M9.6 18.4h4.8L12 23z"/></g></svg>
-      </span>
-      <h2 id="work-title">Design Work</h2>
+<main>
+  <section id="design-work" class="block wrap reveal" aria-labelledby="work-h">
+    <span class="badge sq" aria-hidden="true">✎</span>
+    <img class="deco" src="/assets/images/riso-shapes-deco-copy-4-3a9ac58e.webp" alt="" aria-hidden="true" width="495" height="111" loading="lazy">
+    <h2 id="work-h" class="glass">Design Work</h2>
 
-      <h3 class="period">2023 - Now</h3>
-      <ul class="projects">
-        <li><a href="/nhb-games/">NHB - Gamification Platform</a></li>
-      </ul>
+    <h3 class="label glass">2023 - Now</h3>
+    <ul class="links">
+      <li><a class="glass arrow-link" href="/nhb-games/">NHB - Gamification Platform</a></li>
+    </ul>
 
-      <h3 class="period">2022</h3>
-      <ul class="projects">
-        <li><a href="/private-capital-management-website/">Mapletree PCM - Website POC</a></li>
-      </ul>
+    <h3 class="label glass">2022</h3>
+    <ul class="links">
+      <li><a class="glass arrow-link" href="/private-capital-management-website/">Mapletree PCM - Website POC</a></li>
+    </ul>
 
-      <h3 class="period">2021</h3>
-      <ul class="projects">
-        <li><a href="/research-gateway-design/">NLB - Research Gateway POC</a></li>
-      </ul>
+    <h3 class="label glass">2021</h3>
+    <ul class="links">
+      <li><a class="glass arrow-link" href="/research-gateway-design/">NLB - Research Gateway POC</a></li>
+    </ul>
 
-      <h3 class="period">2018 - 2020: AI DRIVER SERIES</h3>
-      <ul class="projects">
-        <li><a href="/aria-driverless-car-app/">ARIA Autonomous Car - Rideshare App</a></li>
-        <li><a href="/ai-interaction-design/">AI Driver - Interaction Design</a></li>
-        <li><a href="/ai-driver-interaction-surface/">AI Driver - Interaction Surfaces</a></li>
-        <li><a href="/ai-driver-visual-language/">AI Driver - Visual Language</a></li>
-        <li><a href="/ai-visual-identity/">AI Visual Identity</a></li>
-      </ul>
-    </section>
+    <h3 class="label glass">2018 - 2020: AI Driver Series</h3>
+    <ul class="links">
+      <li><a class="glass arrow-link" href="/aria-driverless-car-app/">ARIA Autonomous Car - Rideshare App</a></li>
+      <li><a class="glass arrow-link" href="/ai-interaction-design/">AI Driver - Interaction Design</a></li>
+      <li><a class="glass arrow-link" href="/ai-driver-interaction-surface/">AI Driver - Interaction Surfaces</a></li>
+      <li><a class="glass arrow-link" href="/ai-driver-visual-language/">AI Driver - Visual Language</a></li>
+      <li><a class="glass arrow-link" href="/ai-visual-identity/">AI Visual Identity</a></li>
+    </ul>
+  </section>
 
-    <div class="rule" aria-hidden="true"></div>
 
-    <section class="contact wrap" aria-labelledby="contact-title">
-      <span class="badge round" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.6 7C5.2 14.5 9.5 18.8 17 18.4" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/><ellipse cx="5.6" cy="6" rx="3.4" ry="2.9"/><ellipse cx="18" cy="18.4" rx="2.9" ry="3.4"/></svg>
-      </span>
-      <h2 id="contact-title">Contact Me</h2>
-      <p>I'm Chris Tan, nice to meet you!</p>
-      <p class="mail">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1.2 8.4 12 1.5l10.8 6.9V22.5H1.2zM1.2 8.4l21.6 14.1M22.8 8.4 1.2 22.5"/></svg>
-        <a href="mailto:gax907@gmail.com">gax907@gmail.com</a>
-      </p>
-    </section>
-  </main>
+  <section id="contact" class="block wrap reveal" aria-labelledby="contact-h">
+    <span class="badge round" aria-hidden="true">✆</span>
+    <img class="deco" src="/assets/images/riso-shapes-deco-copy-2-da6dac41.webp" alt="" aria-hidden="true" width="562" height="111" loading="lazy">
+    <h2 id="contact-h" class="glass">Contact Me</h2>
+    <p class="note glass">I'm Chris Tan, nice to meet you!</p>
+    <ul class="links">
+      <li><a class="glass arrow-link" href="mailto:gax907@gmail.com">gax907@gmail.com</a></li>
+    </ul>
+  </section>
 
-  <!-- The two dotted rules slide sideways as you scroll (the first to the left, the second to the right, twice as fast),
-       as they did on the Readymag page. Skipped when the visitor prefers reduced motion; without JS they stay still. -->
-  <script>
-    (function () {
-      var rules = document.querySelectorAll('.rule');
-      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-      var queued = false;
-      function draw() {
-        queued = false;
-        var y = reduce.matches ? 0 : window.scrollY;
-        for (var i = 0; i < rules.length; i++) {
-          rules[i].style.backgroundPositionX = (i % 2 ? 3 : -1.5) * y + 'px';
-        }
-      }
-      function queue() { if (!queued) { queued = true; requestAnimationFrame(draw); } }
-      window.addEventListener('scroll', queue, { passive: true });
-      reduce.addEventListener('change', queue);
-      queue();
-    })();
-  </script>
+  <hr class="strip-line">
+</main>
+
+<footer class="wrap">
+  <p class="name glass">Chris Tan</p>
+  <p class="year glass">2026</p>
+  <nav aria-label="Elsewhere">
+    <a class="glass" href="/">Home</a>
+    <a class="glass" href="https://www.instagram.com/ct907/">Instagram</a>
+    <a class="glass" href="https://linktr.ee/ct907">Linktree</a>
+    <a class="glass" href="mailto:gax907@gmail.com">Email</a>
+  </nav>
+</footer>
+
+<script>
+  /* ---------- reveal on scroll ---------- */
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window)) { els.forEach(function (e) { e.classList.add('in'); }); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, { threshold: 0.12 });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+
+  /* ---------- the "Reduce Motion" toggle ----------
+     Flips <html data-motion>, remembers the choice (same key as the homepage) and, until the visitor has chosen,
+     follows the OS setting. */
+  (function () {
+    var root = document.documentElement, KEY = 'ct907-motion', btn = document.getElementById('motion-toggle'), stored = null;
+    try { stored = localStorage.getItem(KEY); } catch (e) {}
+    var os = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    function reduced() { return root.getAttribute('data-motion') === 'reduced'; }
+    function setMode(mode, remember) {
+      root.setAttribute('data-motion', mode);
+      if (btn) btn.setAttribute('aria-pressed', mode === 'reduced' ? 'true' : 'false');
+      if (remember) { stored = mode; try { localStorage.setItem(KEY, mode); } catch (e) {} }
+    }
+    if (btn) {
+      btn.setAttribute('aria-pressed', reduced() ? 'true' : 'false');
+      btn.addEventListener('click', function () { setMode(reduced() ? 'full' : 'reduced', true); });
+    }
+    function osChange(e) { if (stored !== 'full' && stored !== 'reduced') setMode(e.matches ? 'reduced' : 'full', false); }
+    if (os) { if (os.addEventListener) os.addEventListener('change', osChange); else if (os.addListener) os.addListener(osChange); }
+  })();
+
+  /* ---------- soft glass edges ----------
+     The blur of each frosted plate fades from full strength to none across the last --edge (4px) of its border. CSS
+     can't feather along rounded corners, so the plate's own outline is drawn as a blurred SVG and used as a mask-image.
+     Plates with a visible border keep a crisp edge; without script, or in contrast modes, plates keep a hard edge. */
+  (function () {
+    var root = document.documentElement;
+    if (!('maskImage' in root.style || 'webkitMaskImage' in root.style)) return;
+    var ro = window.ResizeObserver ? new ResizeObserver(function (list) { list.forEach(function (e) { paint(e.target); }); }) : null;
+    function paint(g) {
+      var cs = getComputedStyle(g), E = parseFloat(cs.getPropertyValue('--edge')) || 0;
+      var blur = cs.backdropFilter || cs.webkitBackdropFilter || 'none';
+      var border = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderRightWidth) + parseFloat(cs.borderBottomWidth) + parseFloat(cs.borderLeftWidth);
+      var w = g.offsetWidth, h = g.offsetHeight;
+      if (E <= 0 || blur === 'none' || border > 0 || w < 2 * E + 2 || h < 2 * E + 2) { if (g.style.getPropertyValue('--edge-mask')) g.style.removeProperty('--edge-mask'); return; }
+      var R = Math.min(parseFloat(cs.borderTopLeftRadius) || 0, w / 2, h / 2), inset = E / 2;
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' +
+        '<filter id="f" filterUnits="userSpaceOnUse" x="0" y="0" width="' + w + '" height="' + h + '"><feGaussianBlur stdDeviation="' + (E / 4) + '"/></filter>' +
+        '<rect x="' + inset + '" y="' + inset + '" width="' + (w - E) + '" height="' + (h - E) + '" rx="' + Math.max(R - inset, 0) + '" fill="#000" filter="url(#f)"/></svg>';
+      var url = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+      if (g.style.getPropertyValue('--edge-mask') !== url) g.style.setProperty('--edge-mask', url);
+    }
+    function paintAll() {
+      var list = document.querySelectorAll('.glass');
+      for (var i = 0; i < list.length; i++) { paint(list[i]); if (ro) ro.observe(list[i]); }
+    }
+    paintAll();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintAll);
+    window.addEventListener('load', paintAll);
+  })();
+
+  /* ---------- riso plates on headings ----------
+     The yellow and magenta ghosts of h1, h2 and the sub-headline print a copy of the heading's text
+     (content: attr(data-riso)), so the copy is written down here. Only done where the browser has the CSS the ghosts need;
+     elsewhere the headings keep flat text-shadow plates. The ghosts are laid out like a plain line of text, so where the real
+     text sits lower in its first line (the sub-headline's caret is raised and makes the line taller) the difference is
+     measured and written to --riso-dy. */
+  (function () {
+    if (!(window.CSS && CSS.supports && CSS.supports('color', 'rgb(from red r g b)') && (CSS.supports('mask-image', 'url(x)') || CSS.supports('-webkit-mask-image', 'url(x)')))) return;
+    var els = document.querySelectorAll('h1, h2, .lede');
+    var ro = window.ResizeObserver ? new ResizeObserver(function (l) { l.forEach(function (e) { nudge(e.target); }); }) : null;
+    function firstText(el) { var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); while (w.nextNode()) if (w.currentNode.nodeValue.trim()) return w.currentNode; return null; }
+    function nudge(el) {
+      var tn = firstText(el); if (!tn || !el.isConnected) return;
+      var r = document.createRange(), i = tn.nodeValue.search(/\S/); r.setStart(tn, i); r.setEnd(tn, i + 1);
+      var rr = r.getClientRects()[0], hr = el.getBoundingClientRect(); if (!rr || !hr.height) return;
+      var cs = getComputedStyle(el), fs = parseFloat(cs.fontSize), lh = parseFloat(cs.lineHeight); if (!(lh > 0)) lh = 1.2 * fs;
+      var dy = rr.top - (hr.top + parseFloat(cs.borderTopWidth) + parseFloat(cs.paddingTop) + (lh - rr.height) / 2);
+      var v = (Math.abs(dy) < .25 ? 0 : Math.round(dy * 100) / 100) + 'px';
+      if (el.style.getPropertyValue('--riso-dy') !== v) el.style.setProperty('--riso-dy', v);
+    }
+    function tag(el) {
+      var t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!t) return;
+      if (el.getAttribute('data-riso') !== t) el.setAttribute('data-riso', t);
+      nudge(el); if (ro) ro.observe(el);
+    }
+    for (var i = 0; i < els.length; i++) tag(els[i]);
+    function again() { for (var i = 0; i < els.length; i++) nudge(els[i]); }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
+    window.addEventListener('load', again);
+  })();
+</script>
 </body>
 </html>
