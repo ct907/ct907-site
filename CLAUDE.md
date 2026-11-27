@@ -102,6 +102,20 @@ editor for it (see `editor/README.md`).
 - Source edits happen in this order in `buildNewSource`: text, pictures, new layers and copies, removal of pushed layers,
   deletions, then the managed style block. Path lookups in the source skip layers already placed in that push (`srcAt` with `ign`).
 
+## Frosted glass and the title animation
+
+- **Blur has two tokens.** `--blur` (4px) is for *clickable* plates (links, buttons, the album card) and `--blur-static` (24px) for
+  every other frosted plate (headings, paragraphs, labels, the footer name…). One rule does it:
+  `.glass:not(a, button, .release) { --blur: var(--blur-static) }`, set on the plate itself so it also beats a `--blur`
+  inherited from a section (`#ux-portfolio { --blur: 2px }` still sets the UX section's links). A per-element `--blur`
+  from the editor (the **Bl** field) still wins. 24 means 24 CSS px; Figma's "background blur 24" would be 12px here.
+  The larger radius costs a little more scroll time in a software-rendered test (more slow frames, same median); the
+  grain's overlay blend and the plates themselves are the bigger cost.
+- **The CHRIS TAN title animates its weight** (`h1 { animation: weight 6s infinite }`, 300 ↔ 700, in `index.html`). An
+  `!important` `font-weight` on the h1 beats any animation, so the editor's Weight control on the title (it writes
+  `font-weight: N !important`) freezes it, as `font-weight: 600 !important` did until it was removed from the tweak block.
+  The editor's preview always runs with motion reduced, so the animation is only seen on the real page.
+
 ## Site structure
 
 - Every folder other than `assets/` and `editor/` (`portfolio/`, `ai-*`, `nhb-games/`, `slow-food-*`, …) is a ~400-byte
