@@ -132,7 +132,8 @@
 
       /* Frosted plates behind text, buttons and picture LINKS (pictures that aren't links have none: see "pictures" below).
          Figma "background blur 8" = CSS blur(4px): Figma's number is twice the CSS radius. */
-      --blur: 4px;
+      --blur: 4px;                            /* clickable plates: links, buttons, the album card */
+      --blur-static: 24px;                    /* unclickable plates: headings, paragraphs, labels, everything frosted that isn't a link (Figma's 24 would be 12px here) */
       --edge: 4px;                            /* soft edge: the blur fades from full strength to none over this width at the plate's border (0 = hard edge) */
       --glass: rgb(242 238 234 / .05);       /* #F2EEEA @ 5%  */
       --glass-hover: rgb(255 129 3 / .2);    /* #FF8103 @ 20% */
@@ -276,6 +277,9 @@
     }
     /* A mask would also clip the keyboard-focus ring, so a focused plate shows its hard edge and the ring. */
     .glass:focus-visible { -webkit-mask-image: none; mask-image: none; }
+    /* Plates that aren't clickable (everything frosted except links, buttons and the album card) are blurred much harder than the
+       clickable ones: --blur-static against --blur. Set on the plate itself, so it also beats a --blur inherited from a section. */
+    .glass:not(a, button, .release) { --blur: var(--blur-static); }
 
     /* ---------- hero ---------- */
     .hero { position: relative; padding-block: .6rem 4.5rem; }
@@ -563,14 +567,14 @@
     .ed-deco-1it7 { left: 35% !important; top: 70.6165rem !important; z-index: -1 !important; width: 12rem !important; }
     .ed-deco-d6un { left: 35% !important; top: 29.8291rem !important; z-index: -1 !important; width: 12rem !important; }
     @media (min-width: 1100px) {
-      p.lede.glass { --blur: 2px !important; translate: 0.204rem 5.5157rem !important; font-weight: 300 !important; padding-top: 0rem !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -0.5px !important; --riso-magenta-a: 0.4 !important; --riso-yellow-a: 1 !important; --riso-magenta-y: 2px !important; --riso-magenta-x: 2px !important; }
-      h1.glass { --blur: 2px !important; translate: 0rem 6.1787rem !important; font-weight: 600 !important; --riso-yellow-x: -3px !important; --riso-yellow-y: -2px !important; --riso-magenta-a: 0.4 !important; --riso-yellow-a: 1 !important; box-shadow: none !important; --riso-magenta-y: 3px !important; --riso-magenta-x: 4px !important; }
+      p.lede.glass { translate: 0.204rem 5.5157rem !important; font-weight: 300 !important; padding-top: 0rem !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -0.5px !important; --riso-magenta-a: 0.4 !important; --riso-yellow-a: 1 !important; --riso-magenta-y: 2px !important; --riso-magenta-x: 2px !important; }
+      h1.glass { translate: 0rem 6.1787rem !important; --riso-yellow-x: -3px !important; --riso-yellow-y: -2px !important; --riso-magenta-a: 0.4 !important; --riso-yellow-a: 1 !important; box-shadow: none !important; --riso-magenta-y: 3px !important; --riso-magenta-x: 4px !important; }
       #ux-portfolio { --blur: 2px !important; }
       h3 > a { --blur: 2px !important; border-style: solid !important; border-top-width: 0px !important; border-right-width: 0px !important; border-bottom-width: 0px !important; border-left-width: 0px !important; border-color: #127998 !important; text-shadow: none !important; }
       article.release.glass { --blur: 2px !important; translate: 0rem 1.1277rem !important; border-color: #8bcae0 !important; border-top-width: 2px !important; border-right-width: 2px !important; border-bottom-width: 2px !important; border-left-width: 2px !important; }
-      #ux-h { --blur: 2px !important; translate: -0.125rem -0.8253rem !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -1px !important; --riso-magenta-a: 0.4 !important; --riso-magenta-x: 2px !important; --riso-magenta-y: 2.5px !important; --riso-yellow-a: 1 !important; }
+      #ux-h { translate: -0.125rem -0.8253rem !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -1px !important; --riso-magenta-a: 0.4 !important; --riso-magenta-x: 2px !important; --riso-magenta-y: 2.5px !important; --riso-yellow-a: 1 !important; }
       a.pill.glass { --blur: 2px !important; translate: 0.5rem 1.4402rem !important; font-family: "Merriweather", serif !important; border-color: #90cbe1 !important; border-top-width: 2px !important; border-right-width: 2px !important; border-bottom-width: 2px !important; border-left-width: 2px !important; }
-      #between-h { --blur: 2px !important; translate: 0rem 3.1074rem !important; --riso-yellow-x: -3.5px !important; --riso-yellow-y: -2px !important; --riso-magenta-a: 0.6 !important; text-decoration-line: none !important; --riso-yellow-a: 1 !important; --riso-magenta-y: 2px !important; --riso-magenta-x: 3px !important; }
+      #between-h { translate: 0rem 3.1074rem !important; --riso-yellow-x: -3.5px !important; --riso-yellow-y: -2px !important; --riso-magenta-a: 0.6 !important; text-decoration-line: none !important; --riso-yellow-a: 1 !important; --riso-magenta-y: 2px !important; --riso-magenta-x: 3px !important; }
       #motion-toggle { translate: -5.6485rem 1.8rem !important; font-family: "Merriweather", serif !important; }
       div.portrait.glass { translate: -10.9198rem 6.1787rem !important; }
       span.badge.sq { translate: 0.4375rem 1.375rem !important; background-color: #fe6545 !important; opacity: 0 !important; }

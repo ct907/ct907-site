@@ -33,7 +33,7 @@ and it is never written into the page.
 | Alt + ↑ ↓ ← → | Select parent / first child / previous / next sibling (or use the breadcrumb buttons) |
 | Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z | Undo, redo |
 | Drag the orange **⇅ push this & below** grip (or use **Move this & everything below** in the panel) | Move the element and everything under it together |
-| **Page & background** in the panel (press Esc to deselect) | Grid, cyan, magenta and paper-grain opacity; the riso shift on headings; page length |
+| **Page & background** in the panel (press Esc to deselect) | Grid, cyan, magenta and paper-grain opacity; frosted-glass blur; the riso shift on headings; page length |
 | **Replace image…** in the panel, or drop an image file onto a picture | Swap a picture for your own file |
 | **Add layers** in the panel | Add new text, a heading or an image *inside a box*, or floating *decoration* |
 | The purple ✦ handle on a decorative layer, or the **Layers** list | Select a layer that sits behind the page content |
@@ -160,6 +160,10 @@ will move (each affected block is outlined, and the panel says how many).
 With nothing selected (or in the **Page & background** section when something is), sliders set the opacity of the
 printed grid: **Grid** (both ink plates together, where 100% is the reference print and 50% is how the page ships),
 **Cyan** and **Magenta** on their own, and the **Grain** of the paper. Sliding back to the shipped value records nothing.
+
+**Frosted glass blur** has two sliders: **Clickable** (`--blur`, links, buttons and the album card; ships at 4px) and
+**Unclickable** (`--blur-static`, every other frosted plate: headings, paragraphs, labels; ships at 24px). The **Bl**
+field in a selected element's *Colour & effects* section still sets one element on its own.
 
 Under them, **Header riso shift** controls the off-register printing on heading text (h1, h2 and the big sub-headline): a
 yellow and a magenta copy of the text, printed in opposite directions (yellow up-left, magenta down-right), carrying the

@@ -241,6 +241,11 @@ const RISO = [
   { name: '--riso-magenta-shift', label: 'Magenta', aria: 'Riso magenta shift in pixels (down-right)', title: 'How far the magenta plate is off-register, down and to the right (0 to 4px)', min: 0, max: 4, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
   { name: '--riso-text', label: 'Opacity', aria: 'Riso shift opacity in percent', title: 'Opacity of both plates (the page ships at 20%); 0 switches the effect off', min: 0, max: 100, step: 1, unit: '%', get: (v) => Math.round(100 * (parseFloat(v) || 0)), put: (v) => String(r3(v / 100)) },
 ];
+// How hard the frosted plates blur what is behind them: the page's two tokens (see --blur and --blur-static).
+const BLURS = [
+  { name: '--blur', label: 'Clickable', aria: 'Frosted blur of clickable plates in pixels', title: 'Links, buttons and the album card (the page ships at 4px)' },
+  { name: '--blur-static', label: 'Unclickable', aria: 'Frosted blur of unclickable plates in pixels', title: 'Headings, paragraphs, labels and every other frosted plate that is not a link (the page ships at 24px)' },
+];
 const MAX_PUSH = 20000;                       // px: a typo like 99999999 shouldn't make a page that long
 const IMG_DIR = 'assets/images';
 // Layers added with the editor carry one unique class (ed-text-k3f9, ed-deco-t8x2 …). It is their identity everywhere:
@@ -724,7 +729,7 @@ function onFrameLoad() {
   originals.clear(); imgOrig.clear();
   for (const t of state.text) { const el = safeQuery(t.sel); if (el) originals.set(el, t.before); }
   for (const x of state.images) { const el = safeQuery(x.sel); if (el) imgOrig.set(el, x.was); }
-  renderLive(); tokBase = {}; for (const n of [...Object.keys(INKS), '--grain', ...RISO.map((r) => r.name)]) tokBase[n] = tokenValue(n);
+  renderLive(); tokBase = {}; for (const n of [...Object.keys(INKS), '--grain', ...RISO.map((r) => r.name), ...BLURS.map((b) => b.name)]) tokBase[n] = tokenValue(n);
   commit(); layoutFrame(); buildPanel();
   if (hasDraft) offerDraft(draft);
 }
@@ -1627,6 +1632,9 @@ function pageSection(open) {
       read: () => Math.round(100 * (parseFloat(tokenValue('--grain')) || 0)),
       write: (v) => setTok('--grain', String(r3(v / 100))),
       on: () => isSet(['--grain']), reset: () => { delTweak(state.css, tokScope('--grain'), ':root', '--grain'); renderLive(); } }),
+    h('div', { class: 'sub', text: 'Frosted glass blur' }),
+    ...BLURS.map((bl) => rangeField({ label: bl.label, aria: bl.aria, title: bl.title, min: 0, max: 48, step: 1, unit: 'px',
+      read: () => parseFloat(tokenValue(bl.name)) || 0, write: (v) => setTok(bl.name, r3(v) + 'px'), on: () => isSet([bl.name]), reset: () => clear([bl.name]) })),
     h('div', { class: 'sub', text: 'Header riso shift' }),
     h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'A yellow and a magenta copy of heading text (h1–h3 and the big sub-headline), printed slightly off-register in opposite directions and carrying the paper grain. Every width; skipped for increased contrast and print. Select a heading for its own plates.' }),
     ...RISO.map((r) => rangeField({ label: r.label, aria: r.aria, title: r.title, min: r.min, max: r.max, step: r.step, unit: r.unit,
