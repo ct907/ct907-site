@@ -190,20 +190,23 @@
       background-position: 0 calc(var(--lv) * -1), 0 0, 0 0, 0 0;
       background-blend-mode: multiply;
     }
-    /* Paper texture over everything, so the text and photos are printed on the same sheet. It is a seamless,
-       greyscale tile (assets/images/paper-texture*.webp) multiplied over the whole page at --grain opacity.
-       Multiply can only darken, so black text stays black and white paper picks up the speckle. Regular screens
-       load the 563px file (~110KB), retina screens the 1125px one (~380KB). It sits above all content but never
-       takes a click (pointer-events: none), and it scrolls with the page like real paper. */
+    /* Paper texture over everything, so the text and photos are printed on the same sheet. It is a seamless tile
+       (assets/images/paper-texture*.webp) laid over the whole page at --grain opacity. Each pixel is BLACK with an alpha
+       of (255 - the texture's grey), which gives exactly the result of multiplying the grey texture over the page
+       (normal blending of black at alpha a is page x (1 - a), and multiply by grey g is page x (g / 255)), but without
+       mix-blend-mode: a blend mode makes the browser re-composite the whole page every frame and roughly doubled
+       scroll frame times in testing. It can only darken, so black text stays black. Everyone first gets the 563px
+       file (~110KB); retina screens on a decent connection get the sharper 1125px one (~380KB) swapped in by the
+       script at the bottom once the page has loaded (loading it up front pushed the portrait's paint back by
+       3 seconds on a slow phone connection). It sits above all content but never takes a click, and it scrolls
+       with the page like real paper. */
     body::after {
       content: ""; position: absolute; inset: 0; z-index: 9999; pointer-events: none;
       opacity: var(--grain);
-      mix-blend-mode: multiply;
       background-image: url("assets/images/paper-texture.webp");
-      background-image: -webkit-image-set(url("assets/images/paper-texture.webp") 1x, url("assets/images/paper-texture@2x.webp") 2x);
-      background-image: image-set(url("assets/images/paper-texture.webp") 1x, url("assets/images/paper-texture@2x.webp") 2x);
       background-size: var(--grain-size) var(--grain-size);
     }
+    :root.grain-hd body::after { background-image: url("assets/images/paper-texture@2x.webp"); }
     a { color: inherit; -webkit-tap-highlight-color: transparent; }
     /* Solid ink ring: the orange accent is only ~2.5:1 on this background. */
     a:focus-visible, button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
@@ -945,6 +948,23 @@
     paintAll();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintAll);
     window.addEventListener('load', paintAll);
+  })();
+
+  /* ---------- paper texture: sharper tile for retina screens, after the page has loaded ----------
+     The first paint uses the small 563px tile so the texture never competes with the portrait photo and the fonts.
+     Once the page has loaded, retina screens (not on Save-Data or a slow connection, and not in a contrast mode,
+     where there is no texture) get the 1125px tile; it is fetched first, so the swap shows no gap. */
+  (function () {
+    var c = navigator.connection || {};
+    if ((window.devicePixelRatio || 1) < 1.5 || c.saveData || /2g|3g/.test(c.effectiveType || '')) return;
+    if (window.matchMedia && window.matchMedia('(prefers-contrast: more), (forced-colors: active)').matches) return;
+    function go() {
+      var img = new Image();
+      img.onload = function () { document.documentElement.classList.add('grain-hd'); };
+      img.src = 'assets/images/paper-texture@2x.webp';
+    }
+    function later() { if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 3000 }); else setTimeout(go, 800); }
+    if (document.readyState === 'complete') later(); else window.addEventListener('load', later);
   })();
 </script>
 </body>
