@@ -561,7 +561,7 @@
     }
 
     /* ===== editor tweaks: start (managed by /editor/; safe to hand-edit) ===== */
-    :root { --grain: 0.08 !important; --text: "Merriweather", Georgia, "Times New Roman", serif !important; }
+    :root { --grain: 0.08 !important; --text: "Merriweather", Georgia, "Times New Roman", serif !important; --blur: 0px !important; }
     .ed-deco { position: absolute !important; pointer-events: none !important; user-select: none !important; margin: 0 !important; }
     .ed-deco-tj9q { left: 35% !important; top: 144.0221rem !important; z-index: -1 !important; width: 12rem !important; }
     .ed-deco-1it7 { left: 35% !important; top: 70.6165rem !important; z-index: -1 !important; width: 12rem !important; }
@@ -576,7 +576,7 @@
       .ed-deco-tj9q { translate: -2.1786rem 7.3579rem !important; scale: 0.5 !important; }
       .ed-deco-1it7 { translate: -10.2857rem 24.8578rem !important; scale: 0.5 !important; }
       body { height: 183.7229rem !important; }
-      #music-h { translate: 0rem 1.3571rem !important; }
+      #music-h { translate: 0rem 1.3571rem !important; --riso-yellow-a: 1 !important; --riso-magenta-y: 2.5px !important; --riso-magenta-x: 2px !important; --riso-magenta-a: 0.3 !important; }
       p.music-intro.glass { translate: 0rem 1.3571rem !important; }
       article.release.glass { translate: 0rem 1.3571rem !important; }
       ul.tiles { translate: 0rem 1.3571rem !important; }
@@ -584,7 +584,7 @@
       a.pill.glass { translate: 0rem 1.3571rem !important; }
       div.portrait.glass > img { width: 14.5357rem !important; height: 9.7214rem !important; translate: 3.4643rem -1.2857rem !important; }
       #ux-portfolio { translate: 0rem 0.0715rem !important; }
-      #between-h { translate: 0rem 1.572rem !important; text-decoration-line: none !important; }
+      #between-h { translate: 0rem 1.572rem !important; text-decoration-line: none !important; --riso-magenta-y: 3px !important; --riso-magenta-x: 2px !important; --riso-yellow-a: 1 !important; --riso-yellow-y: -1px !important; }
       div.strip-outer { translate: 0rem 1.572rem !important; }
       hr.strip-line { translate: 0rem -0.0708rem !important; }
       figure.glass:nth-child(2) > img { translate: -4.8929rem 0.0357rem !important; }
@@ -597,18 +597,20 @@
       main { translate: 0rem 1.2141rem !important; }
       p.label.glass:nth-child(3) { translate: 0rem 1.3571rem !important; }
       p.label.glass:nth-child(7) { translate: 0rem 1.3571rem !important; }
+      h1.glass { --riso-magenta-y: 2px !important; --riso-magenta-x: 3px !important; --riso-yellow-a: 1 !important; }
+      p.lede.glass { --riso-yellow-a: 0.6 !important; --riso-magenta-y: 2px !important; --riso-magenta-a: 0.3 !important; --riso-magenta-x: 1px !important; --riso-yellow-y: -1.5px !important; }
     }
     @media (min-width: 721px) and (max-width: 1099px) {
-      .ed-deco-d6un { translate: -15.0519rem 4.429rem !important; width: 5.2872rem !important; height: 1.2722rem !important; }
-      #ux-h { translate: 0rem 1.3148rem !important; }
+      .ed-deco-d6un { translate: -15.0519rem 3.1834rem !important; width: 5.2872rem !important; height: 1.2722rem !important; }
+      #ux-h { translate: 0rem 1.3148rem !important; --riso-magenta-y: 3px !important; --riso-magenta-x: 2px !important; --riso-magenta-a: 0.4 !important; --riso-yellow-a: 1 !important; }
       div.ux { translate: 0rem 1.3148rem !important; }
       #music-projects { translate: 0rem 1.3148rem !important; }
       #in-between { translate: 0rem 2.4912rem !important; }
-      footer.wrap { translate: 0rem 1.73rem !important; }
-      .ed-deco-tj9q { translate: 1.6955rem -15.6748rem !important; scale: 0.55 !important; }
-      .ed-deco-1it7 { translate: -18.2353rem -3.9447rem !important; scale: 0.5 !important; }
-      body { height: 159.2817rem !important; }
-      #music-h { translate: 0rem 1.1764rem !important; }
+      footer.wrap { translate: 0rem 0.4844rem !important; }
+      .ed-deco-tj9q { translate: 1.6955rem -16.9204rem !important; scale: 0.55 !important; }
+      .ed-deco-1it7 { translate: -18.2353rem -5.1903rem !important; scale: 0.5 !important; }
+      body { height: 158.036rem !important; }
+      #music-h { translate: 0rem 1.1764rem !important; --riso-magenta-y: 2px !important; --riso-magenta-x: 2px !important; --riso-yellow-a: 1 !important; --riso-magenta-a: 0.3 !important; }
       p.music-intro.glass { translate: 0rem 1.1764rem !important; }
       article.release.glass { translate: 1.3495rem 1.1764rem !important; }
       ul.tiles { translate: 0.9688rem 1.1764rem !important; }
@@ -625,6 +627,11 @@
       div.strip-outer { translate: 0rem 0.4152rem !important; }
       p.label.glass:nth-child(3) { translate: 0.6574rem 1.1764rem !important; }
       p.label.glass:nth-child(7) { translate: 1.3148rem 1.1764rem !important; }
+      h1.glass { --riso-magenta-a: 0.4 !important; --riso-yellow-a: 1 !important; --riso-yellow-y: -1px !important; --riso-magenta-y: 3px !important; --riso-magenta-x: 2.5px !important; --riso-yellow-x: -3px !important; }
+      p.lede.glass { --riso-yellow-y: -1px !important; --riso-magenta-y: 3px !important; --riso-magenta-x: 2px !important; --riso-yellow-a: 1 !important; translate: 0rem -0.346rem !important; }
+      ul.arrows { font-size: 1.0727rem !important; translate: 0rem -1.2456rem !important; }
+      main { translate: 0rem -1.2456rem !important; }
+      div.portrait.glass { translate: 0rem -0.346rem !important; }
     }
     @media (min-width: 1100px) {
       p.lede.glass { translate: 0.204rem 5.5157rem !important; font-weight: 300 !important; padding-top: 0rem !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -0.5px !important; --riso-magenta-a: 0.4 !important; --riso-yellow-a: 1 !important; --riso-magenta-y: 2px !important; --riso-magenta-x: 2px !important; }
@@ -661,7 +668,6 @@
       a.pill.glass > svg { width: 0.9184rem !important; height: 0.9184rem !important; }
       nav { font-family: "Merriweather", serif !important; }
       p.year.glass { font-family: "Merriweather", serif !important; }
-      span.caret { translate: -0.204rem 1.071rem !important; }
       div.portrait.glass > img { translate: -2.5503rem -7.7449rem !important; }
       .ed-deco-tj9q { translate: 5.7857rem -1.8501rem !important; opacity: 0.4 !important; mix-blend-mode: hard-light !important; filter: brightness(0.4) !important; scale: 0.55 !important; }
       figure.rot.glass > img { translate: 2.0264rem 1.5034rem !important; }
@@ -689,7 +695,7 @@
 <header class="wrap hero">
   <p class="hello glass">Hello there, <span class="wave" aria-hidden="true">👋</span></p>
   <h1 class="glass">Chris Tan</h1>
-  <p class="lede glass">is currently doing some <span class="caret" aria-hidden="true"></span></p>
+  <p class="lede glass">is currently doing some </p>
 
   <ul class="arrows">
     <li><a class="glass arrow-link" href="#ux-portfolio">Design</a><span class="aside glass">by day,</span></li>
