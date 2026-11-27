@@ -33,6 +33,9 @@ and it is never written into the page.
 | Drag the orange **⇅ push this & below** grip (or use **Move this & everything below** in the panel) | Move the element and everything under it together |
 | **Page & background** in the panel (press Esc to deselect) | Grid, cyan, magenta and paper-grain opacity; page length |
 | **Replace image…** in the panel, or drop an image file onto a picture | Swap a picture for your own file |
+| **Add layers** in the panel | Add new text, a heading or an image *inside a box*, or floating *decoration* |
+| The purple ✦ handle on a decorative layer, or the **Layers** list | Select a layer that sits behind the page content |
+| Delete (or the red button) on a layer | Delete a layer you added with the editor (including ones pushed earlier) |
 | **390 / 820 / 1280 / 1440 / 1920** or the Width box | Preview at that screen width |
 | **Review & push** | See exactly what will be written (and uploaded), then open the pull request |
 
@@ -68,6 +71,51 @@ printed grid: **Grid** (both ink plates together, where 100% is the reference pr
 These are site-wide and are written inside `@media (prefers-contrast: no-preference)`, so visitors who ask for increased
 contrast still get the page's own calm, grain-free fallback (an `!important` rule outside that condition would override it).
 The same applies to any design token the page overrides for increased contrast.
+
+### Adding text and images (layers)
+
+The **Add layers** section has two kinds of layer. Each layer gets its own unique class (`ed-text-k3f9`, `ed-deco-t8x2` …)
+which is how the editor recognises it, styles it and, later, deletes it.
+
+**Inside a box.** Select a div, section or any other box (or anything inside one: a paragraph offers the section around it;
+the panel names the box it will use, and the breadcrumbs pick another). Then **＋ Text**, **＋ Heading** or **＋ Image…**.
+*Where* chooses *after the selected item*, *at the start* or *at the end* of the box. A new text layer opens for typing straight away
+(Enter saves; creating and naming it is a single undo step). New text and headings get the page's frosted plate (untick it in
+the Layer section). A new image is 12rem wide, optimised like a replaced picture, and has an **Alt text** box: describe it,
+or leave it empty only if it is purely decorative. The layer is ordinary page content: it moves, resizes and restyles like
+anything else, and later you can add more *after* it.
+
+**Decoration.** **＋ Decorative text** and **＋ Decorative image…** make free-floating layers: absolutely positioned in the page,
+**behind the page content by default** (pick *in front* in the Layer section), marked `aria-hidden="true"` (and `alt=""` for
+images), `pointer-events: none` so they never block a click on the live page, and not selectable by text-selection. They start
+at about 35% across and a third of the way down your current view; drag them into place (the page's own boxes cover a layer that
+is behind the content, so each one has a small purple **✦ handle** in the editor, and there is the **Layers** list), set the
+rotation, opacity and size in the panel. Like every tweak, moves are saved for the width range you are previewing: a
+decoration positioned at Desktop is still present at Phone, so check it there and move it, resize it or set its opacity to 0.
+
+**What gets written.** In-flow layers are inserted into the page's HTML right where you put them, indented like their
+neighbours. Decorative layers go into one managed block just before `</body>`:
+
+```html
+<!-- ===== editor decor: start (managed by /editor/; safe to hand-edit) ===== -->
+<span class="ed-deco ed-deco-t8x2" aria-hidden="true">✦ hello ✦</span>
+<img class="ed-deco ed-deco-m1q7" src="assets/images/sticker-89cdd76d.webp" alt="" aria-hidden="true" width="500" height="500">
+<!-- ===== editor decor: end ===== -->
+```
+
+Their styling is in the managed CSS block (a shared `.ed-deco` rule, plus one rule per layer, plus per-width moves). Image layers
+upload their file to `assets/images/` in the same commit.
+
+**Safety.** The editor finds the right place with its own small HTML indexer, and does not trust it blindly: first it checks
+that it sees exactly the same elements, nested the same way, as the browser does for the *whole* page; then, after inserting, it
+has the browser re-read the result and requires exactly one more element, with the new one in the expected box and beside the
+expected neighbours. If anything is off (the page changed since you opened the editor, or the markup has unclosed `<p>`/`<li>`
+tags) the layer is **not** added, its picture is not uploaded, and it is listed in the pull request instead.
+
+**Deleting.** You can delete any layer the editor made, including ones pushed in earlier pull requests: the layer, its CSS rules
+(and the shared `.ed-deco` rule and the decor block when they are no longer needed) are removed from the file. Adding layers and
+deleting them again gives back the original file byte for byte. The editor will not delete anything it didn't create. A deleted
+layer's picture file stays in `assets/images/`.
 
 ### Replacing pictures
 
@@ -133,6 +181,9 @@ end, so a failure part-way leaves no stray branch):
    in the pull request instead. Other mentions of the old address (the portrait's `og:image` and JSON-LD) are left alone,
    so social-share previews keep the old picture until you change those by hand.
 
+4. **New layers**: in-flow layers are written into the HTML at the spot you chose; decorative layers into the managed decor
+   block (see *Adding text and images*). Their CSS joins the managed block above.
+
 Nothing else in the file is touched.
 
 ### Folding tweaks back into the real CSS
@@ -144,8 +195,8 @@ move the rules into the main stylesheet and delete the block. Until then it is h
 
 - The preview shows the page **as deployed from `main`**. Changes in an unmerged pull request won't appear.
 - Your recorded tweaks are kept in this browser as a draft, so an accidental reload offers to restore them. Replaced
-  pictures are **not** kept in the draft (the files are too big for it): after a reload, pick them again. Closing the tab
-  with unsent changes asks you to confirm.
+  pictures and new layers are **not** kept in the draft (their image files are too big for it): after an accidental reload,
+  add them again. (The **Reload** button inside the editor keeps everything.) Closing the tab with unsent changes asks you to confirm.
 - The push uses GitHub's Git Data API (blobs, tree, commit, ref), which the same *Contents: Read and write* permission covers.
 - Pictures are not cropped for you: the page's own CSS fits them to their frames (`object-fit: cover`), and the focal point
   moves that crop. The tile-sized pictures use a ~170px frame, so very wide images will lose their sides.
