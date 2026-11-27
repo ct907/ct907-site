@@ -1,10 +1,232 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Chris Tan – moved</title>
-<link rel="canonical" href="https://hello.ct907.com/portfolio/">
-<meta http-equiv="refresh" content="0; url=https://hello.ct907.com/portfolio/">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#dbdad8">
+
+  <title>Chris Tan's UX Portfolio</title>
+  <meta name="description" content="UX portfolio of Chris Tan: AI interaction design research and website revamps for government agencies.">
+  <link rel="canonical" href="https://ct907.com/portfolio/">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Chris Tan">
+  <meta property="og:title" content="Chris Tan's UX Portfolio">
+  <meta property="og:description" content="Design by day, music by night.">
+  <meta property="og:url" content="https://ct907.com/portfolio/">
+  <meta property="og:image" content="https://ct907.com/assets/images/chris-tan-profile.webp">
+  <meta property="og:image:width" content="696">
+  <meta property="og:image:height" content="600">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Type (site-wide rule, see CLAUDE.md): Signika for headings and display text, Lora for body text, and
+       Merriweather for body text from 1100px up. Same two font roles as index.html (--display, --text). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=Signika:wght@300..700&display=swap" rel="stylesheet">
+  <!-- Desktop body font. The media attribute keeps it from blocking the first paint on phones and tablets. -->
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300..900&display=swap" rel="stylesheet" media="(min-width: 1100px)">
+
+  <style>
+    :root {
+      --bg: #dbdad8;
+      --ink: #171612;
+      --accent: #ff6546;        /* shapes and icons, as on the Readymag page */
+      --accent-text: #ab300e;   /* the same orange, darkened to 4.8:1 on --bg for text (#ff6546 is only 2.1:1) */
+
+      --display: "Signika", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --text: "Lora", Georgia, "Times New Roman", serif;
+
+      --gutter: clamp(1.25rem, 6vw, 3.75rem);
+    }
+    /* Merriweather is the body font from 1100px up, so it is the token here (index.html applies it with editor rules instead). */
+    @media (min-width: 1100px) { :root { --text: "Merriweather", Georgia, "Times New Roman", serif; } }
+
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 400 1rem/1.6 var(--text);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;               /* the dotted rules are wider than the screen while they slide */
+    }
+    h1, h2, h3, p { margin: 0; }
+    svg { display: block; }
+
+    .wrap { width: 100%; max-width: 64rem; margin-inline: auto; padding-inline: var(--gutter); }
+
+    a { color: inherit; }
+    a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
+
+    /* ---------- greeting strip ---------- */
+    .top {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+      column-gap: 1.5rem; padding-block: .75rem 0;
+      font: 300 1.25rem/1.5 var(--display);
+    }
+    .hello { display: flex; align-items: center; gap: .5rem; }
+    .hello svg { width: 1.5rem; height: 1.5rem; transform: rotate(8deg); }
+    .welcome { margin-left: auto; color: var(--accent-text); }
+
+    /* ---------- hero ---------- */
+    .hero { display: grid; row-gap: 2rem; padding-block: clamp(2.5rem, 9vw, 6rem) 3.5rem; }
+    h1 {
+      font: 300 clamp(3.25rem, 14vw, 4.5rem)/1.125 var(--display);
+      letter-spacing: -.015em; text-transform: uppercase;
+    }
+    .lede {
+      font: 400 clamp(1.6rem, 6.5vw, 2.125rem)/1.3 var(--display);
+      letter-spacing: -.01em; margin: -.6rem 0 .6rem;     /* tucked up under the title, as on the Readymag page */
+    }
+    .lede .caret { display: inline-block; width: .6875rem; height: .5625rem; margin-left: .4rem; vertical-align: .4em; }
+    .lede .caret svg { width: 100%; height: 100%; }
+    .intro p:not(.lede) { max-width: 28.5rem; font-size: .9375rem; line-height: 1.7; text-wrap: pretty; }
+    .intro p:not(.lede) + p { margin-top: 1.4rem; }
+
+    .photo { position: relative; z-index: 2; margin: 0; justify-self: end; width: min(100%, 17.25rem); transform: rotate(6deg); }
+    .photo img { display: block; width: 100%; height: auto; border-radius: .875rem; }
+
+    @media (min-width: 52rem) {
+      /* Fixed photo column: a percentage width inside an auto column would size it from the image's own 696px. */
+      .hero { grid-template-columns: minmax(0, 1fr) 18rem; align-items: end; column-gap: 2rem; }
+      /* The photo ends 2.25rem below the dotted rule (which runs behind it): the hero's 3.5rem bottom padding plus 2.25rem.
+         The small right margin keeps the tilted corner inside the content edge. */
+      .photo { justify-self: stretch; width: auto; margin: 0 .75rem -5.75rem 0; }
+    }
+
+    /* ---------- dotted rules (they slide sideways as the page scrolls; see the script) ---------- */
+    .rule {
+      position: relative; z-index: 1; height: 4px;
+      background: radial-gradient(circle, var(--ink) .75px, transparent 1px) 0 0 / 4px 4px repeat-x;
+    }
+
+    /* ---------- sections ---------- */
+    .badge { display: grid; place-items: center; width: 1.375rem; height: 1.375rem; background: var(--accent); color: var(--ink); }
+    .badge svg { width: .8125rem; height: .8125rem; }
+    .badge.round { border-radius: 50%; }
+    h2 { font: 600 clamp(2.25rem, 9vw, 3rem)/1.23 var(--display); letter-spacing: -.015em; margin-top: .6rem; }
+
+    .work { padding-block: 3rem 3.25rem; }
+    .period { font: 600 .8125rem/1.6 var(--display); letter-spacing: .02em; margin-top: 1.75rem; }
+    h2 + .period { margin-top: 1.25rem; }
+    .projects { list-style: none; margin: 0; padding: 0; }
+    .projects a {
+      display: inline-block; padding-block: .3rem;
+      font: 400 1.0625rem/1.4 var(--text); letter-spacing: .01em; text-decoration: none;
+    }
+    .projects a:hover { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: .25em; }
+
+    .contact { padding-block: 3rem 5rem; }
+    .contact p { font-size: .9375rem; }
+    .contact h2 + p { margin-top: .75rem; }
+    .mail { display: flex; align-items: center; gap: .5rem; margin-top: .25rem; }
+    .mail svg { width: 1.1875rem; height: 1.1875rem; color: var(--accent); }
+    .mail a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .2em; }
+    .mail a:hover { text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
+  </style>
 </head>
-<body><p>This page has moved to <a href="https://hello.ct907.com/portfolio/">hello.ct907.com/portfolio/</a>.</p></body>
+<body>
+
+  <header class="top wrap">
+    <p class="hello">Hello there,
+      <svg viewBox="0 0 28 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M9 15 7.4 6.2Q7 3.6 9 3.6q1.9 0 2.2 2.4L12.4 13"/>
+        <path d="M12.4 13 12.8 3.8Q12.9 1.6 14.7 1.7q1.7.1 1.8 2.3L16 13"/>
+        <path d="M16 13 18 5.6Q18.6 3.6 20.2 4.2q1.5.6.9 2.6L19.6 14"/>
+        <path d="M9 15Q4.2 12.6 3.6 15.3 3.4 17 8.4 19"/>
+        <path d="M8.4 19 9.6 30M19.6 14 17.2 30"/>
+        <path d="M23 7.2q2.3 2.6.4 5.4M25.6 5q3.2 3.8.6 8.6"/>
+      </svg>
+    </p>
+    <p class="welcome">welcome to my portfolio page.</p>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <div class="intro">
+        <h1>Chris Tan</h1>
+        <p class="lede">is a UX Designer.
+          <span class="caret" aria-hidden="true"><svg viewBox="0 0 11 9" preserveAspectRatio="none"><path d="M0 0h11L5.5 9z" fill="#ff6546"/></svg></span>
+        </p>
+        <p>I have over 3 years of experience in UX, starting from UX Research on AI Interaction Design. I moved on to doing website revamps for gov agencies.</p>
+        <p>A lot of what I do is confidential, please reach out to me to find out more about my experience :)</p>
+      </div>
+      <figure class="photo">
+        <img src="/assets/images/chris-tan-profile.webp" width="696" height="600" decoding="async" fetchpriority="high"
+             alt="Chris Tan smiling and looking off to one side in soft golden light, wearing a grey-blue hoodie, with misty hills behind him.">
+      </figure>
+    </section>
+
+    <div class="rule" aria-hidden="true"></div>
+
+    <section class="work wrap" aria-labelledby="work-title">
+      <span class="badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor"><g transform="rotate(45 12 12)"><rect x="9.6" y="1.5" width="4.8" height="15.5" rx=".8"/><path d="M9.6 18.4h4.8L12 23z"/></g></svg>
+      </span>
+      <h2 id="work-title">Design Work</h2>
+
+      <h3 class="period">2023 - Now</h3>
+      <ul class="projects">
+        <li><a href="/nhb-games/">NHB - Gamification Platform</a></li>
+      </ul>
+
+      <h3 class="period">2022</h3>
+      <ul class="projects">
+        <li><a href="/private-capital-management-website/">Mapletree PCM - Website POC</a></li>
+      </ul>
+
+      <h3 class="period">2021</h3>
+      <ul class="projects">
+        <li><a href="/research-gateway-design/">NLB - Research Gateway POC</a></li>
+      </ul>
+
+      <h3 class="period">2018 - 2020: AI DRIVER SERIES</h3>
+      <ul class="projects">
+        <li><a href="/aria-driverless-car-app/">ARIA Autonomous Car - Rideshare App</a></li>
+        <li><a href="/ai-interaction-design/">AI Driver - Interaction Design</a></li>
+        <li><a href="/ai-driver-interaction-surface/">AI Driver - Interaction Surfaces</a></li>
+        <li><a href="/ai-driver-visual-language/">AI Driver - Visual Language</a></li>
+        <li><a href="/ai-visual-identity/">AI Visual Identity</a></li>
+      </ul>
+    </section>
+
+    <div class="rule" aria-hidden="true"></div>
+
+    <section class="contact wrap" aria-labelledby="contact-title">
+      <span class="badge round" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.6 7C5.2 14.5 9.5 18.8 17 18.4" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/><ellipse cx="5.6" cy="6" rx="3.4" ry="2.9"/><ellipse cx="18" cy="18.4" rx="2.9" ry="3.4"/></svg>
+      </span>
+      <h2 id="contact-title">Contact Me</h2>
+      <p>I'm Chris Tan, nice to meet you!</p>
+      <p class="mail">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1.2 8.4 12 1.5l10.8 6.9V22.5H1.2zM1.2 8.4l21.6 14.1M22.8 8.4 1.2 22.5"/></svg>
+        <a href="mailto:gax907@gmail.com">gax907@gmail.com</a>
+      </p>
+    </section>
+  </main>
+
+  <!-- The two dotted rules slide sideways as you scroll (the first to the left, the second to the right, twice as fast),
+       as they did on the Readymag page. Skipped when the visitor prefers reduced motion; without JS they stay still. -->
+  <script>
+    (function () {
+      var rules = document.querySelectorAll('.rule');
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var queued = false;
+      function draw() {
+        queued = false;
+        var y = reduce.matches ? 0 : window.scrollY;
+        for (var i = 0; i < rules.length; i++) {
+          rules[i].style.backgroundPositionX = (i % 2 ? 3 : -1.5) * y + 'px';
+        }
+      }
+      function queue() { if (!queued) { queued = true; requestAnimationFrame(draw); } }
+      window.addEventListener('scroll', queue, { passive: true });
+      reduce.addEventListener('change', queue);
+      queue();
+    })();
+  </script>
+</body>
 </html>

@@ -118,6 +118,22 @@ editor for it (see `editor/README.md`).
 
 ## Site structure
 
-- Every folder other than `assets/` and `editor/` (`portfolio/`, `ai-*`, `nhb-games/`, `slow-food-*`, …) is a ~400-byte
-  redirect stub to `https://hello.ct907.com/<name>/`. The real pages for those live on that other site, outside this
-  repo. So today only `index.html` has typography to maintain here; apply the rule above to any real page added to this repo.
+- `index.html` (homepage) and `portfolio/index.html` are real pages. Every other folder besides `assets/` and `editor/`
+  (`ai-*`, `nhb-games/`, `slow-food-*`, …) is a ~400-byte redirect stub to `https://hello.ct907.com/<name>/`. The real pages
+  for those live on that other site (Readymag), outside this repo. Apply the typography rule above to any real page added
+  to this repo. To migrate another Readymag page, replace its stub with the real page (keep the same folder name, so old
+  links keep working).
+- **`portfolio/index.html`** was migrated from the Readymag page `hello.ct907.com/portfolio` (the CHRIS TAN landing page
+  with the project list and contact details). It is a standalone file with its own inline CSS and no editor support (the
+  editor only manages `index.html`). Differences from the homepage worth knowing:
+  - Fonts follow the standing rule through the same `--display` / `--text` tokens, but here **Merriweather is the `--text`
+    token itself from 1100px up** (`@media (min-width: 1100px) { :root { --text: "Merriweather", … } }`), with its own
+    `<link media="(min-width: 1100px)">`. So there are no per-element Merriweather rules to maintain.
+  - It has no paper grain, grid or riso plates: those are homepage-only looks. Page colours are `--bg` #dbdad8 and `--ink`
+    #171612, with the Readymag orange `--accent` #ff6546 for shapes and icons. Text in orange uses `--accent-text`
+    (#ab300e), because #ff6546 on #dbdad8 is only 2.1:1; keep text at 4.5:1 or better.
+  - The profile photo is `assets/images/chris-tan-profile.webp` (696×600, the same crop Readymag used). The wave, pencil,
+    phone and envelope icons and the caret are inline SVG (the Readymag originals were small PNGs). The two dotted rules
+    slide sideways as the page scrolls (a ~15-line script at the bottom; they stay still under `prefers-reduced-motion`).
+  - The eight project links are root-relative (`/nhb-games/` …), so they go through the redirect stubs today and start
+    pointing at the real pages automatically once those are migrated.
