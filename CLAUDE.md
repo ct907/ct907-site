@@ -73,6 +73,24 @@ editor for it (see `editor/README.md`).
   Chrome 119+, Safari 16.4+, Firefox 128+; older browsers just show no ghosts). It is off for increased contrast, forced
   colours and print. A per-element `text-shadow` tweak from the editor overrides it on that element.
 
+## Page editor: structural edits (`editor/index.html`)
+
+- **Selection.** `sel` is the active element, `selMore` the rest of a multi-selection; `setProp` / `resetProps` / `isTweaked`
+  act on all of them when called without an element, and moves, nudges and the X/Y/W/H fields loop over `targets()`.
+  Shift+click = a run of like elements, Ctrl/Cmd+click = toggle, Alt+click = innermost (Ctrl/Cmd+click used to mean that).
+- **Deleting** an existing element marks it in `state.deleted` (path from `<body>`, tag/id/classes, a text fingerprint) and
+  hides it in the preview with `data-ed-del`; the node stays in the DOM, so paths and selectors keep their meaning. On push
+  it is cut from the HTML **last** (descending path order, ignoring layers placed in the same push) and the browser must
+  read back exactly that many fewer elements. Rules keyed with `:nth-child` are rewritten for the page without it
+  (`rekeyForDeletions`, using a detached copy of the preview).
+- **Duplicating** creates a layer of kind `clone` (class `ed-copy-xxxx`, markup saved at click time, ids made unique). Layers
+  and copies change what `:nth-child(k)` means for later siblings in the preview, so every structural change goes through
+  `withRekey`, which renames the rules, text edits and picture swaps that depend on a position (`state.renames` remembers
+  that a renamed baseline rule is not a change of its own). `originals` / `imgOrig` are keyed by element, not selector, for
+  the same reason. Don't store selectors across a structural change.
+- Source edits happen in this order in `buildNewSource`: text, pictures, new layers and copies, removal of pushed layers,
+  deletions, then the managed style block. Path lookups in the source skip layers already placed in that push (`srcAt` with `ign`).
+
 ## Site structure
 
 - Every folder other than `assets/` and `editor/` (`portfolio/`, `ai-*`, `nhb-games/`, `slow-food-*`, …) is a ~400-byte
