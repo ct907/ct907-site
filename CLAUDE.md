@@ -118,6 +118,39 @@ editor for it (see `editor/README.md`).
 
 ## Site structure
 
-- Every folder other than `assets/` and `editor/` (`portfolio/`, `ai-*`, `nhb-games/`, `slow-food-*`, …) is a ~400-byte
-  redirect stub to `https://hello.ct907.com/<name>/`. The real pages for those live on that other site, outside this
-  repo. So today only `index.html` has typography to maintain here; apply the rule above to any real page added to this repo.
+- `index.html` (homepage) and `portfolio/index.html` are real pages. Every other folder besides `assets/` and `editor/`
+  (`ai-*`, `nhb-games/`, `slow-food-*`, …) is a ~400-byte redirect stub to `https://hello.ct907.com/<name>/`. The real pages
+  for those live on that other site (Readymag), outside this repo. Apply the typography rule above to any real page added
+  to this repo. To migrate another Readymag page, replace its stub with the real page (keep the same folder name, so old
+  links keep working).
+- **`portfolio/index.html`** was migrated from the Readymag page `hello.ct907.com/portfolio` (the CHRIS TAN landing page
+  with the project list and contact details) and then restyled to **look like the homepage**. It is a standalone file with
+  its own inline CSS and no editor support (the editor only manages `index.html`).
+  - **It copies the homepage's design system, it does not share it.** From `index.html`, with the homepage's *live* values:
+    the `:root` tokens (palette, `--ink-c` #cdf6ff / `--ink-m` #f6ecf5, `--grain` .08, riso and glass tokens), the fluid
+    root font size and `--pad`, the grid + grain layers, `.glass` plates and their soft edges, the riso heading plates, the
+    animated h1 weight, `.arrow-link`, `.label`, `.badge`, the footer, the reduce-motion toggle, reveal-on-scroll, the hover
+    and press tints and the contrast / print / forced-colours fallbacks. **If you change any of those in `index.html`,
+    change the copy in `portfolio/index.html` too.** (Pulling them into shared files under `assets/` would remove the
+    duplication, but it means refactoring `index.html`, which the editor reads and writes; not done.)
+  - **Not copied:** the liquid cursor effect (the lens that follows the pointer and the poured hover tint) — hover and press
+    use the plain CSS tints the homepage itself falls back to on touch — and the editor's per-element `translate` nudges.
+    From 1100px the editor's live *values* are reproduced as plain rules in the "desktop values" block (stronger yellow
+    plate and a 40% magenta plate on h1, h2 and the sub-headline, light 300 weights, Merriweather on the greeting, the
+    riso decor shapes in place of the badges, 2px blur on link plates).
+  - Riso plates apply to `h1`, `h2` and `.lede` only. The period labels are `h3.label` (small uppercase plates like the
+    homepage's `.label`), which deliberately get no riso plates; labels never do.
+  - Fonts follow the standing rule through the same `--display` / `--text` tokens, but here **Merriweather is the `--text`
+    token itself from 1100px up** (`@media (min-width: 1100px) { :root { --text: "Merriweather", … } }`), with its own
+    `<link media="(min-width: 1100px)">`. So there are no per-element Merriweather rules to maintain.
+  - Orange text uses `--accent-text` (#c2370f, 4.7:1 on `--bg`) because the accent #ff6546 is only 2.5:1; the accent stays
+    for arrows and shapes. Keep any text at 4.5:1 or better.
+  - Layout: the hero is a two-column grid (text stack | tilted portrait) that stacks at **960px**, not the homepage's 720px:
+    beside the portrait the title wraps on a tablet. The toggle shares the homepage's `ct907-motion` key, so a visitor's
+    choice carries over between the two pages.
+  - The portrait is `assets/images/chris-tan-profile.webp` (696×600, the same crop Readymag used). The decor shapes are the
+    homepage's `riso-shapes-deco-copy-4` / `-copy-2` images; they are `display: none` (so never fetched) below 1100px, where
+    the grey `.badge` squares show instead, as on the homepage.
+  - The footer adds a "Home" link (the Readymag page had no way back); Instagram, Linktree and Email are the homepage's.
+  - The eight project links are root-relative (`/nhb-games/` …), so they go through the redirect stubs today and start
+    pointing at the real pages automatically once those are migrated.
