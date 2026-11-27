@@ -416,9 +416,9 @@
 
     /* ---------- hover / press / keyboard focus ----------
        Clickable plates (links, buttons, the album card) tint orange on hover and blue on press.
-       Non-clickable plates tint black @ 5% and deepen their blur, so the grid seems to vanish
-       behind them. Hover only applies where a real hover exists (not on touch, where it would
-       stick after a tap).
+       Non-clickable plates deepen their blur on hover, so the grid seems to vanish behind them,
+       and tint black @ 5% (and stay tinted: see the read state below). Hover only applies where
+       a real hover exists (not on touch, where it would stick after a tap).
        With the cursor effects running (html.fx) the tint is drawn by the liquid layer instead
        (see the script), so these plain CSS tints are the fallback: reduced motion, touch,
        contrast modes, or no JS. Keyboard focus always uses the plate itself. */
@@ -426,6 +426,18 @@
       :root:not(.fx) :is(a, button).glass:hover, :root:not(.fx) .release:hover { --fill: var(--glass-hover); }
       :root:not(.fx) .glass:not(a, button, .release, .aside):hover { --fill: var(--glass-quiet); }
       .glass:not(a, button, .release, .aside):hover { --blur: var(--blur-hover); }
+    }
+    /* Read state. A non-clickable plate the cursor has visited keeps a dark-grey tint (black @ 5%)
+       until the page is reloaded, like read vs unread. The script adds .is-read (when the cursor
+       approaches, or on hover without the liquid effect); nothing is stored, so a refresh or a
+       new browser session starts clean. The tint is the plate's own fill, so it crossfades
+       uniformly over the whole plate, at a third of the clickable tint's speed (.54s vs .18s). */
+    .glass.is-read:not(a, button, .release, .aside) {
+      --fill: var(--glass-quiet);
+      transition: background-color .54s ease, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
+    }
+    .strip figure.glass.is-read {   /* keep this one's lift-on-hover transition */
+      transition: transform .25s, background-color .54s ease, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
     }
     :is(a, button).glass:focus-visible { --fill: var(--glass-hover); }
     :root:not(.fx) :is(a, button).glass:active, :root:not(.fx) .release:active { --fill: var(--glass-press); }
@@ -616,8 +628,11 @@
         the OS preference until the visitor has chosen.
      2. With full motion on a mouse-type device, a frosted lens follows the cursor and hovering a
         plate pours a tint out of the cursor that fills the plate like liquid (metaball).
-        Clickable plates: orange (hover) / blue (press). Everything else: black @ 5%.
-        Reduced motion, touch, contrast modes: the plain CSS tints are used instead. */
+        Clickable plates: orange (hover) / blue (press), poured out of the cursor.
+        Non-clickable plates are quieter: as the cursor approaches, the plate's own colour
+        crossfades to dark grey (black @ 5%) uniformly and slowly, while the cursor and the
+        plate's shape still fuse like liquid; the tint then stays ("read") until the page is
+        reloaded. Reduced motion, touch, contrast modes: the plain CSS tints are used instead. */
   (function () {
     var root = document.documentElement;
     var KEY = 'ct907-motion';
@@ -642,10 +657,14 @@
     /* ----- liquid cursor ----- */
     var ORANGE = { r: 255, g: 129, b: 3, a: 0.2 };    // #FF8103 @ 20%  hover, clickable
     var BLUE   = { r: 0, g: 180, b: 255, a: 0.2 };    // #00B4FF @ 20%  press, clickable
-    var QUIET  = { r: 0, g: 0, b: 0, a: 0.05 };       // #000000 @ 5%   hover, not clickable
+    // Non-clickable plates ("quiet") are a separate, subtler system: black @ 5%, crossfaded at a
+    // third of the clickable tint's speed (14/s -> 14/3 per s), uniformly over the whole plate.
+    var QUIET_A = 0.05, QUIET_RATE = 14 / 3;
     var layer, lens, svg, region, blurNode, flood, rect, dot;
+    var svgQ, regionQ, blurQ, floodQ, cutMask, cutBg, cutRect, rectQ, dotQ;
     var active = false, raf = 0, lastT = 0, pickAt = 0, bound = false;
     var px = 0, py = 0, seen = false, pressed = false, needPick = false, el = null, R = 20, PAD = 36;
+    var near = null, qEl = null, qA = 0, qT = 0, plates = null;   // quiet system: nearest non-clickable plate, its fade
     var cx = spring(0), cy = spring(0);                                   // the cursor puck
     var bx = spring(0), by = spring(0), bw = spring(0), bh = spring(0), br = spring(0), ba = spring(0);   // the tint shape
     var col = { r: 255, g: 129, b: 3, a: 0 }, colT = { r: 255, g: 129, b: 3, a: 0 };
@@ -665,10 +684,34 @@
             '<feComposite in="f" in2="m" operator="in"/>' +
           '</filter></defs>' +
           '<g filter="url(#fx-filter)"><rect id="fx-rect" fill="#000"/><circle id="fx-dot" fill="#000"/></g>' +
+        '</svg>' +
+        // Second, independent liquid layer for NON-clickable plates. Same goo filter, but black,
+        // and masked so the plate's own interior is cut out: the plate's tint is its own CSS
+        // fill (.is-read), so only the cursor-attached liquid (bridge, bulge, puck) is drawn here.
+        '<svg class="fx-goo" focusable="false" style="visibility:hidden"><defs>' +
+          '<filter id="fx-filter-q" filterUnits="userSpaceOnUse" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">' +
+            '<feGaussianBlur id="fx-blur-q" in="SourceGraphic" stdDeviation="8" result="b"/>' +
+            '<feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -14.5" result="m"/>' +
+            '<feFlood id="fx-flood-q" flood-color="#000" flood-opacity="0" result="f"/>' +
+            '<feComposite in="f" in2="m" operator="in"/>' +
+          '</filter>' +
+          '<mask id="fx-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1" height="1">' +
+            '<rect id="fx-cutbg" fill="#fff"/><rect id="fx-cutrect" fill="#000"/>' +
+          '</mask></defs>' +
+          '<g mask="url(#fx-cut)"><g filter="url(#fx-filter-q)"><rect id="fx-qrect" fill="#000"/><circle id="fx-qdot" fill="#000"/></g></g>' +
         '</svg>';
       document.body.appendChild(layer);
       lens = layer.querySelector('.fx-lens');
       svg = layer.querySelector('svg');
+      svgQ = layer.querySelectorAll('svg')[1];
+      regionQ = document.getElementById('fx-filter-q');
+      blurQ = document.getElementById('fx-blur-q');
+      floodQ = document.getElementById('fx-flood-q');
+      cutMask = document.getElementById('fx-cut');
+      cutBg = document.getElementById('fx-cutbg');
+      cutRect = document.getElementById('fx-cutrect');
+      rectQ = document.getElementById('fx-qrect');
+      dotQ = document.getElementById('fx-qdot');
       region = document.getElementById('fx-filter');
       blurNode = document.getElementById('fx-blur');
       flood = document.getElementById('fx-flood');
@@ -680,6 +723,7 @@
       R = n2(parseFloat(getComputedStyle(root).fontSize) * 1.25);   // puck radius scales with the text
       PAD = R * 1.8;
       put(blurNode, 'stdDeviation', n2(R * 0.4));
+      put(blurQ, 'stdDeviation', n2(R * 0.4));
       lens.style.width = lens.style.height = (R * 2) + 'px';
     }
 
@@ -690,12 +734,30 @@
       col.a = 0;
     }
 
-    function pick() {   // which plate is under the pointer?
-      needPick = false;
-      var t = seen ? document.elementFromPoint(px, py) : null;
+    function isClickable(g) { return g.matches('a, button, .release'); }
+
+    function approach() {   // the nearest non-clickable plate within reach of the puck, if any
+      if (!plates) plates = [].filter.call(document.querySelectorAll('.glass'), function (g) { return !g.matches('a, button, .release, .aside'); });
+      var best = null, bd = 1e9, nd = 1e9, i, g, r, dx, dy, d;
+      for (i = 0; i < plates.length; i++) {
+        g = plates[i]; r = g.getBoundingClientRect();
+        dx = Math.max(r.left - px, 0, px - r.right); dy = Math.max(r.top - py, 0, py - r.bottom);
+        d = Math.sqrt(dx * dx + dy * dy);
+        if (d < bd) { bd = d; best = g; }
+        if (g === near) nd = d;
+      }
+      if (best && bd < R * 1.6 && getComputedStyle(best).opacity !== '0') return best;
+      return (near && nd < R * 2.1) ? near : null;      // a little hysteresis so it doesn't flicker at the edge
+    }
+
+    function pick() {   // what is the pointer on, or approaching?
+      needPick = false; el = null;
+      if (!seen) { near = null; return; }
+      var t = document.elementFromPoint(px, py);
       var g = t && t.closest ? t.closest('.glass') : null;
       if (g && getComputedStyle(g).opacity === '0') g = null;    // not revealed yet
-      el = g;
+      if (g && isClickable(g)) { el = g; near = null; return; }  // clickable: the orange/blue liquid
+      near = (g && !g.classList.contains('aside')) ? g : approach();   // non-clickable: the quiet one
     }
 
     function measure(g) {   // the plate's shape in viewport px, including any rotation/scale
@@ -730,6 +792,32 @@
       svg.style.visibility = col.a < 0.002 ? 'hidden' : 'visible';
     }
 
+    // The quiet layer: the plate's own shape held rigidly in place (no springing out of the cursor),
+    // fused with the cursor puck by the goo filter, with the plate's interior cut out.
+    function drawQuiet(nt) {
+      var on = !!nt && qA > 0.002;
+      svgQ.style.visibility = on ? 'visible' : 'hidden';
+      if (!on) return;
+      var w = nt.w, h = nt.h, x = nt.x, y = nt.y, r = Math.min(nt.r, w / 2, h / 2);
+      var rot = 'rotate(' + n2(nt.a * 57.29578) + ' ' + n2(x) + ' ' + n2(y) + ')';
+      put(rectQ, 'x', n2(x - w / 2)); put(rectQ, 'y', n2(y - h / 2));
+      put(rectQ, 'width', n2(w)); put(rectQ, 'height', n2(h)); put(rectQ, 'rx', n2(r)); put(rectQ, 'transform', rot);
+      put(dotQ, 'cx', n2(cx.x)); put(dotQ, 'cy', n2(cy.x)); put(dotQ, 'r', R);
+      // cut-out: the plate, 1px smaller, so no seam shows where the plate's own tint takes over
+      put(cutRect, 'x', n2(x - w / 2 + 1)); put(cutRect, 'y', n2(y - h / 2 + 1));
+      put(cutRect, 'width', n2(Math.max(w - 2, 0))); put(cutRect, 'height', n2(Math.max(h - 2, 0)));
+      put(cutRect, 'rx', n2(Math.max(r - 1, 0))); put(cutRect, 'transform', rot);
+      var c = Math.abs(Math.cos(nt.a)), s = Math.abs(Math.sin(nt.a));
+      var hw = (w * c + h * s) / 2, hh = (w * s + h * c) / 2;
+      var x0 = Math.min(x - hw, cx.x - R) - PAD, y0 = Math.min(y - hh, cy.x - R) - PAD;
+      var x1 = Math.max(x + hw, cx.x + R) + PAD, y1 = Math.max(y + hh, cy.x + R) + PAD;
+      var X = n2(x0), Y = n2(y0), W = n2(x1 - x0), H = n2(y1 - y0);
+      put(regionQ, 'x', X); put(regionQ, 'y', Y); put(regionQ, 'width', W); put(regionQ, 'height', H);
+      put(cutMask, 'x', X); put(cutMask, 'y', Y); put(cutMask, 'width', W); put(cutMask, 'height', H);
+      put(cutBg, 'x', X); put(cutBg, 'y', Y); put(cutBg, 'width', W); put(cutBg, 'height', H);
+      put(floodQ, 'flood-opacity', qA.toFixed(3));
+    }
+
     function frame(now) {
       raf = 0;
       if (!active) return;
@@ -738,11 +826,11 @@
 
       var t = el ? measure(el) : null;
       cx.t = px; cy.t = py;
-      if (t) {   // hovering a plate: the tint shape springs out to fill it
-        var sq = (pressed && t.click) ? 0.965 : 1;          // a little squish when pressed
+      if (t) {   // hovering a clickable plate: the tint shape springs out to fill it
+        var sq = pressed ? 0.965 : 1;                       // a little squish when pressed
         bx.t = t.x; by.t = t.y; bw.t = t.w * sq; bh.t = t.h * sq;
         br.t = Math.min(t.r, bw.t / 2, bh.t / 2); ba.t = t.a;
-        colT = t.click ? (pressed ? BLUE : ORANGE) : QUIET;
+        colT = pressed ? BLUE : ORANGE;
       } else {   // nothing hovered: it pulls back into the cursor and fades out
         bx.t = cx.x; by.t = cy.x; bw.t = bh.t = R * 2; br.t = R; ba.t = 0;
         colT = { r: col.r, g: col.g, b: col.b, a: 0 };
@@ -763,9 +851,23 @@
       col.b += (colT.b - col.b) * f; col.a += (colT.a - col.a) * f;
       draw();
 
+      // Non-clickable plates. When the puck gets near one, the plate marks itself as read (its own
+      // fill then crossfades to dark grey over the whole plate, see .is-read) and the quiet liquid
+      // layer fades in at a third of the speed. When the cursor leaves, the liquid fades out slowly;
+      // the plate keeps its tint.
+      var nt = null;
+      if (near) {
+        qT = QUIET_A; qEl = near;
+        if (!near.classList.contains('is-read')) near.classList.add('is-read');
+      } else { qT = 0; }
+      if (qEl) nt = measure(qEl);
+      qA += (qT - qA) * (1 - Math.exp(-dt * QUIET_RATE));
+      if (!near && qA < 0.0015) { qA = 0; qEl = null; nt = null; }
+      drawQuiet(nt);
+
       var still = rest(cx, 0.05) && rest(cy, 0.05) && rest(bx, 0.05) && rest(by, 0.05) && rest(bw, 0.05) &&
-                  rest(bh, 0.05) && rest(br, 0.05) && rest(ba, 0.0005) && Math.abs(col.a - colT.a) < 0.002;
-      if (!still || el) raf = requestAnimationFrame(frame);   // while over a plate, keep following it
+                  rest(bh, 0.05) && rest(br, 0.05) && rest(ba, 0.0005) && Math.abs(col.a - colT.a) < 0.002 && !qEl;
+      if (!still || el || near) raf = requestAnimationFrame(frame);   // while on/near a plate, keep following it
     }
     function kick() { if (active && !raf) { lastT = performance.now(); raf = requestAnimationFrame(frame); } }
 
@@ -779,7 +881,7 @@
     function onUp() { if (active && pressed) { pressed = false; kick(); } }
     function onScroll() { if (active && seen) { needPick = true; kick(); } }
     function onResize() { if (active) { size(); kick(); } }
-    function onLeave() { if (active) { seen = false; el = null; pressed = false; lens.classList.remove('on'); kick(); } }
+    function onLeave() { if (active) { seen = false; el = null; near = null; pressed = false; lens.classList.remove('on'); kick(); } }
 
     function allowed() { return !reduced() && fine.matches && !calm.matches; }
     function sync() {
@@ -806,8 +908,9 @@
         root.classList.remove('fx');
         if (layer) layer.style.display = 'none';
         if (raf) cancelAnimationFrame(raf);
-        raf = 0; el = null; seen = false; pressed = false;
+        raf = 0; el = null; near = null; qEl = null; qA = 0; qT = 0; seen = false; pressed = false;
         if (lens) lens.classList.remove('on');
+        if (svgQ) svgQ.style.visibility = 'hidden';
       }
     }
 
@@ -822,6 +925,13 @@
       btn.setAttribute('aria-pressed', reduced() ? 'true' : 'false');
       btn.addEventListener('click', function () { setMode(reduced() ? 'full' : 'reduced', true); });
     }
+    // Read state without the liquid effect (reduced motion, contrast modes): just hovering a
+    // non-clickable plate marks it too. Held in the DOM only, so a reload starts clean.
+    document.addEventListener('pointerover', function (e) {
+      if (e.pointerType === 'touch') return;
+      var g = e.target.closest && e.target.closest('.glass');
+      if (g && !g.matches('a, button, .release, .aside')) g.classList.add('is-read');
+    }, { passive: true });
     // Until the visitor has chosen, keep following the OS setting if it changes.
     listen(osReduce, function (e) { if (stored !== 'full' && stored !== 'reduced') setMode(e.matches ? 'reduced' : 'full', false); });
     listen(fine, sync);
