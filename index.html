@@ -99,12 +99,15 @@
 
       /* Risograph paper + inks. The grid is printed as two ink plates, cyan and magenta,
          that multiply where they overlap (the verticals come out blue). The inks are the
-         colours measured from the reference print's peaks, corrected for this paper and grain.
+         colours measured from the reference print's peaks, corrected for this paper and grain,
+         then printed at 50% opacity: each ink is mixed 1:1 with paper white, which under
+         multiply blending is exactly half the ink (the originals were #59e1ff and #e1c1dd).
          --paper is a hair lighter than --bg on purpose: the grain on top darkens the page
-         by ~2%, so the page averages out to exactly --bg (#F2EEEA). */
-      --paper: #f8f4ef;
-      --ink-c: #59e1ff;
-      --ink-m: #e1c1dd;
+         a little, so the page averages out to exactly --bg (#F2EEEA). */
+      --paper: #f6f2ed;
+      --ink-c: #acf0ff;
+      --ink-m: #f0e0ee;
+      --grain: .7;                 /* paper grain opacity (was 1, i.e. 30% less now) */
 
       /* Graph-paper grid. One cell is 2.25rem, so it grows and shrinks with the
          text (the root font-size below is fluid). Line widths are a share of the cell
@@ -117,7 +120,6 @@
       /* Frosted plates behind text, images and buttons.
          Figma "background blur 8" = CSS blur(4px): Figma's number is twice the CSS radius. */
       --blur: 4px;
-      --blur-hover: 12px;                    /* non-clickable plates on hover: Figma 24 */
       --glass: rgb(242 238 234 / .05);       /* #F2EEEA @ 5%  */
       --glass-hover: rgb(255 129 3 / .2);    /* #FF8103 @ 20% */
       --glass-press: rgb(0 180 255 / .2);    /* #00B4FF @ 20% */
@@ -183,9 +185,11 @@
        mottling (0.09), tuned against the reference's contrast, colour speckle and dark-speck
        skew, then sized for the page's real scale (the reference is a ~5x zoom). Each tile is
        stitched, and the two tile sizes differ (300 / 420px) so no repeat shows. It only ever
-       darkens, so black text stays black. */
+       darkens, so black text stays black. Shown at --grain opacity (30% less than the tuned
+       strength). */
     body::after {
       content: ""; position: absolute; inset: 0; z-index: 60; pointer-events: none;
+      opacity: var(--grain);
       background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1.55 0 0 0 -.525  0 1.4 0 0 -.450  0 0 2.2 0 -.830  0 0 0 .13 -.049'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.09' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .25  0 0 0 0 .25  0 0 0 0 .28  0 0 0 .09 -.034'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -210,7 +214,7 @@
       background-color: var(--fill, var(--glass));
       -webkit-backdrop-filter: blur(var(--blur));
       backdrop-filter: blur(var(--blur));
-      transition: background-color .18s ease, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
+      transition: background-color .18s ease;
     }
 
     /* ---------- hero ---------- */
@@ -399,7 +403,7 @@
     .strip { display: flex; align-items: flex-end; width: max-content; min-width: 100%; padding: 0 1rem; justify-content: safe center; }
     .strip figure {
       --gx: .35rem; --gy: .35rem; --gr: .85rem; margin: 0 -.9rem 0 0; flex: none;
-      transition: transform .25s, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
+      transition: transform .25s, background-color .18s ease;
     }
     .strip figure:hover { z-index: 5; position: relative; }
     :root:not([data-motion="reduced"]) .strip figure:hover { transform: translateY(-6px) scale(1.03); }
@@ -416,16 +420,15 @@
 
     /* ---------- hover / press / keyboard focus ----------
        Clickable plates (links, buttons, the album card) tint orange on hover and blue on press.
-       Non-clickable plates deepen their blur on hover, so the grid seems to vanish behind them,
-       and tint black @ 5% (and stay tinted: see the read state below). Hover only applies where
-       a real hover exists (not on touch, where it would stick after a tap).
+       Non-clickable plates tint black @ 5% (and stay tinted: see the read state below); their
+       blur does not change on hover. Hover only applies where a real hover exists (not on
+       touch, where it would stick after a tap).
        With the cursor effects running (html.fx) the tint is drawn by the liquid layer instead
        (see the script), so these plain CSS tints are the fallback: reduced motion, touch,
        contrast modes, or no JS. Keyboard focus always uses the plate itself. */
     @media (hover: hover) {
       :root:not(.fx) :is(a, button).glass:hover, :root:not(.fx) .release:hover { --fill: var(--glass-hover); }
       :root:not(.fx) .glass:not(a, button, .release, .aside):hover { --fill: var(--glass-quiet); }
-      .glass:not(a, button, .release, .aside):hover { --blur: var(--blur-hover); }
     }
     /* Read state. A non-clickable plate the cursor has visited keeps a dark-grey tint (black @ 5%)
        until the page is reloaded, like read vs unread. The script adds .is-read (when the cursor
@@ -434,10 +437,10 @@
        uniformly over the whole plate, at a third of the clickable tint's speed (.54s vs .18s). */
     .glass.is-read:not(a, button, .release, .aside) {
       --fill: var(--glass-quiet);
-      transition: background-color .54s ease, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
+      transition: background-color .54s ease;
     }
     .strip figure.glass.is-read {   /* keep this one's lift-on-hover transition */
-      transition: transform .25s, background-color .54s ease, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
+      transition: transform .25s, background-color .54s ease;
     }
     :is(a, button).glass:focus-visible { --fill: var(--glass-hover); }
     :root:not(.fx) :is(a, button).glass:active, :root:not(.fx) .release:active { --fill: var(--glass-press); }
@@ -482,7 +485,7 @@
     }
     /* Increased contrast: pale inks, and no grain, so text sits on clean paper. */
     @media (prefers-contrast: more) {
-      :root { --ink-c: #c3ecfb; --ink-m: #ecdde6; --paper: var(--bg); }
+      :root { --ink-c: #e1f6fd; --ink-m: #f6eef3; --paper: var(--bg); }
       body::after { display: none; }
     }
     /* Paper grain is for screens: leave it out of printouts. */
