@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The editor talks to exactly two places: this site (to load the page being edited) and
+     api.github.com (to open the pull request). Nothing else, so a pasted token can't be sent anywhere else. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://api.github.com; frame-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex, nofollow">
+<title>Page editor</title>
+<style>
+  :root {
+    --bg: #1a1c20; --panel: #22252a; --panel2: #2a2e34; --line: #353a42; --text: #e8eaed; --muted: #98a0aa;
+    --accent: #3b8cff; --accent-2: #1f6fe0; --ok: #38c172; --warn: #f5a623; --bad: #ff5d5d;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: 48px minmax(0, 1fr);
+    grid-template-areas: "bar bar" "stage panel";
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: #4a515b; background: #30353c; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent-2); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ---- top bar ---- */
+  #bar { grid-area: bar; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
+  .brand { font-weight: 600; letter-spacing: .02em; margin-right: 6px; white-space: nowrap; }
+  .seg { display: inline-flex; }
+  .seg button { border-radius: 0; margin-left: -1px; padding: 5px 9px; }
+  .seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+  .seg button:last-child { border-radius: 0 6px 6px 0; }
+  .seg button[aria-pressed="true"] { background: var(--accent-2); border-color: var(--accent); color: #fff; position: relative; }
+  #bar label { color: var(--muted); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  #bar input[type=number], #bar select { background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
+  #bar input[type=number] { width: 64px; }
+  .pill { background: #15171a; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--muted); white-space: nowrap; }
+  .pill b { color: var(--text); font-weight: 600; }
+  .spacer { flex: 1; }
+  #count { background: rgba(255,255,255,.22); border-radius: 999px; padding: 0 7px; margin-left: 4px; font-size: 11px; }
+
+  /* ---- canvas ---- */
+  #stage { grid-area: stage; overflow: auto; padding: 16px; min-width: 0;
+    background: #2a2d33 repeating-conic-gradient(#2e3138 0% 25%, transparent 0% 50%) 0 0 / 20px 20px; }
+  #frameWrap { margin: 0 auto; box-shadow: 0 6px 30px rgba(0,0,0,.5); background: #fff; position: relative; }
+  #frame { border: 0; background: #fff; display: block; transform-origin: 0 0; }
+  #empty { position: absolute; inset: 0; display: grid; place-items: center; color: #444; font-size: 14px; padding: 20px; text-align: center; }
+
+  /* ---- inspector ---- */
+  #panel { grid-area: panel; overflow: auto; background: var(--panel); border-left: 1px solid var(--line); }
+  #panel details { border-bottom: 1px solid var(--line); }
+  #panel summary { padding: 9px 12px; cursor: pointer; font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: .06em; list-style: none; }
+  #panel summary::before { content: "▸"; display: inline-block; width: 14px; transition: transform .15s; }
+  #panel details[open] > summary::before { transform: rotate(90deg); }
+  #panel .body { padding: 2px 12px 12px; }
+  .hint { color: var(--muted); padding: 0 12px; }
+  .sel-head { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .sel-head code { display: block; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #9ec5ff; word-break: break-all; margin: 4px 0 6px; }
+  .crumbs { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+  .crumbs button { padding: 1px 6px; font-size: 11px; background: transparent; color: var(--muted); }
+  .crumbs button.cur { color: var(--text); border-color: var(--accent); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .f { display: grid; grid-template-columns: 22px minmax(0, 1fr) 16px 14px; align-items: center; gap: 4px; }
+  .f .lab { color: var(--muted); cursor: ew-resize; user-select: none; font-size: 11px; text-align: center; }
+  .f input { width: 100%; background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; min-width: 0; }
+  .f .u { color: var(--muted); font-size: 10px; }
+  .f .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); line-height: 1; font-size: 14px; }
+  .f.on .x { visibility: visible; }
+  .f.on input { border-color: #3d6fb7; }
+  .fc { display: grid; grid-template-columns: 56px 30px minmax(0, 1fr) 58px 14px; align-items: center; gap: 6px; margin-top: 6px; }
+  .fc .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fc .lab { color: var(--muted); font-size: 12px; }
+  .fc input[type=color] { width: 30px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
+  .fc input[type=text], .fc input[type=number] { width: 100%; background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; min-width: 0; }
+  .fc .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; }
+  .fc.on .x { visibility: visible; }
+  .sub { margin: 10px 0 4px; color: var(--muted); font-size: 11px; }
+  .changes { list-style: none; margin: 0; padding: 0; }
+  .changes li { display: grid; grid-template-columns: minmax(0, 1fr) 18px; gap: 6px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .changes code { font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
+  .changes .scope { font-size: 10px; border-radius: 999px; padding: 0 6px; background: #15171a; border: 1px solid var(--line); color: var(--muted); margin-right: 5px; }
+  .changes button { padding: 0; border: 0; background: none; color: var(--muted); font-size: 15px; }
+  .muted { color: var(--muted); }
+  .warn { color: var(--warn); }
+
+  /* ---- dialogs / toast ---- */
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 0; width: min(640px, 94vw); max-height: 88vh; }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog form { display: flex; flex-direction: column; max-height: 88vh; }
+  dialog h2 { margin: 0; padding: 14px 18px; font-size: 15px; border-bottom: 1px solid var(--line); }
+  dialog .dbody { padding: 14px 18px; overflow: auto; }
+  dialog .dfoot { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  dialog label.row { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; align-items: center; margin: 8px 0; }
+  dialog input[type=text], dialog input[type=password] { width: 100%; background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; }
+  dialog pre { background: #15171a; border: 1px solid var(--line); border-radius: 6px; padding: 10px; overflow: auto; max-height: 220px; font: 11.5px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  dialog ol, dialog ul { padding-left: 18px; }
+  dialog a { color: #8dbbff; }
+  .note { color: var(--muted); font-size: 12px; }
+  .err { color: var(--bad); }
+  .ok { color: var(--ok); }
+  #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: #111317; border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; display: none; z-index: 50; max-width: 90vw; }
+  #toast.on { display: flex; gap: 10px; align-items: center; }
+  .small-screen { display: none; }
+  @media (max-width: 900px) { .small-screen { display: block; position: fixed; inset: 48px 0 0 0; z-index: 40; background: var(--bg); padding: 24px; color: var(--muted); } }
+</style>
+</head>
+<body>
+<header id="bar">
+  <div class="brand">Page editor</div>
+  <div class="seg" id="widths" role="group" aria-label="Preview width"></div>
+  <label>Width <input id="w" type="number" min="280" max="3000" step="10" aria-label="Preview width in pixels"> px</label>
+  <span class="pill" id="range" title="Tweaks you make are saved for this width range only"></span>
+  <label>Zoom
+    <select id="zoom" aria-label="Zoom">
+      <option value="fit">Fit</option><option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option>
+    </select>
+  </label>
+  <button id="reload" title="Reload the preview (your recorded tweaks are kept)">Reload</button>
+  <div class="spacer"></div>
+  <button id="undo" title="Undo (Ctrl/Cmd+Z)" disabled>Undo</button>
+  <button id="redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>Redo</button>
+  <button id="settings">Settings</button>
+  <button id="review" class="primary" disabled>Review &amp; push <span id="count">0</span></button>
+</header>
+
+<main id="stage" aria-label="Preview">
+  <div id="frameWrap">
+    <iframe id="frame" title="Page being edited"></iframe>
+    <div id="empty">Loading…</div>
+  </div>
+</main>
+
+<aside id="panel" aria-label="Inspector"></aside>
+
+<dialog id="dlgSettings"><form method="dialog" id="fSettings">
+  <h2>Settings</h2>
+  <div class="dbody">
+    <label class="row">Repository <span style="display:flex;gap:6px"><input type="text" id="sOwner" aria-label="Owner" placeholder="owner"> <span style="align-self:center">/</span> <input type="text" id="sRepo" aria-label="Repository" placeholder="repo"></span></label>
+    <label class="row">Base branch <input type="text" id="sBase" placeholder="main"></label>
+    <label class="row">Page file <input type="text" id="sPath" placeholder="index.html"></label>
+    <label class="row">GitHub token <input type="password" id="sToken" autocomplete="off" placeholder="github_pat_…"></label>
+    <label class="row"><span></span><span><input type="checkbox" id="sRemember"> Remember the token on this device</span></label>
+    <p class="note">The token only ever goes to <b>api.github.com</b> (the page's security policy blocks everything else) and is kept in this browser only. Create a <b>fine-grained token</b> at
+      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">github.com/settings/personal-access-tokens/new</a>:
+      <b>Repository access</b>: only this repository. <b>Permissions</b>: <i>Contents: Read and write</i> and <i>Pull requests: Read and write</i>. Set a short expiry.</p>
+  </div>
+  <div class="dfoot"><button value="cancel" type="button" id="sCancel">Cancel</button><button value="ok" class="primary" id="sSave">Save</button></div>
+</form></dialog>
+
+<dialog id="dlgReview"><form method="dialog" id="fReview">
+  <h2>Review &amp; push</h2>
+  <div class="dbody" id="reviewBody"></div>
+  <div class="dfoot" id="reviewFoot"></div>
+</form></dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="small-screen">This editor needs a wider screen (a laptop or desktop browser).</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   Page editor: visual tweaks  ->  CSS rules  ->  a GitHub pull request.
+
+   - The page is shown in an iframe so its media queries see the preview width.
+   - Every tweak is stored as  { scope: { selector: { property: value } } }.
+     "scope" is the screen-width range you were previewing (or '' for global design tokens).
+   - On push, the tweaks are written into ONE managed block at the end of the page's <style>
+     (between two marker comments), and text edits into the HTML. Nothing else in the file is touched.
+   ===================================================================== */
+
+const RANGES = [
+  { key: 'phone',   label: 'Phone',   cond: '(max-width: 720px)',                         test: (w) => w <= 720 },
+  { key: 'tablet',  label: 'Tablet',  cond: '(min-width: 721px) and (max-width: 1099px)', test: (w) => w > 720 && w < 1100 },
+  { key: 'desktop', label: 'Desktop', cond: '(min-width: 1100px)',                        test: (w) => w >= 1100 },
+];
+const WIDTHS = [390, 820, 1280, 1440, 1920];
+const MARK_START = '/* ===== editor tweaks: start (managed by /editor/; safe to hand-edit) ===== */';
+const MARK_END = '/* ===== editor tweaks: end ===== */';
+// The block, with the line break(s) before it, so that adding and removing it are exact inverses.
+// Groups: 1 = leading newline(s), 2 = indentation, 3 = the CSS inside the markers.
+const BLOCK_RE = /(\n\n?)?([ \t]*)\/\* ===== editor tweaks: start[^\n]*?\*\/([\s\S]*?)\/\* ===== editor tweaks: end ===== \*\//;
+const LS = { settings: 'ct907-editor-settings', token: 'ct907-editor-token', draft: 'ct907-editor-draft' };
+
+/* ---------- small helpers ---------- */
+const q = (s, r = document) => r.querySelector(s);
+function h(tag, props = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') n.className = v;
+    else if (k === 'text') n.textContent = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (v === true) n.setAttribute(k, '');
+    else if (v !== false && v != null) n.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null) n.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return n;
+}
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const r3 = (n) => Math.round(n * 1000) / 1000;
+const r4 = (n) => Math.round(n * 10000) / 10000;   // rem values: 4 places keeps 1px at a 16px root exact (0.0625rem)
+const safeJSON = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/ /g, '&nbsp;');
+const b64decode = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
+const b64encode = (str) => { const b = new TextEncoder().encode(str); let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(bin); };
+const rangeFor = (w) => RANGES.find((r) => r.test(w)) || RANGES[2];
+const scopeLabel = (s) => (s === '' ? 'All widths' : (RANGES.find((r) => r.cond === s) || { label: s }).label);
+
+/* ---------- tweak model ---------- */
+function setTweak(css, scope, sel, prop, val) { ((css[scope] ||= {})[sel] ||= {})[prop] = val; }
+function delTweak(css, scope, sel, prop) {
+  const s = css[scope]?.[sel]; if (!s) return;
+  delete s[prop];
+  if (!Object.keys(s).length) delete css[scope][sel];
+  if (!Object.keys(css[scope]).length) delete css[scope];
+}
+const scopeRank = (s) => (s === '' ? -1 : RANGES.findIndex((r) => r.cond === s) >= 0 ? RANGES.findIndex((r) => r.cond === s) : 99);
+
+function cssText(css) {
+  let out = '';
+  for (const scope of Object.keys(css).sort((a, b) => scopeRank(a) - scopeRank(b))) {
+    const rules = Object.entries(css[scope]).map(([sel, props]) =>
+      `${sel} { ${Object.entries(props).map(([p, v]) => `${p}: ${v} !important;`).join(' ')} }`);
+    out += scope ? `@media ${scope} {\n${rules.map((r) => '  ' + r).join('\n')}\n}\n` : rules.join('\n') + '\n';
+  }
+  return out;
+}
+const blockText = (css) => { const t = cssText(css); return t ? `${MARK_START}\n${t}${MARK_END}` : ''; };
+
+/* A small raw-text parser for the managed block (not the browser's CSS engine, which would rewrite values:
+   "#b3004a" would come back as "rgb(179, 0, 74)" and a later push would churn lines from earlier pushes). */
+function splitDecls(body) {   // split on ";" that is outside (...) and quotes
+  const parts = []; let cur = '', depth = 0, quote = '';
+  for (const c of body) {
+    if (quote) { cur += c; if (c === quote) quote = ''; }
+    else if (c === '"' || c === "'") { quote = c; cur += c; }
+    else if (c === '(') { depth++; cur += c; } else if (c === ')') { depth--; cur += c; }
+    else if (c === ';' && !depth) { parts.push(cur); cur = ''; }
+    else cur += c;
+  }
+  if (cur.trim()) parts.push(cur);
+  return parts;
+}
+function parseRules(src) {
+  const out = {}, css = src.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = (text, scope) => {
+    let i = 0;
+    while (i < text.length) {
+      const o = text.indexOf('{', i); if (o < 0) break;
+      const head = text.slice(i, o).trim();
+      let depth = 1, j = o + 1;
+      while (j < text.length && depth) { const c = text[j]; if (c === '{') depth++; else if (c === '}') depth--; j++; }
+      const body = text.slice(o + 1, j - 1);
+      if (/^@media/i.test(head)) rules(body, head.slice(6).trim().replace(/\s+/g, ' '));
+      else if (head && !head.startsWith('@')) {
+        for (const d of splitDecls(body)) {
+          const k = d.indexOf(':'); if (k < 1) continue;
+          setTweak(out, scope, head.replace(/\s+/g, ' '), d.slice(0, k).trim(), d.slice(k + 1).trim().replace(/\s*!important\s*$/i, ''));
+        }
+      }
+      i = j;
+    }
+  };
+  rules(css, ''); return out;
+}
+function parseBlock(src) { const m = src.match(BLOCK_RE); return m ? parseRules(m[3]) : {}; }
+function stripBlock(src) { return src.replace(BLOCK_RE, ''); }
+function replaceBlock(src, block) {
+  const m = src.match(BLOCK_RE);
+  if (m) return src.replace(BLOCK_RE, (all, lead = '', ind = '') => (block ? lead + ind + block.replace(/\n/g, '\n' + ind) : ''));
+  if (!block) return src;
+  const ind = '    ', ins = '\n\n' + ind + block.replace(/\n/g, '\n' + ind);
+  // Insert straight after the last rule (before any whitespace that precedes </style>), so removing it again restores the file exactly.
+  const i = src.lastIndexOf('</style>');
+  if (i >= 0) { let j = i; while (j > 0 && /[ \t\n]/.test(src[j - 1])) j--; return src.slice(0, j) + ins + src.slice(j); }
+  const hd = src.indexOf('</head>');
+  return src.slice(0, hd) + `  <style>${ins}\n  </style>\n` + src.slice(hd);
+}
+const flatten = (css) => { const m = new Map(); for (const [sc, sels] of Object.entries(css)) for (const [sel, props] of Object.entries(sels)) for (const [p, v] of Object.entries(props)) m.set(JSON.stringify([sc, sel, p]), v); return m; };
+function diffCss(base, cur) {
+  const a = flatten(base), b = flatten(cur), set = [], del = [];
+  for (const [k, v] of b) if (a.get(k) !== v) set.push([...JSON.parse(k), v]);
+  for (const k of a.keys()) if (!b.has(k)) del.push(JSON.parse(k));
+  return { set, del };
+}
+function applyOps(base, ops) {
+  const out = clone(base);
+  for (const [sc, sel, p, v] of ops.set) setTweak(out, sc, sel, p, v);
+  for (const [sc, sel, p] of ops.del) delTweak(out, sc, sel, p);
+  return out;
+}
+
+/* Text edits are replaced in the HTML source. The element's original innerHTML must appear exactly once. */
+function applyTextEdits(src, edits) {
+  let out = src; const applied = [], failed = [];
+  for (const e of edits) {
+    const needle = '>' + e.before + '<';
+    const first = out.indexOf(needle);
+    if (first < 0 || out.indexOf(needle, first + 1) >= 0) { failed.push(e); continue; }
+    out = out.slice(0, first) + '>' + e.after + '<' + out.slice(first + needle.length);
+    applied.push(e);
+  }
+  return { src: out, applied, failed };
+}
+
+/* ---------- editor state ---------- */
+let settings = Object.assign({ owner: 'ct907', repo: 'ct907-site', base: 'main', path: 'index.html', remember: false }, safeJSON(lsGet(LS.settings), {}));
+let token = settings.remember ? (lsGet(LS.token) || '') : '';
+let source0 = '';
+let baseline = {};                 // tweaks that are already in the deployed page
+let state = { css: {}, text: [] }; // baseline + this session's tweaks
+const originals = new Map();       // selector -> original innerHTML (text edits)
+let history = [], hIndex = -1;
+
+let frameW = 1440, zoomMode = 'fit';
+let win = null, doc = null, root = null;
+let ov = {};                       // overlay nodes (inside the iframe)
+let sel = null, hover = null, drag = null, editing = null;
+let nudgeTimer = 0, panelTimer = 0;
+
+const frame = q('#frame'), stage = q('#stage'), wrap = q('#frameWrap'), panel = q('#panel');
+
+/* ---------- toast ---------- */
+let toastTimer = 0;
+function toast(msg, ms = 3200, kind = '') {
+  const t = q('#toast'); t.replaceChildren(h('span', { class: kind, text: msg })); t.classList.add('on');
+  clearTimeout(toastTimer); if (ms) toastTimer = setTimeout(() => t.classList.remove('on'), ms);
+}
+
+/* ---------- history ---------- */
+function commit() {
+  const snap = JSON.stringify(state);
+  if (history[hIndex] === snap) return;
+  history = history.slice(0, hIndex + 1); history.push(snap); if (history.length > 300) history.shift();
+  hIndex = history.length - 1;
+  // Starting to edit without answering the "restore?" offer means "start fresh".
+  if (pendingDraft && history.length > 1) { pendingDraft = null; q('#toast').classList.remove('on'); }
+  afterChange(); saveDraft();
+}
+function restore(i) {
+  hIndex = i; state = JSON.parse(history[hIndex]);
+  renderLive(); afterChange(); saveDraft(); syncFields();
+}
+const undo = () => { if (hIndex > 0) restore(hIndex - 1); };
+const redo = () => { if (hIndex < history.length - 1) restore(hIndex + 1); };
+function afterChange() {
+  q('#undo').disabled = hIndex <= 0; q('#redo').disabled = hIndex >= history.length - 1;
+  const n = summary().count; q('#count').textContent = n; q('#review').disabled = n === 0;
+  renderChanges();
+}
+
+/* ---------- draft (survives an accidental reload) ---------- */
+let pendingDraft = null;   // a saved draft we're offering to restore: don't overwrite it until the user decides
+function saveDraft() {
+  if (pendingDraft) return;
+  const ops = diffCss(baseline, state.css);
+  if (!ops.set.length && !ops.del.length && !state.text.length) { lsDel(LS.draft); return; }
+  lsSet(LS.draft, JSON.stringify({ path: settings.path, ops, text: state.text, originals: [...originals] }));
+}
+window.addEventListener('beforeunload', (e) => { if (summary().count) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- selectors ---------- */
+const VOLATILE = new Set(['in', 'is-read', 'fx', 'js']);
+function stableClasses(e) { return [...e.classList].filter((c) => !VOLATILE.has(c) && !c.startsWith('__ed')); }
+function selectorFor(e) {
+  const d = e.ownerDocument, W = d.defaultView;
+  const part = (n) => {
+    if (n.id) return '#' + W.CSS.escape(n.id);
+    let p = n.localName + stableClasses(n).map((c) => '.' + W.CSS.escape(c)).join('');
+    const sibs = [...n.parentElement.children];
+    const same = sibs.filter((s) => s.localName === n.localName && stableClasses(s).join(' ') === stableClasses(n).join(' '));
+    if (same.length > 1) p += `:nth-child(${sibs.indexOf(n) + 1})`;
+    return p;
+  };
+  const parts = [];
+  for (let cur = e; cur && cur.nodeType === 1 && cur !== d.documentElement; cur = cur.parentElement) {
+    parts.unshift(part(cur));
+    const s = parts.join(' > ');
+    try { if (d.querySelectorAll(s).length === 1) return s; } catch {}
+    if (cur.id) break;
+  }
+  return parts.join(' > ');
+}
+
+/* ---------- live preview ---------- */
+const scopeKey = () => rangeFor(frameW).cond;
+const rootPx = () => parseFloat(win.getComputedStyle(root).fontSize) || 16;
+function renderLive() {
+  if (!doc) return;
+  let st = doc.getElementById('__ed_live');
+  if (!st) { st = doc.createElement('style'); st.id = '__ed_live'; doc.head.append(st); }
+  st.textContent = cssText(state.css);
+  for (const [s, orig] of originals) {
+    const t = state.text.find((x) => x.sel === s), node = doc.querySelector(s);
+    if (!node || (editing && editing.el === node)) continue;
+    const want = t ? t.after : orig; if (node.innerHTML !== want) node.innerHTML = want;
+  }
+  updateOverlay(); schedulePanelSync();
+}
+function setProp(prop, value, scope = scopeKey(), el = sel) {
+  if (!el) return;
+  setTweak(state.css, scope, selectorFor(el), prop, value); renderLive();
+}
+function resetProps(props, el = sel) {
+  if (!el) return; const s = selectorFor(el);
+  for (const p of props) delTweak(state.css, scopeKey(), s, p);
+  renderLive();
+}
+const isTweaked = (props, el = sel) => !!el && props.some((p) => state.css[scopeKey()]?.[selectorFor(el)]?.[p] != null);
+
+/* ---------- frame size / zoom ---------- */
+function layoutFrame() {
+  const availW = stage.clientWidth - 32, availH = stage.clientHeight - 32;
+  const scale = zoomMode === 'fit' ? Math.min(1, availW / frameW) : +zoomMode;
+  wrap.style.width = Math.round(frameW * scale) + 'px'; wrap.style.height = Math.round(availH) + 'px';
+  frame.style.width = frameW + 'px'; frame.style.height = Math.round(availH / scale) + 'px'; frame.style.transform = `scale(${scale})`;
+  const r = rangeFor(frameW);
+  q('#range').replaceChildren('Tweaks apply to ', h('b', { text: `${r.label} ${r.cond}` }));
+  q('#w').value = frameW;
+  for (const b of q('#widths').children) b.setAttribute('aria-pressed', String(+b.dataset.w === frameW));
+  buildPanelSoon();
+}
+function setWidth(w) { frameW = Math.max(280, Math.min(3000, Math.round(w) || 1440)); layoutFrame(); setTimeout(updateOverlay, 30); }
+
+/* ---------- load the page ---------- */
+async function loadPage() {
+  q('#empty').style.display = 'grid'; q('#empty').textContent = 'Loading…';
+  const url = new URL('../' + settings.path.replace(/^\/+/, ''), location.href);
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    source0 = await res.text();
+  } catch (err) {
+    q('#empty').textContent = `Couldn't load ${settings.path} (${err.message}). Open this editor from the live site (…/editor/), not from a file on disk.`; return;
+  }
+  baseline = parseBlock(source0);
+  state = { css: clone(baseline), text: [] }; originals.clear(); history = []; hIndex = -1;
+  sel = null; hover = null; editing = null;
+  frame.src = url.href;
+}
+function onFrameLoad() {
+  if (!frame.contentWindow || frame.src === 'about:blank' || !frame.src) return;
+  win = frame.contentWindow; doc = win.document; root = doc.documentElement;
+  q('#empty').style.display = 'none';
+  // Make the page a calm, static canvas: its own cursor effects, reveal-on-scroll and animations get in the way of editing.
+  root.setAttribute('data-motion', 'reduced'); root.classList.remove('fx');
+  doc.querySelectorAll('.reveal').forEach((e) => e.classList.add('in'));
+  const css = doc.createElement('style'); css.id = '__ed_css';
+  css.textContent = '#fx{display:none!important} html{scroll-behavior:auto!important} .aside{opacity:1!important;transform:none!important;pointer-events:auto!important;transition:none!important}';
+  doc.head.append(css);
+  // The page's own managed tweaks are re-injected by the editor (baseline + session), so remove the static copy.
+  for (const s of doc.querySelectorAll('style')) if (BLOCK_RE.test(s.textContent)) s.textContent = stripBlock(s.textContent);
+  // Read any saved draft BEFORE the first commit (an empty state would otherwise erase it).
+  const draft = safeJSON(lsGet(LS.draft), null);
+  const hasDraft = draft && draft.path === settings.path && history.length === 0 && (draft.ops.set.length || draft.ops.del.length || draft.text.length);
+  if (hasDraft) pendingDraft = draft;
+  buildOverlay(); bindFrameEvents();
+  renderLive(); commit(); layoutFrame(); buildPanel();
+  if (hasDraft) offerDraft(draft);
+}
+function offerDraft(d) {
+  const n = d.ops.set.length + d.ops.del.length + d.text.length;
+  const t = q('#toast'); clearTimeout(toastTimer);
+  t.replaceChildren(h('span', { text: `Restore ${n} unsaved change${n > 1 ? 's' : ''} from last time?` }),
+    h('button', { class: 'primary', text: 'Restore', onclick: () => {
+      pendingDraft = null;
+      state.css = applyOps(baseline, d.ops); state.text = d.text; for (const [k, v] of d.originals) originals.set(k, v);
+      renderLive(); commit(); t.classList.remove('on'); toast('Restored.', 1800);
+    } }),
+    h('button', { text: 'Discard', onclick: () => { pendingDraft = null; lsDel(LS.draft); t.classList.remove('on'); } }));
+  t.classList.add('on');
+}
+
+/* ---------- overlay (drawn inside the page, so it scrolls with it) ---------- */
+const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+const CURSORS = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' };
+function buildOverlay() {
+  const mk = (css) => { const n = doc.createElement('div'); n.style.cssText = css; return n; };
+  const o = mk('position:fixed;inset:0;pointer-events:none;z-index:2147483600;font:11px/1.25 system-ui,sans-serif'); o.id = '__ed';
+  ov = { root: o };
+  ov.hover = mk('position:fixed;display:none;outline:1px solid #3b8cff;background:rgba(59,140,255,.08)');
+  ov.sel = mk('position:fixed;display:none;outline:2px solid #3b8cff');
+  ov.tag = mk('position:fixed;display:none;background:#3b8cff;color:#fff;padding:2px 6px;border-radius:3px;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis');
+  ov.size = mk('position:fixed;display:none;background:#111;color:#fff;padding:1px 6px;border-radius:3px;white-space:nowrap');
+  ov.handles = {};
+  for (const hd of HANDLES) {
+    const n = mk(`position:fixed;display:none;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;background:#fff;border:1.5px solid #3b8cff;border-radius:2px;pointer-events:auto;cursor:${CURSORS[hd]}`);
+    n.dataset.h = hd; ov.handles[hd] = n; o.append(n);
+  }
+  o.prepend(ov.hover, ov.sel, ov.tag, ov.size); root.append(o);
+}
+function isRotated(el) {
+  const t = win.getComputedStyle(el).transform; if (!t || t === 'none') return false;
+  try { const m = new win.DOMMatrixReadOnly(t); return Math.abs(m.b) > 1e-4 || Math.abs(m.c) > 1e-4 || Math.abs(m.a - 1) > 1e-3 || Math.abs(m.d - 1) > 1e-3; } catch { return false; }
+}
+const resizable = (el) => win.getComputedStyle(el).display !== 'inline' && !isRotated(el);
+function place(n, r) { n.style.left = r.left + 'px'; n.style.top = r.top + 'px'; n.style.width = r.width + 'px'; n.style.height = r.height + 'px'; }
+const label = (el) => el.localName + (el.id ? '#' + el.id : '') + stableClasses(el).slice(0, 3).map((c) => '.' + c).join('');
+function updateOverlay() {
+  if (!ov.root || !ov.root.isConnected) return;
+  const hr = hover && hover !== sel && hover.isConnected ? hover.getBoundingClientRect() : null;
+  ov.hover.style.display = hr ? 'block' : 'none'; if (hr) place(ov.hover, hr);
+  const sr = sel && sel.isConnected ? sel.getBoundingClientRect() : null;
+  ov.sel.style.display = sr ? 'block' : 'none'; ov.tag.style.display = ov.size.style.display = sr ? 'block' : 'none';
+  for (const hd of HANDLES) ov.handles[hd].style.display = 'none';
+  if (!sr) return;
+  place(ov.sel, sr);
+  ov.tag.textContent = label(sel); ov.tag.style.left = sr.left + 'px'; ov.tag.style.top = Math.max(0, sr.top - 20) + 'px';
+  ov.size.textContent = `${Math.round(sr.width)} × ${Math.round(sr.height)}`;
+  ov.size.style.left = (sr.left + sr.width / 2 - 28) + 'px'; ov.size.style.top = (sr.bottom + 6) + 'px';
+  if (editing || !resizable(sel)) return;
+  const xs = { w: sr.left, e: sr.right, n: sr.left + sr.width / 2, s: sr.left + sr.width / 2, nw: sr.left, ne: sr.right, sw: sr.left, se: sr.right };
+  const ys = { n: sr.top, s: sr.bottom, e: sr.top + sr.height / 2, w: sr.top + sr.height / 2, nw: sr.top, ne: sr.top, sw: sr.bottom, se: sr.bottom };
+  for (const hd of HANDLES) { const n = ov.handles[hd]; n.style.display = 'block'; n.style.left = xs[hd] + 'px'; n.style.top = ys[hd] + 'px'; }
+}
+let lastKey = '';
+(function tick() {
+  if (sel && sel.isConnected) { const r = sel.getBoundingClientRect(); const k = [r.left, r.top, r.width, r.height].join(); if (k !== lastKey) { lastKey = k; updateOverlay(); } }
+  requestAnimationFrame(tick);
+})();
+
+/* ---------- selecting & dragging inside the page ---------- */
+function deepestAt(x, y) {
+  let n = doc.elementFromPoint(x, y);
+  if (!n || n === root || n === doc.body || n.closest('#__ed')) return null;
+  while (n.ownerSVGElement) n = n.ownerSVGElement;
+  return n;
+}
+function select(el, reveal = false) {
+  if (editing) endTextEdit(true);
+  sel = el; lastKey = '';
+  // Picked from the breadcrumbs / keyboard rather than clicked: scroll the preview to it if it's off-screen.
+  if (reveal) { const r = el.getBoundingClientRect(); if (r.bottom < 0 || r.top > win.innerHeight) el.scrollIntoView({ block: 'center' }); }
+  updateOverlay(); buildPanel();
+}
+function getTranslate(el) {
+  // Prefer the recorded rem value: converting through pixels and back would drift a little on every nudge.
+  const rec = state.css[scopeKey()]?.[selectorFor(el)]?.translate, m = rec && rec.match(/^(-?[\d.]+)rem\s+(-?[\d.]+)rem$/);
+  if (m) { const rp = rootPx(); return { x: +m[1] * rp, y: +m[2] * rp }; }
+  const t = win.getComputedStyle(el).translate; if (!t || t === 'none') return { x: 0, y: 0 };
+  const p = t.split(/\s+/).map(parseFloat); return { x: p[0] || 0, y: p[1] || 0 };
+}
+function ensureMovable() { if (sel && win.getComputedStyle(sel).display === 'inline') setProp('display', 'inline-block'); }
+function setTranslatePx(x, y, el = sel) {
+  if (!el) return; ensureMovable(); const rp = rootPx();
+  if (Math.abs(x) < 0.01 && Math.abs(y) < 0.01) resetProps(['translate'], el);
+  else setProp('translate', `${r4(x / rp)}rem ${r4(y / rp)}rem`, scopeKey(), el);
+}
+function commitSoon() { clearTimeout(nudgeTimer); nudgeTimer = setTimeout(commit, 450); }
+// Set a width/height, then check what the browser really applied. If the page's own max-/min- rule is overriding the
+// request (e.g. .music-intro has max-width: 40rem), lift that cap too, otherwise the handle would silently do nothing.
+function setSize(axis, px, rp = rootPx()) {
+  const W = axis === 'width';
+  setProp(axis, r4(px / rp) + 'rem');
+  const got = parseFloat(win.getComputedStyle(sel)[axis]);
+  if (Number.isFinite(got)) {
+    if (got < px - 0.5) setProp(W ? 'max-width' : 'max-height', 'none');
+    else if (got > px + 0.5) setProp(W ? 'min-width' : 'min-height', '0');
+  }
+}
+
+function bindFrameEvents() {
+  const EVENTS = ['pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'mouseover', 'mouseenter', 'mouseleave', 'mousemove', 'mousedown', 'mouseup', 'click', 'auxclick', 'contextmenu', 'dragstart'];
+  // Capture everything first so the page's own scripts (cursor effects, read state, links) never see editor
+  // interactions. While text is being edited the browser's default behaviour (caret, selection) is left alone.
+  const inEdit = (e) => !!(editing && editing.el.contains(e.target));
+  for (const t of EVENTS) win.addEventListener(t, (e) => { e.stopImmediatePropagation(); if (!inEdit(e) && e.cancelable) e.preventDefault(); }, true);
+  win.addEventListener('mouseout', (e) => { e.stopImmediatePropagation(); if (!e.relatedTarget) { hover = null; updateOverlay(); } }, true);
+  win.addEventListener('pointerdown', onDown, true);
+  win.addEventListener('pointermove', onMove, true);
+  win.addEventListener('pointerup', onUp, true);
+  win.addEventListener('pointercancel', onUp, true);
+  win.addEventListener('dblclick', onDbl, true);
+  win.addEventListener('keydown', onKey, true);
+  win.addEventListener('scroll', () => updateOverlay(), { passive: true });
+  win.addEventListener('resize', () => updateOverlay());
+}
+function onDown(e) {
+  e.stopImmediatePropagation();
+  if (editing && editing.el.contains(e.target)) return;   // let the caret move
+  if (e.button !== 0) return; if (e.cancelable) e.preventDefault();
+  const hd = e.target.dataset && e.target.dataset.h;
+  if (hd && sel) { startDrag(e, 'resize', hd); return; }
+  if (editing) endTextEdit(true);
+  const under = deepestAt(e.clientX, e.clientY);
+  const inSel = sel && sel.isConnected && (() => { const r = sel.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; })();
+  // Ctrl/Cmd/Alt-click always picks the innermost element; otherwise a click inside the selection drags it.
+  if (!(inSel && !(e.altKey || e.ctrlKey || e.metaKey)) && under && under !== sel) select(under);
+  else if (!sel && under) select(under);
+  if (sel) startDrag(e, 'move');
+}
+function startDrag(e, type, handle) {
+  const r = sel.getBoundingClientRect(), cs = win.getComputedStyle(sel);
+  drag = { type, handle, id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, rp: rootPx(), t0: getTranslate(sel), w: parseFloat(cs.width) || r.width, h: parseFloat(cs.height) || r.height };
+  try { e.target.setPointerCapture(e.pointerId); } catch {}
+}
+function onMove(e) {
+  e.stopImmediatePropagation();
+  if (editing && editing.el.contains(e.target) && !drag) return;
+  if (!drag) {
+    const n = deepestAt(e.clientX, e.clientY); if (n !== hover) { hover = n; updateOverlay(); } return;
+  }
+  let dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if (!drag.moved && Math.hypot(dx, dy) < 3) return;
+  drag.moved = true;
+  if (drag.type === 'move') {
+    if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+    setTranslatePx(drag.t0.x + dx, drag.t0.y + dy);
+  } else {
+    const hd = drag.handle; let w = drag.w, hh = drag.h, tx = drag.t0.x, ty = drag.t0.y;
+    if (hd.includes('e')) w += dx; if (hd.includes('w')) { w -= dx; tx += dx; }
+    if (hd.includes('s')) hh += dy; if (hd.includes('n')) { hh -= dy; ty += dy; }
+    if (w < 8) { if (hd.includes('w')) tx -= 8 - w; w = 8; } if (hh < 8) { if (hd.includes('n')) ty -= 8 - hh; hh = 8; }
+    ensureMovable();
+    if (hd.includes('e') || hd.includes('w')) setSize('width', w, drag.rp);
+    if (hd.includes('s') || hd.includes('n')) setSize('height', hh, drag.rp);
+    setTranslatePx(tx, ty);
+  }
+  syncFields();
+}
+function onUp(e) {
+  e.stopImmediatePropagation();
+  if (drag) { const moved = drag.moved; try { e.target.releasePointerCapture(drag.id); } catch {} drag = null; if (moved) commit(); }
+}
+function onDbl(e) {
+  e.stopImmediatePropagation(); e.preventDefault();
+  let n = deepestAt(e.clientX, e.clientY);
+  while (n && !isTextual(n)) n = n.parentElement && n.parentElement !== doc.body ? n.parentElement : null;
+  if (n) { select(n); startTextEdit(n); }
+}
+
+/* ---------- text editing ---------- */
+const INLINE_OK = ['SPAN', 'STRONG', 'EM', 'B', 'I', 'BR'];
+function isTextual(el) {
+  if (!el || el.closest('svg') || !el.textContent.trim()) return false;
+  for (const c of el.children) if (!INLINE_OK.includes(c.tagName)) return false;
+  return [...el.childNodes].some((n) => n.nodeType === 3 && n.nodeValue.trim());
+}
+function sanitize(node) {
+  let out = '';
+  for (const c of node.childNodes) {
+    if (c.nodeType === 3) out += esc(c.nodeValue);
+    else if (c.nodeType === 1) {
+      const t = c.localName;
+      if (t === 'br') out += '<br>';
+      else if (t === 'strong' || t === 'b') out += '<strong>' + sanitize(c) + '</strong>';
+      else if (t === 'em' || t === 'i') out += '<em>' + sanitize(c) + '</em>';
+      else if (t === 'span') out += '<span' + [...c.attributes].filter((a) => a.name === 'class' || a.name === 'aria-hidden').map((a) => ` ${a.name}="${a.value}"`).join('') + '>' + sanitize(c) + '</span>';
+      else out += sanitize(c);
+    }
+  }
+  return out;
+}
+function startTextEdit(el) {
+  if (!isTextual(el)) { toast("This element has no editable text. Double-click the text itself.", 2600); return; }
+  const s = selectorFor(el); if (!originals.has(s)) originals.set(s, el.innerHTML);
+  editing = { el, sel: s, start: el.innerHTML };
+  el.setAttribute('contenteditable', 'true'); el.spellcheck = false;
+  const paste = (ev) => { ev.preventDefault(); doc.execCommand('insertText', false, (ev.clipboardData || win.clipboardData).getData('text/plain')); };
+  el.addEventListener('paste', paste); editing.paste = paste;
+  el.focus(); const r = doc.createRange(); r.selectNodeContents(el); const sn = win.getSelection(); sn.removeAllRanges(); sn.addRange(r);
+  updateOverlay(); toast('Editing text: Enter to save, Esc to cancel', 2600);
+}
+function endTextEdit(save) {
+  if (!editing) return; const { el, sel: s, start, paste } = editing; editing = null;
+  el.removeEventListener('paste', paste); el.removeAttribute('contenteditable'); el.blur();
+  if (!save) { el.innerHTML = start; updateOverlay(); return; }
+  const after = sanitize(el); el.innerHTML = after;
+  const orig = originals.get(s), tmp = doc.createElement('div'); tmp.innerHTML = orig;
+  state.text = state.text.filter((t) => t.sel !== s);
+  if (after !== sanitize(tmp)) state.text.push({ sel: s, before: orig, after });
+  renderLive(); commit();
+}
+
+/* ---------- keyboard ---------- */
+const typing = (t) => t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+function onKey(e) {
+  const mod = e.ctrlKey || e.metaKey;
+  if (editing && editing.el.contains(e.target)) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); endTextEdit(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); endTextEdit(false); }
+    else if (mod && /^[bi]$/i.test(e.key)) e.preventDefault();
+    e.stopPropagation(); return;
+  }
+  if (typing(e.target)) return;
+  if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+  if (e.key === 'Escape') { sel = null; updateOverlay(); buildPanel(); return; }
+  if (!sel) return;
+  const step = e.shiftKey ? 10 : 1;
+  if (e.altKey && e.key === 'ArrowUp' && sel.parentElement && sel.parentElement !== doc.body) { e.preventDefault(); select(sel.parentElement, true); return; }
+  if (e.altKey && e.key === 'ArrowDown' && sel.firstElementChild) { e.preventDefault(); select(sel.firstElementChild, true); return; }
+  if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { const s = e.key === 'ArrowLeft' ? sel.previousElementSibling : sel.nextElementSibling; if (s) { e.preventDefault(); select(s, true); } return; }
+  const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+  if (d) { e.preventDefault(); const t = getTranslate(sel); setTranslatePx(t.x + d[0], t.y + d[1]); commitSoon(); return; }
+  if (e.key === 'Enter' && isTextual(sel)) { e.preventDefault(); startTextEdit(sel); }
+}
+// Keys pressed while the editor's own page has focus (not the preview). Typing in a field keeps its native behaviour.
+document.addEventListener('keydown', (e) => { if (!doc || typing(e.target) || e.target.closest('dialog')) return; onKey(e); });
+
+/* ---------- inspector ---------- */
+let fields = [];
+const fmt = (v) => (Number.isFinite(v) ? String(Math.round(v * 100) / 100) : '');   // show at most 2 decimals; the saved rem keeps full precision
+function schedulePanelSync() { clearTimeout(panelTimer); panelTimer = setTimeout(syncFields, 30); }
+function syncFields() { if (!sel) return; for (const f of fields) f.sync(); }
+let buildTimer = 0;
+function buildPanelSoon() { clearTimeout(buildTimer); buildTimer = setTimeout(buildPanel, 20); }
+
+function scrub(lab, input, step) {
+  lab.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); lab.setPointerCapture(e.pointerId);
+    const x0 = e.clientX, v0 = parseFloat(input.value) || 0; let moved = false;
+    const mv = (ev) => { const d = Math.round((ev.clientX - x0) / 2) * step * (ev.shiftKey ? 10 : 1); if (d || moved) { moved = true; input.value = fmt(v0 + d); input.dispatchEvent(new Event('input')); } };
+    const up = () => { lab.removeEventListener('pointermove', mv); lab.removeEventListener('pointerup', up); if (moved) input.dispatchEvent(new Event('change')); };
+    lab.addEventListener('pointermove', mv); lab.addEventListener('pointerup', up);
+  });
+}
+function numField(spec) {
+  const input = h('input', { type: 'number', step: spec.step ?? 1, inputmode: 'decimal', 'aria-label': spec.aria || spec.label });
+  const lab = h('span', { class: 'lab', text: spec.label, title: 'Drag sideways to scrub' });
+  const reset = h('button', { class: 'x', type: 'button', title: 'Reset this tweak', 'aria-label': 'Reset', text: '×' });
+  const row = h('div', { class: 'f' }, lab, input, h('span', { class: 'u', text: spec.unit || '' }), reset);
+  const f = {
+    row,
+    sync() { if (!sel) return; if (document.activeElement !== input) input.value = fmt(spec.read(sel, win.getComputedStyle(sel))); row.classList.toggle('on', isTweaked(spec.props || [spec.prop])); },
+  };
+  input.addEventListener('input', () => { const v = parseFloat(input.value); if (Number.isFinite(v)) { spec.write(v); syncOthers(f); } });
+  input.addEventListener('change', () => { commit(); syncFields(); });
+  input.addEventListener('keydown', (e) => { if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.shiftKey) { e.preventDefault(); input.value = fmt((parseFloat(input.value) || 0) + (e.key === 'ArrowUp' ? 1 : -1) * (spec.step ?? 1) * 10); input.dispatchEvent(new Event('input')); input.dispatchEvent(new Event('change')); } });
+  reset.addEventListener('click', () => { resetProps(spec.props || [spec.prop]); commit(); syncFields(); });
+  scrub(lab, input, spec.step ?? 1);
+  fields.push(f); return row;
+}
+function syncOthers(except) { for (const f of fields) if (f !== except) f.sync(); }
+
+function parseColor(c) {
+  const m = c.match(/rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.%]+))?\s*\)/); if (!m) return { hex: '#000000', a: 1 };
+  const hex = '#' + [m[1], m[2], m[3]].map((v) => Math.round(+v).toString(16).padStart(2, '0')).join('');
+  let a = m[4] == null ? 1 : (m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4]); return { hex, a };
+}
+function colorSpec(hex, a) {
+  if (a >= 1) return hex;
+  const n = parseInt(hex.slice(1), 16); return `rgb(${n >> 16} ${(n >> 8) & 255} ${n & 255} / ${r3(a)})`;
+}
+function colorField(labelText, prop, opts = {}) {
+  const pick = h('input', { type: 'color', 'aria-label': labelText });
+  const text = h('input', { type: 'text', spellcheck: 'false', 'aria-label': labelText + ' value' });
+  const alpha = h('input', { type: 'number', min: 0, max: 1, step: 0.05, 'aria-label': labelText + ' opacity', title: 'Opacity 0–1' });
+  const reset = h('button', { class: 'x', type: 'button', 'aria-label': 'Reset', title: 'Reset this tweak', text: '×' });
+  const row = h('div', { class: 'fc' }, h('span', { class: 'lab', text: labelText }), pick, text, alpha, reset);
+  const read = () => (opts.token ? parseColor(opts.token.value) : parseColor(win.getComputedStyle(sel)[prop]));
+  const write = (hex, a) => { const v = colorSpec(hex, a); if (opts.token) { setTweak(state.css, '', ':root', opts.token.name, v); renderLive(); } else setProp(prop, v); };
+  const f = { sync() {
+    if (!opts.token && !sel) return; const c = read();
+    if (document.activeElement !== pick) pick.value = c.hex;
+    if (document.activeElement !== text) text.value = c.a >= 1 ? c.hex : colorSpec(c.hex, c.a);
+    if (document.activeElement !== alpha) alpha.value = r3(c.a);
+    row.classList.toggle('on', opts.token ? state.css['']?.[':root']?.[opts.token.name] != null : isTweaked([prop]));
+  } };
+  pick.addEventListener('input', () => { write(pick.value, parseFloat(alpha.value) || 1); syncOthers(f); });
+  alpha.addEventListener('input', () => { const a = Math.max(0, Math.min(1, parseFloat(alpha.value))); if (Number.isFinite(a)) { write(pick.value, a); } });
+  text.addEventListener('change', () => { const t = text.value.trim(); if (/^#[0-9a-f]{6}$/i.test(t)) write(t.toLowerCase(), parseFloat(alpha.value) || 1); else if (t) { if (opts.token) { setTweak(state.css, '', ':root', opts.token.name, t); renderLive(); } else setProp(prop, t); } commit(); syncFields(); });
+  for (const i of [pick, alpha]) i.addEventListener('change', () => { commit(); syncFields(); });
+  reset.addEventListener('click', () => { if (opts.token) { delTweak(state.css, '', ':root', opts.token.name); renderLive(); } else resetProps([prop]); commit(); syncFields(); });
+  fields.push(f); return row;
+}
+
+const remv = (px) => r4(px / rootPx()) + 'rem';
+const P = (label, prop, extra = {}) => ({ label, prop, unit: 'px', aria: `${prop.replace('-', ' ')} in pixels`, read: (e, cs) => parseFloat(cs[prop.replace(/-(\w)/g, (_, c) => c.toUpperCase())]) || 0, write: (v) => setProp(prop, remv(v)), ...extra });
+function buildPanel() {
+  fields = []; panel.replaceChildren();
+  const sections = [];
+  if (!doc) return;
+  if (!sel) {
+    panel.append(h('p', { class: 'hint', style: 'padding-top:12px' }, 'Click anything on the page to select it. Drag to move, use the handles to resize, arrow keys to nudge (Shift = 10px), double-click text to retype. Hold Ctrl/Cmd while clicking to pick the innermost element.'), tokensSection(), changesSection());
+    afterChange(); return;
+  }
+  const r = rangeFor(frameW), cs = win.getComputedStyle(sel);
+  const head = h('div', { class: 'sel-head' },
+    h('div', { class: 'muted', text: `Selected · tweaks apply to ${r.label}` }),
+    h('code', { text: selectorFor(sel) }),
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+      h('button', { text: 'Reset element', title: 'Remove this element’s tweaks at this width', onclick: () => { const s = selectorFor(sel); for (const p of Object.keys(state.css[scopeKey()]?.[s] || {})) delTweak(state.css, scopeKey(), s, p); state.text = state.text.filter((t) => t.sel !== s); renderLive(); commit(); syncFields(); } }),
+      isTextual(sel) ? h('button', { text: 'Edit text', onclick: () => startTextEdit(sel) }) : null,
+      h('button', { text: 'Deselect', onclick: () => { sel = null; updateOverlay(); buildPanel(); } })),
+    crumbs());
+  panel.append(head);
+
+  const sec = (title, open, ...kids) => { const d = h('details', {}, h('summary', { text: title }), h('div', { class: 'body' }, ...kids)); d.open = open; return d; };
+  const g2 = (...c) => h('div', { class: 'grid2' }, ...c);
+  const showGap = /flex|grid/.test(cs.display);
+  panel.append(
+    sec('Position & size', true,
+      g2(numField({ label: 'X', aria: 'Move horizontally in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).x, write: (v) => setTranslatePx(v, getTranslate(sel).y) }),
+         numField({ label: 'Y', aria: 'Move vertically in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).y, write: (v) => setTranslatePx(getTranslate(sel).x, v) }),
+         numField({ label: 'W', aria: 'Width in pixels', prop: 'width', unit: 'px', read: (e, c) => parseFloat(c.width) || e.getBoundingClientRect().width, write: (v) => { ensureMovable(); setSize('width', v); } }),
+         numField({ label: 'H', aria: 'Height in pixels', prop: 'height', unit: 'px', read: (e, c) => parseFloat(c.height) || e.getBoundingClientRect().height, write: (v) => { ensureMovable(); setSize('height', v); } })),
+      h('p', { class: 'muted', style: 'margin:6px 0 0', text: 'Moves are saved as rem offsets, so they scale with the text.' })),
+    sec('Spacing', true,
+      h('div', { class: 'sub', text: 'Padding' }),
+      g2(numField(P('T', 'padding-top')), numField(P('R', 'padding-right')), numField(P('B', 'padding-bottom')), numField(P('L', 'padding-left'))),
+      h('div', { class: 'sub', text: 'Margin' }),
+      g2(numField(P('T', 'margin-top')), numField(P('R', 'margin-right')), numField(P('B', 'margin-bottom')), numField(P('L', 'margin-left'))),
+      showGap ? [h('div', { class: 'sub', text: 'Gap' }), g2(numField(P('G', 'gap', { read: (e, c) => parseFloat(c.rowGap) || 0 })))] : null),
+    sec('Type', true,
+      g2(numField({ label: 'Aa', aria: 'Font size in pixels', prop: 'font-size', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.fontSize), write: (v) => setProp('font-size', remv(v)) }),
+         numField({ label: 'LH', aria: 'Line height (ratio)', prop: 'line-height', unit: '×', step: 0.05, read: (e, c) => (c.lineHeight === 'normal' ? 1.2 : parseFloat(c.lineHeight) / parseFloat(c.fontSize)), write: (v) => setProp('line-height', String(r3(v))) }),
+         numField({ label: 'LS', aria: 'Letter spacing in em', prop: 'letter-spacing', unit: 'em', step: 0.01, read: (e, c) => (c.letterSpacing === 'normal' ? 0 : parseFloat(c.letterSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('letter-spacing', r3(v) + 'em') }))),
+    sec('Colour & effects', true,
+      colorField('Text', 'color'), colorField('Fill', 'background-color'),
+      h('div', { class: 'sub', text: 'Effects' }),
+      g2(numField({ label: 'Op', aria: 'Opacity', prop: 'opacity', unit: '0–1', step: 0.05, read: (e, c) => parseFloat(c.opacity), write: (v) => setProp('opacity', String(Math.max(0, Math.min(1, r3(v))))) }),
+         numField({ label: 'R', aria: 'Corner radius in pixels', prop: 'border-radius', unit: 'px', read: (e, c) => parseFloat(c.borderTopLeftRadius) || 0, write: (v) => setProp('border-radius', remv(v)) }),
+         numField({ label: 'Bl', aria: 'Frosted-glass blur in pixels (frosted plates only)', prop: '--blur', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.getPropertyValue('--blur')) || 0, write: (v) => setProp('--blur', r3(v) + 'px') }))),
+    tokensSection(), changesSection());
+  syncFields(); afterChange();
+}
+function crumbs() {
+  const chain = []; for (let n = sel; n && n !== doc.body && n !== root; n = n.parentElement) chain.unshift(n);
+  const box = h('div', { class: 'crumbs', role: 'group', 'aria-label': 'Select parent or child' });
+  for (const n of chain) box.append(h('button', { class: n === sel ? 'cur' : '', text: n.localName + (n.id ? '#' + n.id : stableClasses(n)[0] ? '.' + stableClasses(n)[0] : ''), onclick: () => select(n, true) }));
+  const kids = [...sel.children].filter((c) => c.localName !== 'script' && c.localName !== 'style').slice(0, 8);
+  if (kids.length) { box.append(h('span', { class: 'muted', text: '↳' })); for (const k of kids) box.append(h('button', { text: k.localName + (stableClasses(k)[0] ? '.' + stableClasses(k)[0] : ''), onclick: () => select(k, true) })); }
+  return box;
+}
+function tokensSection() {
+  const body = h('div', { class: 'body' }); const d = h('details', {}, h('summary', { text: 'Design tokens (all widths)' }), body); d.open = false;
+  if (!doc) return d;
+  const names = new Set();
+  const walk = (rules) => {
+    for (const r of rules) {
+      if (r.type === 1) { if (r.selectorText === ':root') for (const p of r.style) if (p.startsWith('--')) names.add(p); }
+      else if (r.cssRules) walk(r.cssRules);
+    }
+  };
+  for (const s of doc.styleSheets) { try { walk(s.cssRules); } catch {} }
+  const cs = win.getComputedStyle(root); const colors = [], other = [];
+  for (const n of names) { const v = cs.getPropertyValue(n).trim(); if (!v || /url\(/.test(v)) continue; (/^(#[0-9a-f]{3,8}|rgba?\(|hsla?\()/i.test(v) ? colors : other).push([n, v]); }
+  body.append(h('p', { class: 'muted', style: 'margin:0 0 4px', text: 'Site-wide values from the stylesheet. Changes apply at every width.' }));
+  for (const [n, v] of colors) body.append(colorField(n.replace(/^--/, ''), null, { token: { name: n, get value() { return win.getComputedStyle(root).getPropertyValue(n).trim() || v; } } }));
+  if (other.length) body.append(h('div', { class: 'sub', text: 'Other' }));
+  for (const [n, v] of other) {
+    const inp = h('input', { type: 'text', spellcheck: 'false', value: v, 'aria-label': n });
+    const reset = h('button', { class: 'x', type: 'button', text: '×', 'aria-label': 'Reset', title: 'Reset this tweak' });
+    const row = h('div', { class: 'fc', style: 'grid-template-columns:90px minmax(0,1fr) 14px' }, h('span', { class: 'lab', text: n.replace(/^--/, ''), title: n }), inp, reset);
+    const f = { sync() { if (document.activeElement !== inp) inp.value = win.getComputedStyle(root).getPropertyValue(n).trim(); row.classList.toggle('on', state.css['']?.[':root']?.[n] != null); } };
+    inp.addEventListener('change', () => { if (inp.value.trim()) { setTweak(state.css, '', ':root', n, inp.value.trim()); renderLive(); commit(); syncFields(); } });
+    reset.addEventListener('click', () => { delTweak(state.css, '', ':root', n); renderLive(); commit(); syncFields(); });
+    fields.push(f); body.append(row);
+  }
+  return d;
+}
+function tokenSyncAll() { for (const f of fields) f.sync(); }
+
+/* ---------- changes list ---------- */
+function summary() {
+  const ops = diffCss(baseline, state.css), base = flatten(baseline), rows = [];
+  for (const [sc, sl, p, v] of ops.set) rows.push({ scope: sc, sel: sl, prop: p, value: v, was: base.get(JSON.stringify([sc, sl, p])) });
+  for (const [sc, sl, p] of ops.del) rows.push({ scope: sc, sel: sl, prop: p, removed: true, was: base.get(JSON.stringify([sc, sl, p])) });
+  return { rows, text: state.text, count: rows.length + state.text.length };
+}
+let changesHost = null;
+function changesSection() {
+  const body = h('div', { class: 'body' }); const d = h('details', {}, h('summary', { text: 'Recorded changes' }), body); d.open = true; changesHost = body; renderChanges(); return d;
+}
+function renderChanges() {
+  if (!changesHost) return; const s = summary();
+  if (!s.count) { changesHost.replaceChildren(h('p', { class: 'muted', style: 'margin:4px 0', text: 'Nothing recorded yet.' })); return; }
+  const ul = h('ul', { class: 'changes' });
+  for (const r of s.rows) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: scopeLabel(r.scope) }), h('code', { text: r.removed ? `${r.sel} { ${r.prop} removed }` : `${r.sel} { ${r.prop}: ${r.value} }` })),
+    h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { if (r.was != null) setTweak(state.css, r.scope, r.sel, r.prop, r.was); else delTweak(state.css, r.scope, r.sel, r.prop); renderLive(); commit(); syncFields(); } })));
+  for (const t of s.text) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: 'Text' }), h('code', { text: `${t.sel}: “${stripTags(t.after)}”` })),
+    h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { state.text = state.text.filter((x) => x !== t); renderLive(); commit(); } })));
+  changesHost.replaceChildren(ul);
+}
+const stripTags = (s) => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+
+/* ---------- GitHub ---------- */
+class GhError extends Error { constructor(status, message) { super(message); this.status = status; } }
+async function gh(method, path, body) {
+  const res = await fetch('https://api.github.com' + path, { method, headers: Object.assign({ Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined });
+  const text = await res.text(); let json = null; try { json = JSON.parse(text); } catch {}
+  if (!res.ok) throw new GhError(res.status, (json && json.message) || text || res.statusText);
+  return json;
+}
+function ghHelp(err) {
+  if (err.status === 401) return 'GitHub rejected the token (expired or mistyped). Open Settings and paste a new one.';
+  if (err.status === 403 || err.status === 404) return `GitHub says no (${err.status}: ${err.message}). Check the token can read and write Contents and Pull requests on ${settings.owner}/${settings.repo}, and that the repository name is right.`;
+  if (err.status === 422) return 'GitHub refused the request (' + err.message + ').';
+  return err.message || String(err);
+}
+const repoPath = () => `/repos/${encodeURIComponent(settings.owner)}/${encodeURIComponent(settings.repo)}`;
+function buildNewSource(remoteSrc) {
+  const merged = applyOps(parseBlock(remoteSrc), diffCss(baseline, state.css));
+  let out = replaceBlock(remoteSrc, blockText(merged));
+  const t = applyTextEdits(out, state.text);
+  return { src: t.src, merged, applied: t.applied, failed: t.failed };
+}
+function prBody(s, built) {
+  const lines = ['Visual tweaks made with the page editor (`/editor/`).', ''];
+  const by = {}; for (const r of s.rows) (by[r.scope] ||= []).push(r);
+  for (const [sc, rows] of Object.entries(by)) { lines.push(`**${scopeLabel(sc)}**${sc ? ` \`@media ${sc}\`` : ''}`); for (const r of rows) lines.push(r.removed ? `- \`${r.sel}\`: removed \`${r.prop}\`` : `- \`${r.sel}\`: \`${r.prop}: ${r.value}\``); lines.push(''); }
+  if (built.applied.length) { lines.push('**Text**'); for (const t of built.applied) lines.push(`- \`${t.sel}\`: “${stripTags(t.after)}”`); lines.push(''); }
+  if (built.failed.length) { lines.push('**Text edits that could not be placed automatically** (edit by hand):'); for (const t of built.failed) lines.push(`- \`${t.sel}\`: “${stripTags(t.before)}” → “${stripTags(t.after)}”`); lines.push(''); }
+  lines.push('The style changes are in one managed block at the end of the page’s `<style>`, between the “editor tweaks” marker comments. They use `!important` so they always win; fold them into the main CSS whenever convenient.');
+  return lines.join('\n');
+}
+async function pushChanges(title, statusEl, built0) {
+  const set = (m, kind = '') => statusEl.replaceChildren(h('span', { class: kind, text: m }));
+  try {
+    set('Checking the repository…');
+    await gh('GET', repoPath());
+    // Pin to one commit: read the file at the exact commit the branch will be created from, so they can't disagree.
+    const ref = await gh('GET', `${repoPath()}/git/ref/heads/${encodeURIComponent(settings.base)}`);
+    set('Reading ' + settings.path + ' from ' + settings.base + '…');
+    const file = await gh('GET', `${repoPath()}/contents/${settings.path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(ref.object.sha)}`);
+    const remote = b64decode(file.content);
+    const built = buildNewSource(remote);
+    if (built.src === remote) {
+      set(built.failed.length
+        ? `Couldn't place ${built.failed.length === 1 ? 'your text edit' : 'your text edits'}: the original text isn't found exactly once in ${settings.path} on ${settings.base} (the page may have changed since you opened the editor). Nothing was pushed. Reload the editor and try again.`
+        : 'Nothing to change: the file on ' + settings.base + ' already matches.', 'warn');
+      return null;
+    }
+    set('Creating a branch…');
+    const d = new Date(), p2 = (n) => String(n).padStart(2, '0');
+    const branch = `editor/tweaks-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+    await gh('POST', `${repoPath()}/git/refs`, { ref: 'refs/heads/' + branch, sha: ref.object.sha });
+    set('Committing…');
+    const s = summary();
+    await gh('PUT', `${repoPath()}/contents/${settings.path.split('/').map(encodeURIComponent).join('/')}`, { message: `${title}\n\n${prBody(s, built).split('\n').slice(2, 14).join('\n')}`.trim(), content: b64encode(built.src), sha: file.sha, branch });
+    set('Opening the pull request…');
+    const pr = await gh('POST', `${repoPath()}/pulls`, { title, head: branch, base: settings.base, body: prBody(s, built) });
+    return { url: pr.html_url, number: pr.number, branch, failed: built.failed };
+  } catch (err) { set(ghHelp(err), 'err'); return null; }
+}
+
+/* ---------- dialogs ---------- */
+function openSettings() {
+  q('#sOwner').value = settings.owner; q('#sRepo').value = settings.repo; q('#sBase').value = settings.base; q('#sPath').value = settings.path;
+  q('#sToken').value = token; q('#sRemember').checked = !!settings.remember; q('#dlgSettings').showModal();
+}
+q('#sCancel').addEventListener('click', () => q('#dlgSettings').close());
+q('#fSettings').addEventListener('submit', (e) => {
+  if (e.submitter && e.submitter.value !== 'ok') return;
+  const prevPath = settings.path;
+  settings = { owner: q('#sOwner').value.trim() || 'ct907', repo: q('#sRepo').value.trim() || 'ct907-site', base: q('#sBase').value.trim() || 'main', path: q('#sPath').value.trim().replace(/^\/+/, '') || 'index.html', remember: q('#sRemember').checked };
+  token = q('#sToken').value.trim(); lsSet(LS.settings, JSON.stringify(settings));
+  if (settings.remember && token) lsSet(LS.token, token); else lsDel(LS.token);
+  if (settings.path !== prevPath) loadPage(); else toast('Settings saved.', 1600);
+});
+function openReview() {
+  const s = summary(); if (!s.count) return;
+  if (!token) { toast('Add your GitHub token first.', 2600, 'warn'); openSettings(); return; }
+  const built = buildNewSource(source0);   // preview against the page as served; the real push re-reads the file from GitHub
+  const body = q('#reviewBody'), foot = q('#reviewFoot'), dlg = q('#dlgReview');
+  const status = h('div', { style: 'margin-right:auto;min-height:1.4em;max-width:60%' });
+  const title = h('input', { type: 'text', value: `Editor tweaks: ${s.count} change${s.count > 1 ? 's' : ''}`, 'aria-label': 'Pull request title' });
+  body.replaceChildren(...[
+    h('label', { class: 'row', style: 'grid-template-columns:90px 1fr' }, 'PR title', title),
+    h('p', { class: 'note', text: `A new branch will be created from ${settings.owner}/${settings.repo}@${settings.base}, with a pull request for ${settings.path}.` }),
+    h('div', { class: 'sub', text: 'Style changes (written into one managed block)' }),
+    h('pre', { text: blockText(built.merged) || '(none)' }),
+    s.text.length ? [h('div', { class: 'sub', text: 'Text changes' }), h('ul', {}, state.text.map((t) => h('li', {}, `${t.sel}: “${stripTags(t.before)}” → “${stripTags(t.after)}”`)))] : null,
+    built.failed.length ? h('p', { class: 'warn', text: `${built.failed.length} text edit(s) can't be placed automatically (the original text isn't found exactly once in the file). They'll be listed in the PR description for you to apply by hand.` }) : null,
+  ].flat().filter(Boolean));
+  const go = h('button', { class: 'primary', type: 'button', text: 'Create pull request' });
+  const copy = h('button', { type: 'button', text: 'Copy patch', title: 'Copy the style block and text edits to hand to someone else', onclick: async () => { try { await navigator.clipboard.writeText(blockText(built.merged) + (state.text.length ? '\n\n/* text edits */\n' + JSON.stringify(state.text, null, 2) : '')); toast('Copied.', 1500); } catch { toast('Copy failed.', 2000, 'err'); } } });
+  go.addEventListener('click', async () => {
+    go.disabled = copy.disabled = true; const res = await pushChanges(title.value.trim() || 'Editor tweaks', status, built);
+    if (res) {
+      status.replaceChildren(h('span', { class: 'ok', text: 'Pull request created: ' }), h('a', { href: res.url, target: '_blank', rel: 'noopener noreferrer', text: `#${res.number}` }));
+      lsDel(LS.draft); go.replaceWith(h('button', { type: 'button', class: 'primary', text: 'Open on GitHub', onclick: () => window.open(res.url, '_blank', 'noopener') }));
+    } else go.disabled = copy.disabled = false;
+  });
+  foot.replaceChildren(status, copy, h('button', { type: 'button', text: 'Close', onclick: () => dlg.close() }), go);
+  dlg.showModal();
+}
+
+/* ---------- wiring ---------- */
+for (const w of WIDTHS) q('#widths').append(h('button', { type: 'button', 'data-w': w, text: w, 'aria-pressed': 'false', title: `${rangeFor(w).label} preview`, onclick: () => setWidth(w) }));
+q('#w').addEventListener('change', (e) => setWidth(+e.target.value));
+q('#zoom').addEventListener('change', (e) => { zoomMode = e.target.value; layoutFrame(); setTimeout(updateOverlay, 30); });
+q('#undo').addEventListener('click', undo); q('#redo').addEventListener('click', redo);
+q('#settings').addEventListener('click', openSettings); q('#review').addEventListener('click', openReview);
+// Reload only the preview: the recorded tweaks live in the editor, so they are simply re-applied to the fresh page.
+q('#reload').addEventListener('click', () => { if (frame.contentWindow && frame.src) frame.contentWindow.location.reload(); else loadPage(); });
+frame.addEventListener('load', onFrameLoad);
+window.addEventListener('resize', () => { layoutFrame(); updateOverlay(); });
+layoutFrame(); loadPage();
+
+// handy for debugging and for the automated tests
+window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, buildNewSource, get doc() { return doc; }, get sel() { return sel; }, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
+})();
+</script>
+</body>
+</html>
