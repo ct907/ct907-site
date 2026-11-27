@@ -508,15 +508,15 @@
     /* ===== editor tweaks: start (managed by /editor/; safe to hand-edit) ===== */
     :root { --grain: 0.53 !important; }
     @media (min-width: 1100px) {
-      p.lede.glass { --blur: 2px !important; translate: 0rem 7.25rem !important; }
+      p.lede.glass { --blur: 2px !important; translate: 0rem 6.791rem !important; }
       h1.glass { --blur: 2px !important; translate: 0rem 7.25rem !important; }
       #ux-portfolio { --blur: 2px !important; }
-      h3 > a { --blur: 2px !important; }
-      article.release.glass { --blur: 2px !important; translate: 0rem 4.75rem !important; }
+      h3 > a { --blur: 2px !important; border-style: solid !important; border-top-width: 1px !important; border-right-width: 1px !important; border-bottom-width: 1px !important; border-left-width: 1px !important; border-color: #127998 !important; }
+      article.release.glass { --blur: 2px !important; translate: 0rem 4.75rem !important; border-color: #8bcae0 !important; border-top-width: 2px !important; border-right-width: 2px !important; border-bottom-width: 2px !important; border-left-width: 2px !important; }
       #ux-h { --blur: 2px !important; translate: -0.125rem 3.5625rem !important; }
-      a.pill.glass { --blur: 2px !important; translate: 0.5rem 5.0625rem !important; }
+      a.pill.glass { --blur: 2px !important; translate: 0.5rem 5.0625rem !important; font-family: "Merriweather", serif !important; }
       #between-h { --blur: 2px !important; translate: 0rem 2.75rem !important; }
-      #motion-toggle { translate: -10.9427rem 1.8rem !important; }
+      #motion-toggle { translate: -10.9427rem 1.8rem !important; font-family: "Merriweather", serif !important; }
       div.portrait.glass { translate: -10.9198rem 7.25rem !important; }
       span.badge.sq { translate: 0.4375rem 1.375rem !important; background-color: #fe6545 !important; }
       span.badge.round { translate: 0.5rem 1.625rem !important; background-color: #fb6445 !important; }
@@ -525,28 +525,41 @@
       main { translate: 0rem 7.25rem !important; }
       footer.wrap { translate: 0rem 21.5625rem !important; }
       body { height: 180.1594rem !important; }
-      p.hello.glass { translate: -3.3854rem 1.6802rem !important; }
+      p.hello.glass { translate: -3.3854rem 1.6802rem !important; font-family: "Merriweather", serif !important; font-size: 1.0204rem !important; }
       div.ux { translate: 0rem 3.5625rem !important; }
       hr.rule:nth-child(2) { translate: 0rem 4.5625rem !important; background-color: #60bbdb !important; }
       #music-projects { translate: 0rem 4.625rem !important; }
       hr.rule:nth-child(4) { translate: 0rem 9.375rem !important; }
       #in-between { translate: 0rem 9.375rem !important; }
       #music-h { translate: -0.3125rem 3.75rem !important; }
-      p.music-intro.glass { translate: 0rem 3.75rem !important; }
+      p.music-intro.glass { translate: 0rem 3.75rem !important; font-family: "Merriweather", serif !important; font-weight: 300 !important; }
       p.label.glass:nth-child(4) { translate: 0rem 4.75rem !important; }
       ul.tiles { translate: 0rem 4.75rem !important; }
-      p.earlier.glass { translate: 0rem 4.75rem !important; }
-      p.label.glass:nth-child(8) { translate: 0.375rem 4.6875rem !important; }
+      p.earlier.glass { translate: 0rem 3.832rem !important; font-family: "Merriweather", serif !important; width: 43.693rem !important; max-width: none !important; }
+      p.label.glass:nth-child(8) { translate: 0.375rem 4.6875rem !important; font-family: "Merriweather", serif !important; }
       span.badge.hex { translate: 0rem 2.75rem !important; }
       div.strip-outer { translate: 0rem 2.75rem !important; }
       hr.strip-line { translate: 0rem 1.1875rem !important; }
       img.art.glass { width: 18.1625rem !important; max-width: none !important; height: 16.9584rem !important; translate: 0rem 0.8812rem !important; }
+      p.big { font-family: "Merriweather", serif !important; font-weight: 300 !important; }
+      p.small { font-family: "Merriweather", serif !important; font-weight: 300 !important; }
+      ul.links > li:nth-child(1) > a.glass.arrow-link { font-family: "Merriweather", serif !important; font-weight: 600 !important; }
+      ul.links > li:nth-child(2) > a.glass.arrow-link { font-family: "Merriweather", serif !important; font-weight: 600 !important; }
+      p.meta { font-family: "Merriweather", serif !important; font-weight: 400 !important; }
+      p.latest { font-family: "Merriweather", serif !important; }
+      a.pill.glass > svg { width: 0.9184rem !important; height: 0.9184rem !important; }
+      nav { font-family: "Merriweather", serif !important; }
+      p.year.glass { font-family: "Merriweather", serif !important; }
+      span.caret { translate: -0.204rem 1.071rem !important; }
     }
     @media (prefers-contrast: no-preference) {
       :root { --ink-c: #c5f5ff !important; --ink-m: #f5e9f3 !important; }
     }
     /* ===== editor tweaks: end ===== */
   </style>
+  <!-- ===== editor fonts: start (managed by /editor/; safe to hand-edit) ===== -->
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300..900;1,300..900&display=swap" rel="stylesheet">
+  <!-- ===== editor fonts: end ===== -->
 </head>
 <body>
 
@@ -626,7 +639,7 @@
       <li><a class="glass" href="https://open.spotify.com/album/2h6r1jTk9FyczIZ4N9BWyU?si=giPYSb_4QTS18gu-y8l_7g" aria-label="Listen to Karen on Spotify">
         <img src="https://i-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/image-6f90d524-e4cd-4739-9d45-5d394a5516b0.png?w=452&e=webp&nll=true" alt="Karen cover" width="172" height="172" loading="lazy"></a></li>
     </ul>
-    <p class="earlier glass">Earlier releases: Midnight Calling (With You), Chrispy FM, Solid State and Karen.</p>
+    <p class="earlier glass">Earlier releases: Midnight Calling (With You), Chrispy FM, Solid State and Karen For Each Other.</p>
 
     <p class="label glass">Links</p>
     <a class="pill glass" href="https://linktr.ee/ct907">
