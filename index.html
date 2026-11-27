@@ -102,12 +102,14 @@
          colours measured from the reference print's peaks, corrected for this paper and grain,
          then printed at 50% opacity: each ink is mixed 1:1 with paper white, which under
          multiply blending is exactly half the ink (the originals were #59e1ff and #e1c1dd).
-         --paper is a hair lighter than --bg on purpose: the grain on top darkens the page
-         a little, so the page averages out to exactly --bg (#F2EEEA). */
-      --paper: #f6f2ed;
+         --paper is lighter than --bg on purpose: the paper texture on top darkens the page by
+         about 4.5%, so the page averages out to roughly --bg (#F2EEEA) again. (Red can't go above
+         255, so it ends up a level or two under.) */
+      --paper: #fffdf8;
       --ink-c: #acf0ff;
       --ink-m: #f0e0ee;
-      --grain: .7;                 /* paper grain opacity (was 1, i.e. 30% less now) */
+      --grain: .4;                 /* paper texture opacity (40%) */
+      --grain-size: 563px;         /* one tile of the paper texture, in CSS px (the 2x file is 1125px, i.e. native on retina screens) */
 
       /* Graph-paper grid. One cell is 2.25rem, so it grows and shrinks with the
          text (the root font-size below is fluid). Line widths are a share of the cell
@@ -188,20 +190,19 @@
       background-position: 0 calc(var(--lv) * -1), 0 0, 0 0, 0 0;
       background-blend-mode: multiply;
     }
-    /* Paper grain over everything, so the text and photos are printed on the same sheet.
-       Two layers of fractal noise: a fine grain (0.8 base frequency) plus a soft, large-scale
-       mottling (0.09), tuned against the reference's contrast, colour speckle and dark-speck
-       skew, then sized for the page's real scale (the reference is a ~5x zoom). Each tile is
-       stitched, and the two tile sizes differ (300 / 420px) so no repeat shows. It only ever
-       darkens, so black text stays black. Shown at --grain opacity (30% less than the tuned
-       strength). */
+    /* Paper texture over everything, so the text and photos are printed on the same sheet. It is a seamless,
+       greyscale tile (assets/images/paper-texture*.webp) multiplied over the whole page at --grain opacity.
+       Multiply can only darken, so black text stays black and white paper picks up the speckle. Regular screens
+       load the 563px file (~110KB), retina screens the 1125px one (~380KB). It sits above all content but never
+       takes a click (pointer-events: none), and it scrolls with the page like real paper. */
     body::after {
-      content: ""; position: absolute; inset: 0; z-index: 60; pointer-events: none;
+      content: ""; position: absolute; inset: 0; z-index: 9999; pointer-events: none;
       opacity: var(--grain);
-      background-image:
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1.55 0 0 0 -.525  0 1.4 0 0 -.450  0 0 2.2 0 -.830  0 0 0 .13 -.049'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.09' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .25  0 0 0 0 .25  0 0 0 0 .28  0 0 0 .09 -.034'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      background-size: 300px 300px, 420px 420px;
+      mix-blend-mode: multiply;
+      background-image: url("assets/images/paper-texture.webp");
+      background-image: -webkit-image-set(url("assets/images/paper-texture.webp") 1x, url("assets/images/paper-texture@2x.webp") 2x);
+      background-image: image-set(url("assets/images/paper-texture.webp") 1x, url("assets/images/paper-texture@2x.webp") 2x);
+      background-size: var(--grain-size) var(--grain-size);
     }
     a { color: inherit; -webkit-tap-highlight-color: transparent; }
     /* Solid ink ring: the orange accent is only ~2.5:1 on this background. */
@@ -509,7 +510,6 @@
     }
 
     /* ===== editor tweaks: start (managed by /editor/; safe to hand-edit) ===== */
-    :root { --grain: 0.53 !important; }
     @media (min-width: 1100px) {
       p.lede.glass { --blur: 2px !important; translate: 0rem 6.791rem !important; }
       h1.glass { --blur: 2px !important; translate: 0rem 7.25rem !important; }

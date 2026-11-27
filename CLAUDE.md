@@ -22,6 +22,16 @@ editor for it (see `editor/README.md`).
 - Not covered by the rule: the editor's own interface (`editor/`) is a tool rather than a site page and keeps its system
   UI font.
 
+## Paper texture
+
+- The grain over the whole page is a tileable greyscale image, multiplied at 40% by `body::after` in `index.html`:
+  `assets/images/paper-texture.webp` (563px, regular screens, ~110KB) and `paper-texture@2x.webp` (1125px, retina,
+  ~380KB), picked with `image-set()`. `--grain` is the opacity, `--grain-size` the tile size in CSS px (563px).
+- The supplied tile had a gentle light-to-dark gradient that showed as bands at every tile edge, so its low-frequency
+  lighting was flattened (the fine grain is untouched). If the texture is ever replaced, check it for the same thing
+  (tile it 2x2, blur it and boost the contrast: the seams show), and retune `--paper`: the texture darkens the page by
+  ~4.5%, so `--paper` is lightened to keep the page averaging out to `--bg` (#F2EEEA).
+
 ## Site structure
 
 - Every folder other than `assets/` and `editor/` (`portfolio/`, `ai-*`, `nhb-games/`, `slow-food-*`, …) is a ~400-byte
