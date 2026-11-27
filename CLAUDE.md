@@ -62,16 +62,45 @@ editor for it (see `editor/README.md`).
 
 ## Riso shift on headings
 
-- `h1`, `h2`, `h3` and `.lede` (the big sub-headline) have two hard-edged `text-shadow` plates behind the text, like
-  off-register riso printing: **yellow up-left by up to 2px and magenta down-right by up to 4px, both at 20%**. One
-  rule in `index.html` (next to the paper texture); body text, labels and buttons don't have it.
-- It is driven by tokens in `:root`: `--riso-yellow` (#ffe600), `--riso-magenta` (#ff3d9a), `--riso-yellow-shift` (2px),
-  `--riso-magenta-shift` (4px) and `--riso-text` (.2, the opacity of both). The editor's **Page & background > Header
-  riso shift** has sliders for the two shifts (0–2px, 0–4px) and the opacity (0 switches it off); the colours are in
-  Design tokens. Those are site-wide and apply at every width, so change them there rather than with per-element tweaks.
-- Colours get their opacity with `rgb(from var(--riso-yellow) r g b / var(--riso-text))` (relative colour syntax:
-  Chrome 119+, Safari 16.4+, Firefox 128+; older browsers just show no ghosts). It is off for increased contrast, forced
-  colours and print. A per-element `text-shadow` tweak from the editor overrides it on that element.
+- `h1`, `h2` and `.lede` (the big sub-headline) have a **yellow plate up-left (up to 2px) and a magenta plate down-right (up to 4px),
+  both at 20%, carrying the paper-grain texture** (so they look like ink on paper). Body text, labels and buttons don't have it.
+- Each plate is a pseudo-element (`::before` yellow, `::after` magenta) printing a copy of the heading's text
+  (`content: attr(data-riso)`), shifted with `translate`, coloured with `rgb(from var(--riso-yellow) r g b / alpha)` and masked
+  by `assets/images/paper-texture.webp` as a **luminance** mask at `--grain-size`: the grain's dark specks let the paper show
+  through the ink. The script at the bottom of `index.html` writes the text into `data-riso` and keeps it current (a
+  MutationObserver, because the editor retypes headings and adds copies of them) and measures `--riso-dy`, how far the real text
+  sits below where a plain line would put it (the sub-headline's raised caret makes its first line taller), so the ghost lines up.
+  It only tags a heading when the browser has `rgb(from …)` and `mask-image`; otherwise the heading keeps the **flat**
+  `text-shadow` plates the CSS also defines (so does no-JS).
+- **The card title (`.release h3`) keeps the flat plates on purpose**: its card-wide link is `h3 a::after { position: absolute;
+  inset: 0 }`, which only covers the card while the h3 is not positioned, and the ghosts need a positioned host.
+- Tokens in `:root`: `--riso-yellow` (#ffe600), `--riso-magenta` (#ff3d9a), `--riso-yellow-shift` (2px), `--riso-magenta-shift`
+  (4px), `--riso-text` (.2). One heading can override the plates with `--riso-yellow-x/-y/-a` and `--riso-magenta-x/-y/-a`
+  (offset px, opacity); they are deliberately **not** declared in `:root`, so the plates fall back to the shifts and `--riso-text`.
+  Today's tweak block gives the headings (h1, sub-headline, three h2) a yellow-only plate at -2px/-1px by that route (the
+  magenta plate is `--riso-magenta-a: 0`); remove that override to bring the magenta plate back.
+- The editor's **Page & background > Header riso shift** has the three global sliders, and selecting a heading shows **Riso
+  plates (this heading)** with X/Y/opacity per plate. A text shadow typed on a heading (the Text shadow control) is an extra
+  flat shadow on top. Everything is off for increased contrast, forced colours and print. Browser support: Chrome 120+,
+  Safari 16.4+, Firefox 128+ for the textured ghosts.
+
+## Page editor: structural edits (`editor/index.html`)
+
+- **Selection.** `sel` is the active element, `selMore` the rest of a multi-selection; `setProp` / `resetProps` / `isTweaked`
+  act on all of them when called without an element, and moves, nudges and the X/Y/W/H fields loop over `targets()`.
+  Shift+click = a run of like elements, Ctrl/Cmd+click = toggle, Alt+click = innermost (Ctrl/Cmd+click used to mean that).
+- **Deleting** an existing element marks it in `state.deleted` (path from `<body>`, tag/id/classes, a text fingerprint) and
+  hides it in the preview with `data-ed-del`; the node stays in the DOM, so paths and selectors keep their meaning. On push
+  it is cut from the HTML **last** (descending path order, ignoring layers placed in the same push) and the browser must
+  read back exactly that many fewer elements. Rules keyed with `:nth-child` are rewritten for the page without it
+  (`rekeyForDeletions`, using a detached copy of the preview).
+- **Duplicating** creates a layer of kind `clone` (class `ed-copy-xxxx`, markup saved at click time, ids made unique). Layers
+  and copies change what `:nth-child(k)` means for later siblings in the preview, so every structural change goes through
+  `withRekey`, which renames the rules, text edits and picture swaps that depend on a position (`state.renames` remembers
+  that a renamed baseline rule is not a change of its own). `originals` / `imgOrig` are keyed by element, not selector, for
+  the same reason. Don't store selectors across a structural change.
+- Source edits happen in this order in `buildNewSource`: text, pictures, new layers and copies, removal of pushed layers,
+  deletions, then the managed style block. Path lookups in the source skip layers already placed in that push (`srcAt` with `ign`).
 
 ## Site structure
 

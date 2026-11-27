@@ -245,7 +245,7 @@ const MAX_PUSH = 20000;                       // px: a typo like 99999999 should
 const IMG_DIR = 'assets/images';
 // Layers added with the editor carry one unique class (ed-text-k3f9, ed-deco-t8x2 …). It is their identity everywhere:
 // the CSS tweaks are keyed on it, the editor recognises them by it, and it is what lets a pushed layer be found and deleted later.
-const LAYER_RE = /^ed-(text|heading|image|deco)-[a-z0-9]{4}$/;
+const LAYER_RE = /^ed-(text|heading|image|deco|copy)-[a-z0-9]{4}$/;
 const DECOR_START = '<!-- ===== editor decor: start (managed by /editor/; safe to hand-edit) ===== -->';
 const DECOR_END = '<!-- ===== editor decor: end ===== -->';
 const DECOR_RE = /<!-- ===== editor decor: start[^\n]*?-->([\s\S]*?)<!-- ===== editor decor: end ===== -->/;
@@ -386,9 +386,9 @@ let settings = Object.assign({ owner: 'ct907', repo: 'ct907-site', base: 'main',
 let token = settings.remember ? (lsGet(LS.token) || '') : '';
 let source0 = '';
 let baseline = {};                 // tweaks that are already in the deployed page
-let state = { css: {}, text: [], images: [], layers: [], removed: [], fonts: [] }; // baseline + this session's tweaks (images: replaced pictures, files in `assets`; layers: new text/images; removed: pushed layers to delete)
-const originals = new Map();       // selector -> original innerHTML (text edits)
-const imgOrig = new Map();         // selector -> original src attribute (image replacements)
+let state = { css: {}, text: [], images: [], layers: [], removed: [], deleted: [], renames: [], fonts: [] }; // baseline + this session's tweaks (images: replaced pictures, files in `assets`; layers: new text/images; removed: pushed layers to delete)
+const originals = new Map();       // element -> its original innerHTML (text edits). Keyed by element, not selector: a selector's :nth-child can shift when a copy is inserted
+const imgOrig = new Map();         // img element -> its original src attribute (image replacements)
 const assets = new Map();          // repo path -> { blob, url, file, ... }: the replacement files (too big for the undo history)
 let pageFonts = new Map();         // Google fonts the page itself already loads (lower-case name -> weights/italics)
 let guarded = new Set();           // site-wide tokens the page overrides for increased contrast (see GUARD)
@@ -403,6 +403,7 @@ let frameW = 1440, zoomMode = 'fit';
 let win = null, doc = null, root = null;
 let ov = {};                       // overlay nodes (inside the iframe)
 let sel = null, hover = null, drag = null, editing = null;
+let selMore = [];                  // the other selected elements when several are picked (sel is the active one: the panel reads its values)
 let nudgeTimer = 0, panelTimer = 0;
 
 const frame = q('#frame'), stage = q('#stage'), wrap = q('#frameWrap'), panel = q('#panel');
@@ -429,7 +430,9 @@ function commit(amend = false) {
 }
 function restore(i) {
   hIndex = i; state = JSON.parse(history[hIndex]); push = null;
-  renderLive(); afterChange(); saveDraft(); buildPanelSoon();
+  renderLive();
+  if (sel && !sel.isConnected) { sel = null; selMore = []; updateOverlay(); }   // e.g. undoing the copy that was selected
+  afterChange(); saveDraft(); buildPanelSoon();
 }
 const undo = () => { if (hIndex > 0) restore(hIndex - 1); };
 const redo = () => { if (hIndex < history.length - 1) restore(hIndex + 1); };
@@ -445,7 +448,7 @@ function saveDraft() {
   if (pendingDraft) return;
   const all = diffCss(baseline, state.css), ops = { set: all.set.filter((x) => !newLayerSel(x[1])), del: all.del.filter((x) => !newLayerSel(x[1])) };
   if (!ops.set.length && !ops.del.length && !state.text.length) { lsDel(LS.draft); return; }
-  lsSet(LS.draft, JSON.stringify({ path: settings.path, ops, text: state.text, originals: [...originals], fonts: state.fonts }));
+  lsSet(LS.draft, JSON.stringify({ path: settings.path, ops, text: state.text, originals: [...originals].filter(([el]) => el.isConnected).map(([el, v]) => [selectorFor(el), v]), fonts: state.fonts }));
 }
 window.addEventListener('beforeunload', (e) => { if (summary().count) { e.preventDefault(); e.returnValue = ''; } });
 
@@ -453,13 +456,13 @@ window.addEventListener('beforeunload', (e) => { if (summary().count) { e.preven
 const VOLATILE = new Set(['in', 'is-read', 'fx', 'js']);
 function stableClasses(e) { return [...e.classList].filter((c) => !VOLATILE.has(c) && !c.startsWith('__ed')); }
 function selectorFor(e) {
-  const d = e.ownerDocument, W = d.defaultView;
+  const d = e.ownerDocument, W = d.defaultView || window;   // a detached copy of the page has no window of its own
   const part = (n) => {
     const lc = layerClass(n); if (lc) return '.' + lc;
     if (n.id) return '#' + W.CSS.escape(n.id);
     let p = n.localName + stableClasses(n).map((c) => '.' + W.CSS.escape(c)).join('');
     const sibs = [...n.parentElement.children];
-    const same = sibs.filter((s) => s.localName === n.localName && stableClasses(s).join(' ') === stableClasses(n).join(' '));
+    const mine = stableClasses(n), same = sibs.filter((s) => s.localName === n.localName && mine.every((c) => s.classList.contains(c)));   // a sibling with extra classes (a copy) matches this selector too
     if (same.length > 1) p += `:nth-child(${sibs.indexOf(n) + 1})`;
     return p;
   };
@@ -610,9 +613,10 @@ function syncLayers() {
   for (const l of state.layers) {
     const parent = l.where === 'deco' ? doc.body : liveAt(l.parent); if (!parent) continue;
     let n = doc.querySelector(`[data-ed-layer="${l.id}"]`), fresh = false;
-    if (!n) { n = doc.createElement(l.tag); n.setAttribute('data-ed-layer', l.id); fresh = true; }
-    const cls = l.classes.join(' '); if (n.getAttribute('class') !== cls) n.setAttribute('class', cls);
-    if (l.kind === 'image') {
+    if (!n) { n = l.kind === 'clone' ? cloneNodeFor(l) : doc.createElement(l.tag); n.setAttribute('data-ed-layer', l.id); fresh = true; }
+    const cls = l.classes.join(' '); if (l.kind !== 'clone' && n.getAttribute('class') !== cls) n.setAttribute('class', cls);
+    if (l.kind === 'clone') { /* the markup is in the node already */ }
+    else if (l.kind === 'image') {
       const a = assets.get(l.path); if (a && n.getAttribute('src') !== a.url) n.setAttribute('src', a.url);
       n.setAttribute('alt', l.where === 'deco' ? '' : l.alt || ''); if (l.w) { n.setAttribute('width', l.w); n.setAttribute('height', l.h); }
     } else if (!(editing && editing.el === n) && n.innerHTML !== l.text) n.innerHTML = l.text;
@@ -624,38 +628,47 @@ function syncLayers() {
   for (const n of doc.querySelectorAll('[data-ed-gone]')) if (!gone.has(layerClass(n))) n.removeAttribute('data-ed-gone');
   for (const c of gone) for (const n of doc.querySelectorAll('.' + c)) n.setAttribute('data-ed-gone', '');
 }
+// Elements deleted in the editor stay in the preview's DOM (so undo is trivial and every path/selector keeps its meaning) but are hidden.
+function syncDeleted() {
+  if (!doc) return; const want = new Set();
+  for (const d of state.deleted) { const n = liveAt(d.path); if (n && sameSig(sigOf(n), d.sig)) { want.add(n); if (!n.hasAttribute('data-ed-del')) n.setAttribute('data-ed-del', ''); } }
+  for (const n of doc.querySelectorAll('[data-ed-del]')) if (!want.has(n)) n.removeAttribute('data-ed-del');
+}
 const rootPx = () => parseFloat(win.getComputedStyle(root).fontSize) || 16;
 function renderLive() {
   if (!doc) return;
   let st = doc.getElementById('__ed_live');
   if (!st) { st = doc.createElement('style'); st.id = '__ed_live'; doc.head.append(st); }
   st.textContent = cssText(state.css);
-  syncFonts(); syncLayers();
-  for (const [s, orig] of originals) {
-    const t = state.text.find((x) => x.sel === s), node = doc.querySelector(s);
-    if (!node || (editing && editing.el === node)) continue;
+  syncFonts(); syncLayers(); syncDeleted();
+  for (const [node, orig] of originals) {
+    if (!node.isConnected || (editing && editing.el === node)) continue;
+    const s = selectorFor(node), t = state.text.find((x) => x.sel === s);
     const want = t ? t.after : orig; if (node.innerHTML !== want) node.innerHTML = want;
   }
-  for (const [s, orig] of imgOrig) {
-    const e = state.images.find((x) => x.sel === s), node = doc.querySelector(s), a = e && assets.get(e.path);
+  for (const [node, orig] of imgOrig) {
+    if (!node.isConnected) continue;
+    const s = selectorFor(node), e = state.images.find((x) => x.sel === s), a = e && assets.get(e.path);
     const want = a ? a.url : orig;
-    if (node && want && node.getAttribute('src') !== want) { node.removeAttribute('srcset'); node.setAttribute('src', want); }
+    if (want && node.getAttribute('src') !== want) { node.removeAttribute('srcset'); node.setAttribute('src', want); }
   }
   updateOverlay(); schedulePanelSync();
   // The page draws each frosted plate's soft-edge mask in script: ask it to redo them (once per frame) after a plate, --blur or --edge changed.
   if (win.ct907Feather && !featherQueued) { featherQueued = true; win.requestAnimationFrame(() => { featherQueued = false; try { win.ct907Feather(); } catch {} }); }
 }
 let featherQueued = false;
-function setProp(prop, value, scope = scopeKey(), el = sel) {
-  if (!el) return;
-  setTweak(state.css, scope, selectorFor(el), prop, value); renderLive();
-}
-function resetProps(props, el = sel) {
-  if (!el) return; const s = selectorFor(el);
-  for (const p of props) delTweak(state.css, scopeKey(), s, p);
+// With no element given these act on everything that is selected; with one, on just that element.
+function setProp(prop, value, scope = scopeKey(), el = null) {
+  const list = el ? [el] : targets(); if (!list.length) return;
+  for (const t of list) setTweak(state.css, scope, selectorFor(t), prop, value);
   renderLive();
 }
-const isTweaked = (props, el = sel) => !!el && props.some((p) => state.css[scopeKey()]?.[selectorFor(el)]?.[p] != null);
+function resetProps(props, el = null) {
+  const list = el ? [el] : targets(); if (!list.length) return;
+  for (const t of list) { const s = selectorFor(t); for (const p of props) delTweak(state.css, scopeKey(), s, p); }
+  renderLive();
+}
+const isTweaked = (props, el = null) => (el ? [el] : targets()).some((t) => props.some((p) => state.css[scopeKey()]?.[selectorFor(t)]?.[p] != null));
 
 /* ---------- frame size / zoom ---------- */
 function layoutFrame() {
@@ -683,10 +696,10 @@ async function loadPage() {
     q('#empty').textContent = `Couldn't load ${settings.path} (${err.message}). Open this editor from the live site (…/editor/), not from a file on disk.`; return;
   }
   baseline = parseBlock(source0);
-  state = { css: clone(baseline), text: [], images: [], layers: [], removed: [], fonts: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1;
+  state = { css: clone(baseline), text: [], images: [], layers: [], removed: [], deleted: [], renames: [], fonts: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1;
   for (const a of assets.values()) URL.revokeObjectURL(a.url);
   assets.clear(); push = null;
-  sel = null; hover = null; editing = null;
+  sel = null; selMore = []; hover = null; editing = null;
   frame.src = url.href;
 }
 function onFrameLoad() {
@@ -697,7 +710,7 @@ function onFrameLoad() {
   root.setAttribute('data-motion', 'reduced'); root.classList.remove('fx');
   doc.querySelectorAll('.reveal').forEach((e) => e.classList.add('in'));
   const css = doc.createElement('style'); css.id = '__ed_css';
-  css.textContent = '*,*::before,*::after{transition:none!important} html .ed-deco{pointer-events:auto!important} html [data-ed-gone]{display:none!important} #fx{display:none!important} html{scroll-behavior:auto!important} .aside{opacity:1!important;transform:none!important;pointer-events:auto!important;transition:none!important}';
+  css.textContent = '*,*::before,*::after{transition:none!important} html .ed-deco{pointer-events:auto!important} html [data-ed-gone],html [data-ed-del]{display:none!important} #fx{display:none!important} html{scroll-behavior:auto!important} .aside{opacity:1!important;transform:none!important;pointer-events:auto!important;transition:none!important}';
   doc.head.append(css);
   // The page's own managed tweaks are re-injected by the editor (baseline + session), so remove the static copy.
   for (const s of doc.querySelectorAll('style')) if (BLOCK_RE.test(s.textContent)) s.textContent = stripBlock(s.textContent);
@@ -707,6 +720,10 @@ function onFrameLoad() {
   const hasDraft = draft && draft.path === settings.path && history.length === 0 && (draft.ops.set.length || draft.ops.del.length || draft.text.length);
   if (hasDraft) pendingDraft = draft;
   buildOverlay(); bindFrameEvents();
+  // After a Reload of the preview the elements are new objects: find the ones recorded text edits and picture swaps belong to again.
+  originals.clear(); imgOrig.clear();
+  for (const t of state.text) { const el = safeQuery(t.sel); if (el) originals.set(el, t.before); }
+  for (const x of state.images) { const el = safeQuery(x.sel); if (el) imgOrig.set(el, x.was); }
   renderLive(); tokBase = {}; for (const n of [...Object.keys(INKS), '--grain', ...RISO.map((r) => r.name)]) tokBase[n] = tokenValue(n);
   commit(); layoutFrame(); buildPanel();
   if (hasDraft) offerDraft(draft);
@@ -717,7 +734,7 @@ function offerDraft(d) {
   t.replaceChildren(h('span', { text: `Restore ${n} unsaved change${n > 1 ? 's' : ''} from last time?` }),
     h('button', { class: 'primary', text: 'Restore', onclick: () => {
       pendingDraft = null;
-      state.css = applyOps(baseline, d.ops); state.text = d.text; state.fonts = d.fonts || []; for (const [k, v] of d.originals) originals.set(k, v);
+      state.css = applyOps(baseline, d.ops); state.text = d.text; state.fonts = d.fonts || []; for (const [k, v] of d.originals) { const el = safeQuery(k); if (el) originals.set(el, v); }
       renderLive(); commit(); t.classList.remove('on'); toast('Restored.', 1800);
     } }),
     h('button', { text: 'Discard', onclick: () => { pendingDraft = null; lsDel(LS.draft); t.classList.remove('on'); } }));
@@ -739,7 +756,7 @@ function buildOverlay() {
   ov.cut = mk('position:fixed;display:none;left:0;right:0;height:0;border-top:2px dashed #ff8a00');
   ov.grip = mk('position:fixed;display:none;right:14px;background:#ff8a00;color:#111;padding:2px 9px;border-radius:999px;font-weight:600;white-space:nowrap;pointer-events:auto;cursor:ns-resize;box-shadow:0 1px 4px rgba(0,0,0,.35)');
   ov.grip.dataset.h = 'push'; ov.grip.textContent = '⇅ push this & below';
-  ov.units = []; ov.chips = [];
+  ov.units = []; ov.chips = []; ov.more = [];
   ov.handles = {};
   for (const hd of HANDLES) {
     const n = mk(`position:fixed;display:none;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;background:#fff;border:1.5px solid #3b8cff;border-radius:2px;pointer-events:auto;cursor:${CURSORS[hd]}`);
@@ -773,25 +790,28 @@ function updateChips() {
 function updateOverlay() {
   if (!ov.root || !ov.root.isConnected) return;
   updateChips();
-  const hr = hover && hover !== sel && hover.isConnected ? hover.getBoundingClientRect() : null;
+  const hr = hover && !targets().includes(hover) && hover.isConnected ? hover.getBoundingClientRect() : null;
   ov.hover.style.display = hr ? 'block' : 'none'; if (hr) place(ov.hover, hr);
+  const others = sel && sel.isConnected ? targets().slice(1) : [];
+  while (ov.more.length < others.length) { const n = doc.createElement('div'); n.style.cssText = 'position:fixed;outline:2px solid #3b8cff;background:rgba(59,140,255,.07);pointer-events:none'; ov.root.prepend(n); ov.more.push(n); }
+  ov.more.forEach((n, i) => { const r = others[i] ? others[i].getBoundingClientRect() : null; n.style.display = r ? 'block' : 'none'; if (r) place(n, r); });
   const sr = sel && sel.isConnected ? sel.getBoundingClientRect() : null;
   ov.sel.style.display = sr ? 'block' : 'none'; ov.tag.style.display = ov.size.style.display = sr ? 'block' : 'none';
   for (const hd of HANDLES) ov.handles[hd].style.display = 'none';
   updatePushOverlay(sr);
   if (!sr) return;
   place(ov.sel, sr);
-  ov.tag.textContent = label(sel); ov.tag.style.left = sr.left + 'px'; ov.tag.style.top = Math.max(0, sr.top - 20) + 'px';
+  ov.tag.textContent = others.length ? `${others.length + 1} selected · active: ${label(sel)}` : label(sel); ov.tag.style.left = sr.left + 'px'; ov.tag.style.top = Math.max(0, sr.top - 20) + 'px';
   ov.size.textContent = `${Math.round(sr.width)} × ${Math.round(sr.height)}`;
   ov.size.style.left = (sr.left + sr.width / 2 - 28) + 'px'; ov.size.style.top = (sr.bottom + 6) + 'px';
-  if (editing || !resizable(sel)) return;
+  if (editing || others.length || !resizable(sel)) return;
   const xs = { w: sr.left, e: sr.right, n: sr.left + sr.width / 2, s: sr.left + sr.width / 2, nw: sr.left, ne: sr.right, sw: sr.left, se: sr.right };
   const ys = { n: sr.top, s: sr.bottom, e: sr.top + sr.height / 2, w: sr.top + sr.height / 2, nw: sr.top, ne: sr.top, sw: sr.bottom, se: sr.bottom };
   for (const hd of HANDLES) { const n = ov.handles[hd]; n.style.display = 'block'; n.style.left = xs[hd] + 'px'; n.style.top = ys[hd] + 'px'; }
 }
 // The cut line, the tint over what will move, and the grip you can drag to push it all.
 function updatePushOverlay(sr) {
-  const show = !!sr && pushOpen && !editing;
+  const show = !!sr && pushOpen && !editing && !isMulti();
   const hot = show && (pushHot || gripHover || (drag && drag.type === 'push'));
   ov.cut.style.display = ov.grip.style.display = show ? 'block' : 'none';
   ov.cutTint.style.display = hot ? 'block' : 'none';
@@ -809,7 +829,7 @@ function updatePushOverlay(sr) {
 }
 let lastKey = '';
 (function tick() {
-  if (sel && sel.isConnected) { const r = sel.getBoundingClientRect(); const k = [r.left, r.top, r.width, r.height].join(); if (k !== lastKey) { lastKey = k; updateOverlay(); } }
+  if (sel && sel.isConnected) { const k = targets().map((e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].join(); }).join('|'); if (k !== lastKey) { lastKey = k; updateOverlay(); } }
   requestAnimationFrame(tick);
 })();
 
@@ -820,9 +840,44 @@ function deepestAt(x, y) {
   while (n.ownerSVGElement) n = n.ownerSVGElement;
   return n;
 }
+/* Multi-select. `sel` is the active element (the last one picked; the panel shows its values) and `selMore` holds the rest.
+   Whatever is changed in the panel is written to every selected element; moves and nudges act on each one in turn.
+   Shift+click adds a run of siblings (or one element), Ctrl/Cmd+click adds or removes one; Alt+click picks the innermost. */
+const targets = () => (sel ? [sel, ...selMore.filter((e) => e !== sel && e.isConnected)] : []);
+const isMulti = () => targets().length > 1;
+function clearSel() { sel = null; selMore = []; lastKey = ''; push = null; pushHot = false; gripHover = false; updateOverlay(); buildPanel(); }
+function selectMany(list, active) {
+  list = [...new Set(list)].filter((e) => e && e.isConnected);
+  if (!list.length) { clearSel(); return; }
+  if (editing) endTextEdit(true);
+  sel = list.includes(active) ? active : list[list.length - 1]; selMore = list.filter((e) => e !== sel);
+  lastKey = ''; push = null; pushHot = false; gripHover = false; updateOverlay(); buildPanel();
+}
+function toggleSel(el) {
+  const cur = targets();
+  if (cur.includes(el)) { const rest = cur.filter((x) => x !== el); selectMany(rest, rest[rest.length - 1]); }
+  else selectMany([...cur, el], el);
+}
+// Shift+click: a run of like elements. If the active element and the clicked one are siblings, everything between them. If they sit
+// in different siblings (two links in two list items), the same relative element in every sibling between those (every link in
+// the list items from one to the other). Null when the two are not alike, so the click just adds one element.
+function siblingRun(el) {
+  if (!sel || sel === el) return null;
+  const chain = (n) => { const c = []; for (; n && n !== doc.body && n !== root; n = n.parentElement) c.unshift(n); return c; };
+  const ca = chain(sel), cb = chain(el); let k = 0; while (k < ca.length && k < cb.length && ca[k] === cb[k]) k++;
+  if (k >= ca.length || k >= cb.length) return null;                       // one contains the other
+  const A = ca[k], B = cb[k]; if (!A.parentElement || A.parentElement !== B.parentElement) return null;
+  const rel = (chainEls, from) => chainEls.slice(from + 1).map((n, i) => [...chainEls[from + i].children].indexOf(n));
+  const ra = rel(ca, k), rb = rel(cb, k); if (ra.join() !== rb.join()) return null;
+  const sibs = [...A.parentElement.children].filter((c) => !SKIP_TAGS.has(c.tagName) && c.id !== 'fx' && !(c.id || '').startsWith('__ed') && !c.hasAttribute('data-ed-gone') && !c.hasAttribute('data-ed-del'));
+  const i = sibs.indexOf(A), j = sibs.indexOf(B); if (i < 0 || j < 0) return null;
+  const out = [];
+  for (const sb of sibs.slice(Math.min(i, j), Math.max(i, j) + 1)) { let n = sb; for (const x of ra) n = n && n.children[x]; if (n && n.localName === sel.localName) out.push(n); }
+  return out.length > 1 ? out : null;
+}
 function select(el, reveal = false) {
   if (editing) endTextEdit(true);
-  sel = el; lastKey = ''; push = null; pushHot = false; gripHover = false;
+  sel = el; selMore = []; lastKey = ''; push = null; pushHot = false; gripHover = false;
   // Picked from the breadcrumbs / keyboard rather than clicked: scroll the preview to it if it's off-screen.
   if (reveal) { const r = el.getBoundingClientRect(); if (r.bottom < 0 || r.top > win.innerHeight) el.scrollIntoView({ block: 'center' }); }
   updateOverlay(); buildPanel();
@@ -843,13 +898,13 @@ function setTranslatePx(x, y, el = sel) {
 function commitSoon() { clearTimeout(nudgeTimer); nudgeTimer = setTimeout(commit, 450); }
 // Set a width/height, then check what the browser really applied. If the page's own max-/min- rule is overriding the
 // request (e.g. .music-intro has max-width: 40rem), lift that cap too, otherwise the handle would silently do nothing.
-function setSize(axis, px, rp = rootPx()) {
+function setSize(axis, px, rp = rootPx(), el = sel) {
   const W = axis === 'width';
-  setProp(axis, r4(px / rp) + 'rem');
-  const got = parseFloat(win.getComputedStyle(sel)[axis]);
+  setProp(axis, r4(px / rp) + 'rem', scopeKey(), el);
+  const got = parseFloat(win.getComputedStyle(el)[axis]);
   if (Number.isFinite(got)) {
-    if (got < px - 0.5) setProp(W ? 'max-width' : 'max-height', 'none');
-    else if (got > px + 0.5) setProp(W ? 'min-width' : 'min-height', '0');
+    if (got < px - 0.5) setProp(W ? 'max-width' : 'max-height', 'none', scopeKey(), el);
+    else if (got > px + 0.5) setProp(W ? 'min-width' : 'min-height', '0', scopeKey(), el);
   }
 }
 
@@ -946,15 +1001,24 @@ function onDown(e) {
   if (hd && sel) { startDrag(e, 'resize', hd); return; }
   if (editing) endTextEdit(true);
   const under = deepestAt(e.clientX, e.clientY);
-  const inSel = sel && sel.isConnected && (() => { const r = sel.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; })();
-  // Ctrl/Cmd/Alt-click always picks the innermost element; otherwise a click inside the selection drags it.
-  if (!(inSel && !(e.altKey || e.ctrlKey || e.metaKey)) && under && under !== sel) select(under);
+  // Shift/Ctrl/Cmd-click builds a selection (Shift: a run of siblings; Ctrl/Cmd: add or remove one). No dragging.
+  if ((e.shiftKey || e.ctrlKey || e.metaKey) && under) {
+    const run = e.shiftKey ? siblingRun(under) : null;
+    if (run) selectMany([...targets(), ...run], under); else toggleSel(under);
+    return;
+  }
+  const hit = (el) => { const r = el.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
+  const inSel = targets().some((t) => t.isConnected && hit(t));
+  // Alt-click always picks the innermost element; otherwise a click inside the selection drags it (all of it, when several are selected).
+  let collapse = null;
+  if (!(inSel && !e.altKey) && under && (under !== sel || isMulti())) select(under);
   else if (!sel && under) select(under);
-  if (sel) startDrag(e, 'move');
+  else if (isMulti() && inSel) { const inside = targets().filter(hit); collapse = (under && inside.find((t) => t === under || t.contains(under))) || inside[inside.length - 1]; }
+  if (sel) startDrag(e, 'move', undefined, collapse);
 }
-function startDrag(e, type, handle) {
+function startDrag(e, type, handle, collapse = null) {
   const r = sel.getBoundingClientRect(), cs = win.getComputedStyle(sel);
-  drag = { type, handle, id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, rp: rootPx(), t0: getTranslate(sel), w: parseFloat(cs.width) || r.width, h: parseFloat(cs.height) || r.height };
+  drag = { type, handle, id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, rp: rootPx(), t0: getTranslate(sel), t0s: targets().map((el) => [el, getTranslate(el)]), collapse, w: parseFloat(cs.width) || r.width, h: parseFloat(cs.height) || r.height };
   try { e.target.setPointerCapture(e.pointerId); } catch {}
 }
 function onMove(e) {
@@ -970,7 +1034,7 @@ function onMove(e) {
   if (drag.type === 'push') { pushTo(drag.base + dy); syncFields(); return; }
   if (drag.type === 'move') {
     if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
-    setTranslatePx(drag.t0.x + dx, drag.t0.y + dy);
+    for (const [el, t0] of drag.t0s) setTranslatePx(t0.x + dx, t0.y + dy, el);
   } else {
     const hd = drag.handle; let w = drag.w, hh = drag.h, tx = drag.t0.x, ty = drag.t0.y;
     if (hd.includes('e')) w += dx; if (hd.includes('w')) { w -= dx; tx += dx; }
@@ -985,7 +1049,7 @@ function onMove(e) {
 }
 function onUp(e) {
   e.stopImmediatePropagation();
-  if (drag) { const moved = drag.moved, was = drag.type; try { e.target.releasePointerCapture(drag.id); } catch {} drag = null; if (moved) commit(); if (was === 'push') { gripHover = e.target === ov.grip; updateOverlay(); buildPanelSoon(); } }
+  if (drag) { const moved = drag.moved, was = drag.type, collapse = drag.collapse; try { e.target.releasePointerCapture(drag.id); } catch {} drag = null; if (moved) commit(); else if (collapse && was === 'move') select(collapse); if (was === 'push') { gripHover = e.target === ov.grip; updateOverlay(); buildPanelSoon(); } }
 }
 function onDbl(e) {
   e.stopImmediatePropagation(); e.preventDefault();
@@ -1018,7 +1082,7 @@ function sanitize(node) {
 }
 function startTextEdit(el) {
   if (!isTextual(el)) { toast("This element has no editable text. Double-click the text itself.", 2600); return; }
-  const s = selectorFor(el); if (!layerOf(el) && !originals.has(s)) originals.set(s, el.innerHTML);
+  const s = selectorFor(el); if (!layerOf(el) && !cloneRootOf(el) && !originals.has(el)) originals.set(el, el.innerHTML);
   editing = { el, sel: s, start: el.innerHTML };
   el.setAttribute('contenteditable', 'true'); el.spellcheck = false;
   const paste = (ev) => { ev.preventDefault(); doc.execCommand('insertText', false, (ev.clipboardData || win.clipboardData).getData('text/plain')); };
@@ -1031,8 +1095,9 @@ function endTextEdit(save) {
   el.removeEventListener('paste', paste); el.removeAttribute('contenteditable'); el.blur();
   if (!save) { el.innerHTML = start; updateOverlay(); return; }
   const after = sanitize(el); el.innerHTML = after;
+  const CR = cloneRootOf(el); if (CR) { const CL = layerOf(CR); CL.html = cloneMarkup(CR); freshLayer = null; renderLive(); commit(); return; }
   const L = layerOf(el); if (L) { L.text = after || L.text; const amend = freshLayer === L.id; freshLayer = null; renderLive(); commit(amend); return; }
-  const orig = originals.get(s), tmp = doc.createElement('div'); tmp.innerHTML = orig;
+  const orig = originals.get(el), tmp = doc.createElement('div'); tmp.innerHTML = orig;
   state.text = state.text.filter((t) => t.sel !== s);
   if (after !== sanitize(tmp)) state.text.push({ sel: s, before: orig, after });
   renderLive(); commit();
@@ -1051,16 +1116,16 @@ function onKey(e) {
   if (typing(e.target)) return;
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
-  if (e.key === 'Escape') { sel = null; updateOverlay(); buildPanel(); return; }
+  if (e.key === 'Escape') { clearSel(); return; }
   if (!sel) return;
-  if ((e.key === 'Delete' || e.key === 'Backspace') && layerClass(sel)) { e.preventDefault(); deleteLayer(sel); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(); return; }
   const step = e.shiftKey ? 10 : 1;
-  if (e.altKey && e.key === 'ArrowUp' && sel.parentElement && sel.parentElement !== doc.body) { e.preventDefault(); select(sel.parentElement, true); return; }
-  if (e.altKey && e.key === 'ArrowDown' && sel.firstElementChild) { e.preventDefault(); select(sel.firstElementChild, true); return; }
-  if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { const s = e.key === 'ArrowLeft' ? sel.previousElementSibling : sel.nextElementSibling; if (s) { e.preventDefault(); select(s, true); } return; }
+  if (e.altKey && !isMulti() && e.key === 'ArrowUp' && sel.parentElement && sel.parentElement !== doc.body) { e.preventDefault(); select(sel.parentElement, true); return; }
+  if (e.altKey && !isMulti() && e.key === 'ArrowDown' && sel.firstElementChild) { e.preventDefault(); select(sel.firstElementChild, true); return; }
+  if (e.altKey && !isMulti() && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { const s = e.key === 'ArrowLeft' ? sel.previousElementSibling : sel.nextElementSibling; if (s) { e.preventDefault(); select(s, true); } return; }
   const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-  if (d) { e.preventDefault(); const t = getTranslate(sel); setTranslatePx(t.x + d[0], t.y + d[1]); commitSoon(); return; }
-  if (e.key === 'Enter' && isTextual(sel)) { e.preventDefault(); startTextEdit(sel); }
+  if (d) { e.preventDefault(); for (const el of targets()) { const t = getTranslate(el); setTranslatePx(t.x + d[0], t.y + d[1], el); } commitSoon(); return; }
+  if (e.key === 'Enter' && !isMulti() && isTextual(sel)) { e.preventDefault(); startTextEdit(sel); }
 }
 // Keys pressed while the editor's own page has focus (not the preview). Typing in a field keeps its native behaviour.
 document.addEventListener('keydown', (e) => { if (!doc || typing(e.target) || e.target.closest('dialog')) return; onKey(e); });
@@ -1277,6 +1342,20 @@ function shadowBlock(kind) {
 }
 
 /* ---- the Type section ---- */
+/* ---- Riso plates on one heading: offsets and opacity of its yellow (::before) and magenta (::after) ghosts ---- */
+function risoSection() {
+  const ghost = (which) => win.getComputedStyle(sel, which);
+  const off = (which) => { const t = ghost(which).translate, p = t && t !== 'none' ? t.split(/\s+/).map(parseFloat) : [0, 0]; return { x: p[0] || 0, y: (p[1] || 0) - (parseFloat(sel.style.getPropertyValue('--riso-dy')) || 0) }; };   // minus the alignment nudge the page adds
+  const alpha = (which) => Math.round(100 * parseColor(ghost(which).color).a);
+  const mk = (name, which, pre) => [
+    g2(numField({ label: 'X', aria: `Heading ${name.toLowerCase()} ghost X offset in pixels`, props: [`--riso-${pre}-x`], unit: 'px', step: 0.5, read: () => off(which).x, write: (v) => setProp(`--riso-${pre}-x`, r3(v) + 'px') }),
+       numField({ label: 'Y', aria: `Heading ${name.toLowerCase()} ghost Y offset in pixels`, props: [`--riso-${pre}-y`], unit: 'px', step: 0.5, read: () => off(which).y, write: (v) => setProp(`--riso-${pre}-y`, r3(v) + 'px') })),
+    g2(numField({ label: '%', aria: `Heading ${name.toLowerCase()} ghost opacity in percent`, props: [`--riso-${pre}-a`], unit: '%', step: 5, read: () => alpha(which), write: (v) => setProp(`--riso-${pre}-a`, String(r3(Math.max(0, Math.min(100, v)) / 100))) }))];
+  return sec('Riso plates (this heading)', false,
+    h('p', { class: 'muted', style: 'margin:0 0 4px', text: 'The off-register yellow and magenta copies of this heading, with the paper grain. Opacity 0 hides a plate. The sliders under Page & background set them for every heading.' }),
+    h('div', { class: 'sub', text: 'Yellow' }), ...mk('Yellow', '::before', 'yellow'),
+    h('div', { class: 'sub', text: 'Magenta' }), ...mk('Magenta', '::after', 'magenta'));
+}
 function typeSection() {
   const cs = () => win.getComputedStyle(sel), tw = () => state.css[scopeKey()]?.[selectorFor(sel)] || {};
   const famNow = () => cs().fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '');
@@ -1334,7 +1413,7 @@ function typeSection() {
        numField({ label: 'LH', aria: 'Line height (ratio)', prop: 'line-height', unit: '×', step: 0.05, read: (e, c) => (c.lineHeight === 'normal' ? 1.2 : parseFloat(c.lineHeight) / parseFloat(c.fontSize)), write: (v) => setProp('line-height', String(r3(v))) }),
        numField({ label: 'LS', aria: 'Letter spacing in em', prop: 'letter-spacing', unit: 'em', step: 0.01, read: (e, c) => (c.letterSpacing === 'normal' ? 0 : parseFloat(c.letterSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('letter-spacing', r3(v) + 'em') }),
        numField({ label: 'WS', aria: 'Word spacing in em', prop: 'word-spacing', unit: 'em', step: 0.05, read: (e, c) => (c.wordSpacing === 'normal' ? 0 : parseFloat(c.wordSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('word-spacing', r3(v) + 'em') })),
-    nested('Text shadow', shadowBlock('text')));
+    nested('Text shadow', sel.hasAttribute('data-riso') ? h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'This heading’s yellow and magenta plates (with the paper grain) are in the Riso plates section. A text shadow here is an extra, flat shadow.' }) : null, shadowBlock('text')));
 }
 
 /* ---- Border ---- */
@@ -1437,31 +1516,36 @@ function buildPanel() {
   const sections = [];
   if (!doc) return;
   if (!sel) {
-    panel.append(h('p', { class: 'hint', style: 'padding-top:12px' }, 'Click anything on the page to select it. Drag to move, use the handles to resize, arrow keys to nudge (Shift = 10px), double-click text to retype, drop an image file onto a picture to replace it. Hold Ctrl/Cmd while clicking to pick the innermost element.'), addSection(), layersSection(), pageSection(true), tokensSection(), changesSection());
+    panel.append(h('p', { class: 'hint', style: 'padding-top:12px' }, 'Click anything on the page to select it. Drag to move, use the handles to resize, arrow keys to nudge (Shift = 10px), double-click text to retype, drop an image file onto a picture to replace it. Shift+click or Ctrl/Cmd+click adds to the selection (then whatever you change applies to all of it); Alt+click picks the innermost element. Duplicate and Delete are the buttons at the top of the panel for a selected element.'), addSection(), layersSection(), pageSection(true), tokensSection(), changesSection());
     syncFields(); afterChange(); return;
   }
-  const r = rangeFor(frameW), cs = win.getComputedStyle(sel);
+  const r = rangeFor(frameW), cs = win.getComputedStyle(sel), all = targets(), many = all.length > 1;
+  const resetAll = () => { for (const t of all) { const s = selectorFor(t); for (const p of Object.keys(state.css[scopeKey()]?.[s] || {})) delTweak(state.css, scopeKey(), s, p); state.text = state.text.filter((x) => x.sel !== s); state.images = state.images.filter((x) => x.sel !== s); } renderLive(); commit(); buildPanelSoon(); };
   const head = h('div', { class: 'sel-head' },
-    h('div', { class: 'muted', text: `Selected · tweaks apply to ${r.label}` }),
-    h('code', { text: selectorFor(sel) }),
-    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
-      h('button', { text: 'Reset element', title: 'Remove this element’s tweaks at this width', onclick: () => { const s = selectorFor(sel); for (const p of Object.keys(state.css[scopeKey()]?.[s] || {})) delTweak(state.css, scopeKey(), s, p); state.text = state.text.filter((t) => t.sel !== s); state.images = state.images.filter((x) => x.sel !== s); renderLive(); commit(); buildPanelSoon(); } }),
-      isTextual(sel) ? h('button', { text: 'Edit text', onclick: () => startTextEdit(sel) }) : null,
-      h('button', { text: 'Deselect', onclick: () => { sel = null; updateOverlay(); buildPanel(); } })),
-    crumbs());
+    h('div', { class: 'muted', text: many ? `${all.length} elements selected · tweaks apply to all of them, at ${r.label}` : `Selected · tweaks apply to ${r.label}` }),
+    many ? h('div', { class: 'crumbs', role: 'group', 'aria-label': 'Selected elements: pick the active one' }, ...all.map((t) => h('button', { class: t === sel ? 'cur' : '', title: 'Make this the active element (the fields show its values)', text: label(t), onclick: () => selectMany(all, t) })))
+         : h('code', { text: selectorFor(sel) }),
+    many ? h('p', { class: 'muted', style: 'margin:6px 0 0', text: 'The fields show the active element (highlighted). Whatever you change is written to every selected element. Arrow keys and dragging move them all.' }) : null,
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px' },
+      h('button', { text: many ? 'Reset elements' : 'Reset element', title: 'Remove the tweaks of ' + (many ? 'these elements' : 'this element') + ' at this width', onclick: resetAll }),
+      !many && isTextual(sel) ? h('button', { text: 'Edit text', onclick: () => startTextEdit(sel) }) : null,
+      h('button', { text: 'Deselect', onclick: () => clearSel() }),
+      h('button', { text: many ? `Duplicate ${all.length}` : 'Duplicate', title: 'Add a copy right after ' + (many ? 'each of these elements' : 'this element') + ' (on the page when you push)', onclick: () => duplicateSelection() }),
+      h('button', { text: many ? `Delete ${all.length}` : 'Delete', title: 'Delete ' + (many ? 'these elements' : 'this element') + ' from the page (Del). Ctrl/Cmd+Z brings it back.', style: 'color:#ff8b8b', onclick: () => deleteSelection() })),
+    many ? null : crumbs());
   panel.append(head);
-  const ib = layerClass(sel) ? layerSection(sel) : imageBlock(); if (ib) panel.append(ib);   // a picture's / layer's own controls come first
-  panel.append(addSection());
+  const ib = many ? null : layerClass(sel) ? layerSection(sel) : imageBlock(); if (ib) panel.append(ib);   // a picture's / layer's own controls come first
+  if (!many) panel.append(addSection());
 
   const showGap = /flex|grid/.test(cs.display);
   panel.append(
     sec('Position & size', true,
-      g2(numField({ label: 'X', aria: 'Move horizontally in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).x, write: (v) => setTranslatePx(v, getTranslate(sel).y) }),
-         numField({ label: 'Y', aria: 'Move vertically in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).y, write: (v) => setTranslatePx(getTranslate(sel).x, v) }),
-         numField({ label: 'W', aria: 'Width in pixels', prop: 'width', unit: 'px', read: (e, c) => parseFloat(c.width) || e.getBoundingClientRect().width, write: (v) => { ensureMovable(); setSize('width', v); } }),
-         numField({ label: 'H', aria: 'Height in pixels', prop: 'height', unit: 'px', read: (e, c) => parseFloat(c.height) || e.getBoundingClientRect().height, write: (v) => { ensureMovable(); setSize('height', v); } })),
+      g2(numField({ label: 'X', aria: 'Move horizontally in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).x, write: (v) => { for (const t of targets()) setTranslatePx(v, getTranslate(t).y, t); } }),
+         numField({ label: 'Y', aria: 'Move vertically in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).y, write: (v) => { for (const t of targets()) setTranslatePx(getTranslate(t).x, v, t); } }),
+         numField({ label: 'W', aria: 'Width in pixels', prop: 'width', unit: 'px', read: (e, c) => parseFloat(c.width) || e.getBoundingClientRect().width, write: (v) => { for (const t of targets()) { ensureMovable(t); setSize('width', v, rootPx(), t); } } }),
+         numField({ label: 'H', aria: 'Height in pixels', prop: 'height', unit: 'px', read: (e, c) => parseFloat(c.height) || e.getBoundingClientRect().height, write: (v) => { for (const t of targets()) { ensureMovable(t); setSize('height', v, rootPx(), t); } } })),
       h('p', { class: 'muted', style: 'margin:6px 0 0', text: 'Moves are saved as rem offsets, so they scale with the text.' })),
-    pushSection(),
+    ...(many ? [] : [pushSection()]),
     sec('Spacing', true,
       h('div', { class: 'sub', text: 'Padding' }),
       g2(numField(P('T', 'padding-top')), numField(P('R', 'padding-right')), numField(P('B', 'padding-bottom')), numField(P('L', 'padding-left'))),
@@ -1475,11 +1559,13 @@ function buildPanel() {
       g2(numField({ label: 'Op', aria: 'Opacity', prop: 'opacity', unit: '0–1', step: 0.05, read: (e, c) => parseFloat(c.opacity), write: (v) => setProp('opacity', String(Math.max(0, Math.min(1, r3(v))))) }),
          numField({ label: 'R', aria: 'Corner radius in pixels', prop: 'border-radius', unit: 'px', read: (e, c) => parseFloat(c.borderTopLeftRadius) || 0, write: (v) => setProp('border-radius', remv(v)) }),
          numField({ label: 'Bl', aria: 'Frosted-glass blur in pixels (frosted plates only)', prop: '--blur', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.getPropertyValue('--blur')) || 0, write: (v) => setProp('--blur', r3(v) + 'px') }))),
+    ...(!many && sel.hasAttribute('data-riso') ? [risoSection()] : []),
     borderSection(), fxSection(!!layerClass(sel)), layoutSection(), cssSection(),   // rotation lives here, and is a main control for a decorative layer
     ...[layersSection(), pageSection(false), tokensSection(), changesSection()].filter(Boolean));
   syncFields(); afterChange();
 }
 function imageBlock() {
+  if (sel.localName === 'img' && cloneRootOf(sel)) return sec('Image', true, h('p', { class: 'muted', style: 'margin:0', text: 'This picture is inside a copy. To change it, replace the picture in the original before copying, or delete the copy.' }));
   if (sel.localName === 'img') return layerOf(sel) ? null : imageSection(sel);
   const imgs = sel.querySelectorAll('img');
   if (imgs.length !== 1) return null;
@@ -1542,7 +1628,7 @@ function pageSection(open) {
       write: (v) => setTok('--grain', String(r3(v / 100))),
       on: () => isSet(['--grain']), reset: () => { delTweak(state.css, tokScope('--grain'), ':root', '--grain'); renderLive(); } }),
     h('div', { class: 'sub', text: 'Header riso shift' }),
-    h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'A yellow and a magenta copy of heading text (h1–h3 and the big sub-headline), printed slightly off-register in opposite directions. Every width; skipped for increased contrast and print.' }),
+    h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'A yellow and a magenta copy of heading text (h1–h3 and the big sub-headline), printed slightly off-register in opposite directions and carrying the paper grain. Every width; skipped for increased contrast and print. Select a heading for its own plates.' }),
     ...RISO.map((r) => rangeField({ label: r.label, aria: r.aria, title: r.title, min: r.min, max: r.max, step: r.step, unit: r.unit,
       read: () => r.get(tokenValue(r.name)), write: (v) => setTok(r.name, r.put(v)), on: () => isSet([r.name]), reset: () => clear([r.name]) })),
     h('div', { class: 'sub', text: `Page length (${rangeFor(frameW).label})` }),
@@ -1590,7 +1676,7 @@ function addLayer(o) {
     } else L.anchor = addPos === 'start' ? { start: true } : { end: true };
     if (image) setTweak(css, '', S, 'width', '12rem');
   }
-  state.layers.push(L); renderLive();
+  withRekey(() => { state.layers.push(L); renderLive(); });
   const n = doc.querySelector(`[data-ed-layer="${id}"]`); if (!n) return null;
   select(n, true); commit();
   if (!image) { freshLayer = id; startTextEdit(n); }
@@ -1601,17 +1687,182 @@ async function addImageLayer(where, file) {
   try { const prep = await prepareImage(file, { optimise: imgOpts.optimise, maxSide: imgOpts.maxSide || (where === 'deco' ? 1200 : 1600) }); addLayer({ where, kind: 'image', prep }); toast(`Added (${fmtBytes(prep.bytes)}). ${where === 'deco' ? 'Drag it into place.' : 'Describe it in the Layer section.'}`, 3600); }
   catch (err) { toast(err.message || String(err), 4500, 'err'); }
 }
-function deleteLayer(el) {
-  const c = layerClass(el);
-  if (!c) { toast('Only layers added with the editor can be deleted.', 3000, 'warn'); return; }
-  const L = layerOf(el);
+/* Putting an element into the preview (a layer, a copy) or taking one out changes what :nth-child(k) means for its later siblings.
+   Rules, text edits and picture swaps are recorded under selectors, so every one that depends on a position is looked up first and
+   renamed afterwards, to keep pointing at the same element. (Undo and redo restore whole snapshots, which already agree.) */
+function withRekey(change) {
+  const pos = (sl) => { if (!/:nth-child\(/.test(sl)) return null; let m; try { m = doc.querySelectorAll(sl); } catch { return null; } return m.length === 1 ? m[0] : null; };
+  const css = [], text = [], imgs = [];
+  for (const sc of Object.keys(state.css)) for (const k of Object.keys(state.css[sc])) { const e = pos(k); if (e) css.push([sc, k, e]); }
+  for (const t of state.text) { const e = pos(t.sel); if (e) text.push([t, e]); }
+  for (const x of state.images) { const e = pos(x.sel); if (e) imgs.push([x, e]); }
+  push = null;
+  change();
+  const moves = css.map(([sc, k, e]) => [sc, k, selectorFor(e), state.css[sc] && state.css[sc][k]]).filter(([sc, k, nk, props]) => props && nk !== k);
+  for (const [sc, k] of moves) delete state.css[sc][k];
+  for (const [sc, k, nk, props] of moves) {
+    for (const [p, v] of Object.entries(props)) setTweak(state.css, sc, nk, p, v);
+    const r = (state.renames ||= []).find((x) => x.sc === sc && x.to === k);   // remember that this is the same rule, moved: it is not a change of its own
+    if (r) { r.to = nk; if (r.to === r.from) state.renames.splice(state.renames.indexOf(r), 1); } else state.renames.push({ sc, from: k, to: nk });
+  }
+  for (const sc of Object.keys(state.css)) if (!Object.keys(state.css[sc]).length) delete state.css[sc];
+  for (const [t, e] of text) t.sel = selectorFor(e);
+  for (const [x, e] of imgs) x.sel = selectorFor(e);
+  renderLive();
+}
+// Forget a layer (a new one) or schedule its removal (one an earlier push put in the page). The caller commits.
+function dropLayer(el) {
+  const c = layerClass(el), L = layerOf(el);
   if (L) {
     for (const o of state.layers) if (o.anchor.after && o.anchor.after.layer === L.id) o.anchor = clone(L.anchor);   // whatever followed it now follows what it followed
     state.layers = state.layers.filter((x) => x !== L);
   } else state.removed.push({ cls: c });
   for (const sc of Object.keys(state.css)) { for (const k of Object.keys(state.css[sc])) if (hasCls(k, c)) delete state.css[sc][k]; if (!Object.keys(state.css[sc]).length) delete state.css[sc]; }
   if (![...doc.querySelectorAll('.ed-deco')].some((n) => n !== el && !n.hasAttribute('data-ed-gone'))) { if (state.css['']) { delete state.css[''][DECO_BASE]; if (!Object.keys(state.css['']).length) delete state.css['']; } }
-  sel = null; renderLive(); commit(); buildPanel(); toast('Layer deleted.', 1800);
+}
+function deleteLayer(el) {
+  if (!layerClass(el)) { deleteSelection([el]); return; }
+  withRekey(() => { dropLayer(el); renderLive(); }); sel = null; selMore = []; commit(); buildPanel(); toast('Layer deleted.', 1800);
+}
+/* ---- Delete any element ----
+   A layer is forgotten (or scheduled for removal). Any other element is marked deleted: hidden in the preview, and cut out of the
+   page's HTML when you push. Everything recorded for it and for what is inside it (tweaks, text edits, pictures, layers) goes with
+   it, and is kept in the entry so that undoing the deletion from the Recorded changes list brings it all back. */
+const safeQuery = (s) => { try { return doc.querySelector(s); } catch { return null; } };
+function scriptRefs(el) {   // ids inside el that the page's own script looks for
+  const ids = [el.id, ...[...el.querySelectorAll('[id]')].map((n) => n.id)].filter(Boolean);
+  const js = [...doc.querySelectorAll('script')].filter((x) => !x.type || /javascript|module/i.test(x.type)).map((x) => x.textContent).join('\n');
+  return ids.filter((id) => new RegExp('[\'"#]' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[\'"\\s,)\\]]').test(js));
+}
+function markDeleted(el) {
+  const inside = (n) => !!n && el.contains(n);
+  const entry = { path: pathOf(el), sig: sigOf(el), label: label(el), sel: selectorFor(el), gone: { css: [], text: [], images: [], layers: [], removed: [] } };
+  try { const idx = indexHtml(source0), body = findBody(idx), node = body && srcAt(body, entry.path); if (node && sameSig(srcSig(node), entry.sig)) entry.fp = fpOf(source0, node); } catch {}
+  for (const sc of Object.keys(state.css)) {
+    for (const k of Object.keys(state.css[sc])) {
+      let m; try { m = doc.querySelectorAll(k); } catch { continue; }
+      if (m.length && [...m].every(inside)) { entry.gone.css.push([sc, k, state.css[sc][k]]); delete state.css[sc][k]; }
+    }
+    if (!Object.keys(state.css[sc]).length) delete state.css[sc];
+  }
+  entry.gone.text = state.text.filter((t) => inside(safeQuery(t.sel))); state.text = state.text.filter((t) => !entry.gone.text.includes(t));
+  entry.gone.images = state.images.filter((x) => inside(safeQuery(x.sel))); state.images = state.images.filter((x) => !entry.gone.images.includes(x));
+  entry.gone.layers = state.layers.filter((l) => l.where !== 'deco' && inside(liveAt(l.parent)));
+  for (const l of entry.gone.layers) { state.layers = state.layers.filter((x) => x !== l); entry.gone.css.push(...cssOfCls(l.cls)); dropCss(state.css, l.cls); }
+  entry.gone.removed = state.removed.filter((r) => inside(doc.querySelector('.' + r.cls))); state.removed = state.removed.filter((r) => !entry.gone.removed.includes(r));
+  // an earlier deletion inside this element is part of this one now
+  const within = (p) => entry.path.every((v, i) => p[i] === v) && p.length > entry.path.length;
+  entry.gone.deleted = state.deleted.filter((d) => within(d.path)); state.deleted = state.deleted.filter((d) => !entry.gone.deleted.includes(d));
+  state.deleted.push(entry); return entry;
+}
+const cssOfCls = (cls) => { const out = []; for (const sc of Object.keys(state.css)) for (const k of Object.keys(state.css[sc])) if (hasCls(k, cls)) out.push([sc, k, state.css[sc][k]]); return out; };
+function restoreDeleted(d) {
+  state.deleted = state.deleted.filter((x) => x !== d);
+  const g = d.gone || {};
+  for (const [sc, k, props] of g.css || []) for (const [pr, v] of Object.entries(props)) setTweak(state.css, sc, k, pr, v);
+  state.text.push(...(g.text || [])); state.images.push(...(g.images || [])); state.layers.push(...(g.layers || [])); state.removed.push(...(g.removed || [])); state.deleted.push(...(g.deleted || []));
+}
+function deleteSelection(list = targets()) {
+  list = list.filter((e) => e && e.isConnected); if (!list.length) return;
+  const top = list.filter((e) => !list.some((o) => o !== e && o.contains(e)));   // an element inside another selected one goes with it
+  let n = 0; const skipped = [], refs = [];
+  withRekey(() => {
+    for (const el of top) {
+      if (el === doc.body || el === root) { skipped.push('the page itself'); continue; }
+      if (layerClass(el)) { dropLayer(el); n++; continue; }
+      const inLayer = el.closest('[data-ed-layer]');
+      if (inLayer) { skipped.push(`${label(el)} (it is inside a layer added in this session: delete that layer instead)`); continue; }
+      refs.push(...scriptRefs(el)); markDeleted(el); n++;
+    }
+    renderLive();
+  });
+  if (!n) { toast(`Nothing deleted: ${skipped[0] || 'no element'}.`, 3600, 'warn'); return; }
+  sel = null; selMore = []; commit(); buildPanel();
+  toast(`Deleted ${n === 1 ? '1 element' : n + ' elements'}${skipped.length ? `; skipped ${skipped.join(', ')}` : ''}. Ctrl/Cmd+Z brings ${n === 1 ? 'it' : 'them'} back.` + (refs.length ? ` The page's own script refers to ${[...new Set(refs)].map((x) => '#' + x).join(', ')}, so removing ${refs.length === 1 ? 'it' : 'them'} may break that script.` : ''), refs.length ? 8000 : 3600, refs.length ? 'warn' : '');
+}
+/* ---- Duplicate any element ----
+   A copy is a layer of kind "clone": its markup is saved when you press the button (so later edits to the original don't leak into
+   it), it gets its own unique class (ed-copy-xxxx), and it goes into the page right after the original when you push. Every id
+   inside it is made unique, and the tweaks that belong to the original alone (those whose selector matched only it) are copied to the
+   copy. Class-based styles apply to the copy by themselves. */
+const cloneRootOf = (el) => { const r = el && el.closest && el.closest('[data-ed-layer]'); const L = r && layerOf(r); return L && L.kind === 'clone' ? r : null; };
+const ID_ATTRS = ['aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-owns', 'aria-activedescendant', 'for', 'list', 'headers'];
+// A tidy copy of an element's markup as the source should have it: nothing the page's script or the editor added at run time.
+function cleanClone(el, suffix) {
+  const c = el.cloneNode(true), all = [c, ...c.querySelectorAll('*')];
+  for (const n of all) {
+    for (const a of ['data-ed-layer', 'data-ed-gone', 'data-ed-del', 'contenteditable', 'spellcheck', 'data-riso']) n.removeAttribute(a);
+    for (const v of VOLATILE) n.classList.remove(v);
+    if (n.hasAttribute('class') && !n.getAttribute('class').trim()) n.removeAttribute('class');
+    if (n.style && n.style.getPropertyValue('--edge-mask')) n.style.removeProperty('--edge-mask');   // drawn by the page's script, never saved
+    if (n.style && n.style.getPropertyValue('--riso-dy')) n.style.removeProperty('--riso-dy');         // likewise the heading-ghost alignment
+    if (n.hasAttribute('style') && !n.getAttribute('style').trim()) n.removeAttribute('style');
+  }
+  if (suffix) {
+    const ids = new Map();
+    for (const n of all) if (n.id) { const nid = n.id + '-' + suffix; ids.set(n.id, nid); n.id = nid; }
+    if (ids.size) for (const n of all) {
+      for (const a of ID_ATTRS) { const v = n.getAttribute(a); if (v) n.setAttribute(a, v.split(/\s+/).map((t) => ids.get(t) || t).join(' ')); }
+      for (const a of n.getAttributeNames()) { const v = n.getAttribute(a); if (/url\(#/.test(v)) n.setAttribute(a, v.replace(/url\(#([^)\s]+)\)/g, (m, i) => (ids.has(i) ? `url(#${ids.get(i)})` : m))); }
+      for (const a of ['href', 'xlink:href']) { const v = n.getAttribute(a); if (v && v[0] === '#' && ids.has(v.slice(1))) n.setAttribute(a, '#' + ids.get(v.slice(1))); }
+    }
+  }
+  return c;
+}
+// Pictures replaced in this session are blob: addresses in the preview; the saved markup names the file that will be uploaded.
+function srcToPaths(c) {
+  const paths = [];
+  for (const im of [c, ...c.querySelectorAll('img')].filter((n) => n.localName === 'img')) {
+    const a = [...assets.values()].find((x) => x.url === im.getAttribute('src'));
+    if (a) { im.setAttribute('src', relPath(settings.path, a.path)); paths.push(a.path); }
+  }
+  return paths;
+}
+function cloneMarkup(el) { const c = cleanClone(el, ''); srcToPaths(c); return c.outerHTML; }
+function cloneNodeFor(l) {
+  const t = doc.createElement('template'); t.innerHTML = l.html.trim();
+  const n = doc.importNode(t.content.firstElementChild, true);
+  for (const im of [n, ...n.querySelectorAll('img')].filter((x) => x.localName === 'img')) {
+    const a = (l.assets || []).map((pth) => assets.get(pth)).find((x) => x && im.getAttribute('src') === relPath(settings.path, x.path)); if (a) im.setAttribute('src', a.url);
+  }
+  for (const c of l.live || []) n.classList.add(c);   // the page's reveal-on-scroll class, so the copy is visible in the preview
+  return n;
+}
+function duplicateSelection(list = targets()) {
+  list = list.filter((e) => e && e.isConnected);
+  const top = list.filter((e) => !list.some((o) => o !== e && o.contains(e))).sort((a, b) => (a.compareDocumentPosition(b) & 4 ? -1 : 1));
+  const made = [], skipped = [];
+  withRekey(() => {
+    for (const el of top) {
+      if (el === doc.body || el === root) { skipped.push('the page itself'); continue; }
+      if (el.closest('[data-ed-del],[data-ed-gone]')) { skipped.push(label(el) + ' (deleted)'); continue; }
+      const inLayer = el.closest('[data-ed-layer]');
+      if (inLayer && inLayer !== el) { skipped.push(`${label(el)} (it is inside a layer added in this session: copy that layer instead)`); continue; }
+      const id = newLayerId(), cls = `ed-copy-${id}`, oldCls = layerClass(el), deco = !!oldCls && el.classList.contains('ed-deco');
+      const c = cleanClone(el, id); if (oldCls) c.classList.remove(oldCls); c.classList.add(cls);
+      const assetPaths = srcToPaths(c), parent = el.parentElement, rl = layerOf(el);
+      const L = { id, cls, where: deco ? 'deco' : 'in', kind: 'clone', tag: el.localName, classes: [...c.classList], html: c.outerHTML, assets: [...new Set(assetPaths)], count: 1 + c.querySelectorAll('*').length,
+        label: label(el), alt: '', text: '', path: '', w: 0, h: 0, live: el.classList.contains('in') ? ['in'] : [] };
+      if (deco) { L.parent = []; L.anchor = { end: true }; }
+      else { L.parent = pathOf(parent); L.psig = sigOf(parent); L.anchor = rl ? { after: { layer: rl.id } } : { after: { path: pathOf(el), sig: sigOf(el) } }; if (!L.parent) { skipped.push(label(el)); continue; } }
+      state.layers.push(L); made.push({ L, el });
+    }
+    if (made.length) renderLive();
+  });
+  if (!made.length) { toast(`Nothing copied: ${skipped[0] || 'no element'}.`, 3600, 'warn'); return; }
+  // Carry over the tweaks that belong to the original alone (a selector that now also matches the copy, like a class, already styles it).
+  for (const { L, el } of made) {
+    for (const sc of Object.keys(state.css)) for (const [k, props] of Object.entries(state.css[sc])) {
+      if (hasCls(k, L.cls)) continue;
+      let m; try { m = doc.querySelectorAll(k); } catch { continue; }
+      if (m.length === 1 && m[0] === el) for (const [pr, v] of Object.entries(props)) setTweak(state.css, sc, '.' + L.cls, pr, v);
+    }
+    if (L.where === 'deco') { const t = state.css['']?.['.' + L.cls]?.top, mm = t && /^(-?[\d.]+)rem$/.exec(t); if (mm) setTweak(state.css, '', '.' + L.cls, 'top', r4(+mm[1] + 1.5) + 'rem'); }   // a floating copy would sit exactly on the original
+  }
+  renderLive();
+  const nodes = made.map(({ L }) => doc.querySelector(`[data-ed-layer="${L.id}"]`)).filter(Boolean);
+  selectMany(nodes, nodes[nodes.length - 1]); commit();
+  toast(`Copied ${made.length === 1 ? '1 element' : made.length + ' elements'}: ${made.length === 1 ? 'the copy is' : 'the copies are'} right after ${made.length === 1 ? 'the original' : 'the originals'}${skipped.length ? `; skipped ${skipped.join(', ')}` : ''}. Drag or edit ${made.length === 1 ? 'it' : 'them'} as you like.`, 4200);
 }
 const layerNodes = () => [...doc.querySelectorAll('*')].filter((n) => layerClass(n) && !n.hasAttribute('data-ed-gone'));
 function addSection() {
@@ -1648,9 +1899,10 @@ function layersSection() {
 }
 // The inspector for a selected layer.
 function layerSection(el) {
-  const c = layerClass(el), L = layerOf(el), deco = /^ed-deco-/.test(c), isImg = el.localName === 'img', kids = [];
-  kids.push(h('p', { class: 'muted', style: 'margin:0 0 6px', text: (deco ? 'Decorative layer: ignored by screen readers, and not clickable on the live page.' : 'A layer added with the editor.') + (L ? ' It is added to the page when you push.' : ' It is already in the page.') }));
-  if (L) {
+  const c = layerClass(el), L = layerOf(el), deco = /^ed-deco-/.test(c) || (!!L && L.where === 'deco'), isImg = el.localName === 'img', kids = [];
+  if (L && L.kind === 'clone') kids.push(h('p', { class: 'muted', style: 'margin:0 0 6px', text: `A copy of ${L.label}. It is added to the page when you push. Edit it like any element; double-click its text to retype it.` }));
+  else kids.push(h('p', { class: 'muted', style: 'margin:0 0 6px', text: (deco ? 'Decorative layer: ignored by screen readers, and not clickable on the live page.' : 'A layer added with the editor.') + (L ? ' It is added to the page when you push.' : ' It is already in the page.') }));
+  if (L && L.kind !== 'clone') {
     const glass = h('input', { type: 'checkbox', checked: L.classes.includes('glass'), 'aria-label': 'Frosted plate behind it' });
     glass.addEventListener('change', () => { L.classes = glass.checked ? ['glass', ...L.classes.filter((x) => x !== 'glass')] : L.classes.filter((x) => x !== 'glass'); renderLive(); commit(); });
     kids.push(h('label', { class: 'tick' }, glass, 'Frosted plate behind it'));
@@ -1689,7 +1941,7 @@ function imageSection(img) {
     a ? h('img', { class: 'ph', src: a.url, alt: '' }) : h('div', { class: 'ph' }),
     h('div', {},
       entry ? h('div', {}, h('b', { text: 'Replaced' }), ` · ${fmtBytes(entry.bytes)}${entry.w ? ` · ${entry.w}×${entry.h}` : ''}`) : h('div', { class: 'muted', text: `Current · ${img.naturalWidth || '?'} × ${img.naturalHeight || '?'}` }),
-      h('code', { text: entry ? entry.path : shortSrc(imgOrig.get(s) ?? img.getAttribute('src') ?? '') })));
+      h('code', { text: entry ? entry.path : shortSrc(imgOrig.get(img) ?? img.getAttribute('src') ?? '') })));
   const pick = h('button', { type: 'button', class: 'primary', text: entry ? 'Choose another…' : 'Replace image…', onclick: () => file.click() });
   const revert = entry ? h('button', { type: 'button', text: 'Revert', title: 'Go back to the original picture', onclick: () => { state.images = state.images.filter((x) => x.sel !== s); renderLive(); commit(); buildPanel(); } }) : null;
   const opt = h('input', { type: 'checkbox', checked: imgOpts.optimise, 'aria-label': 'Optimise for the web' });
@@ -1754,10 +2006,10 @@ async function replaceImage(img, file) {
   let prep;
   try { prep = await prepareImage(file, { optimise: imgOpts.optimise, maxSide: imgOpts.maxSide || auto }); }
   catch (err) { toast(err.message || String(err), 4500, 'err'); return; }
-  if (!imgOrig.has(s)) imgOrig.set(s, img.getAttribute('src'));
+  if (!imgOrig.has(img)) imgOrig.set(img, img.getAttribute('src'));
   assets.set(prep.path, prep);   // earlier replacements stay in `assets` so that undo can bring them back
   state.images = state.images.filter((x) => x.sel !== s);
-  state.images.push({ sel: s, was: imgOrig.get(s), path: prep.path, name: prep.name, bytes: prep.bytes, w: prep.w, h: prep.h, type: prep.type });
+  state.images.push({ sel: s, was: imgOrig.get(img), path: prep.path, name: prep.name, bytes: prep.bytes, w: prep.w, h: prep.h, type: prep.type });
   renderLive(); commit(); if (sel === img) buildPanel();
   toast(`Picture replaced (${fmtBytes(prep.bytes)}${prep.w ? `, ${prep.w}×${prep.h}` : ''}). It is uploaded when you push.`, 3600);
 }
@@ -1768,7 +2020,8 @@ function onDrop(e) {
   const n = doc.elementFromPoint(e.clientX, e.clientY);
   const img = n && !n.closest('#__ed') && (n.localName === 'img' ? n : n.querySelectorAll('img').length === 1 ? n.querySelector('img') : null);
   if (!img) { toast('Drop it onto the picture you want to replace.', 3000, 'warn'); return; }
-  select(img); replaceImage(img, f);
+  select(img); if (cloneRootOf(img)) { toast('This picture is inside a copy: replace the original before copying it, or delete the copy.', 4200, 'warn'); return; }
+  replaceImage(img, f);
 }
 
 function crumbs() {
@@ -1817,7 +2070,14 @@ function summary() {
   const ops = diffCss(baseline, state.css), base = flatten(baseline), rows = [];
   for (const [sc, sl, p, v] of ops.set) if (!newLayerSel(sl)) rows.push({ scope: sc, sel: sl, prop: p, value: v, was: base.get(JSON.stringify([sc, sl, p])) });
   for (const [sc, sl, p] of ops.del) if (!newLayerSel(sl)) rows.push({ scope: sc, sel: sl, prop: p, removed: true, was: base.get(JSON.stringify([sc, sl, p])) });
-  return { rows, text: state.text, images: state.images, layers: state.layers, removed: state.removed, count: rows.length + state.text.length + state.images.length + state.layers.length + state.removed.length };
+  // a rule that only changed its selector because something was inserted before it (:nth-child shifted) is not a change of its own
+  for (const rn of state.renames || []) {
+    for (const d of rows.filter((r) => r.removed && r.scope === rn.sc && r.sel === rn.from)) {
+      const m = rows.find((r) => !r.removed && r.scope === rn.sc && r.sel === rn.to && r.prop === d.prop && r.value === d.was);
+      if (m) { rows.splice(rows.indexOf(m), 1); rows.splice(rows.indexOf(d), 1); }
+    }
+  }
+  return { rows, text: state.text, images: state.images, layers: state.layers, removed: state.removed, deleted: state.deleted, count: rows.length + state.text.length + state.images.length + state.layers.length + state.removed.length + state.deleted.length };
 }
 let changesHost = null;
 function changesSection() {
@@ -1835,6 +2095,8 @@ function renderChanges() {
     h('button', { title: 'Delete this layer', 'aria-label': 'Delete this layer', text: '×', onclick: () => { const n = doc.querySelector(`[data-ed-layer="${l.id}"]`); if (n) deleteLayer(n); } })));
   for (const r of s.removed) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: 'Layer' }), h('code', { text: `delete .${r.cls}` })),
     h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { state.removed = state.removed.filter((x) => x !== r); renderLive(); commit(); buildPanelSoon(); } })));
+  for (const d of s.deleted) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: 'Delete' }), h('code', { text: 'delete ' + d.label, title: d.sel })),
+    h('button', { title: 'Bring it back (with the tweaks and edits it had)', 'aria-label': 'Undo this deletion', text: '×', onclick: () => { restoreDeleted(d); renderLive(); commit(); buildPanelSoon(); } })));
   for (const im of s.images) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: 'Image' }), h('code', { text: `${im.sel}: → ${im.path}` })),
     h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { state.images = state.images.filter((x) => x !== im); renderLive(); commit(); buildPanelSoon(); } })));
   changesHost.replaceChildren(ul);
@@ -1897,15 +2159,19 @@ const sameSig = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function findNode(node, test) { for (const c of node.children) { if (test(c)) return c; const r = findNode(c, test); if (r) return r; } return null; }
 const findBody = (root) => findNode(root, (n) => n.tag === 'body');
 const findByClass = (root, cls) => findNode(root, (n) => classesOf(n).includes(cls));
-const srcAt = (body, path) => { let n = body; for (const i of path) n = n && n.children[i]; return n || null; };
+const srcAt = (body, path, ign = null) => { let n = body; for (const i of path) n = n && (ign ? n.children.filter((c) => !classesOf(c).some((x) => ign.has(x))) : n.children)[i]; return n || null; };
 const lineIndent = (src, pos) => /^[ \t]*/.exec(src.slice(src.lastIndexOf('\n', pos - 1) + 1))[0];
 const escAttr = (v) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 function layerHtml(L, pagePath) {
+  if (L.kind === 'clone') return L.html;
   const deco = L.where === 'deco', cls = ` class="${L.classes.join(' ')}"`;
   if (L.kind === 'image') return `<img${cls} src="${relPath(pagePath, L.path)}" alt="${deco ? '' : escAttr(L.alt || '')}"${deco ? ' aria-hidden="true"' : ' loading="lazy"'}${L.w && L.h ? ` width="${L.w}" height="${L.h}"` : ''}>`;
   return `<${L.tag}${cls}${deco ? ' aria-hidden="true"' : ''}>${L.text}</${L.tag}>`;
 }
 const parseDoc = (h2) => new DOMParser().parseFromString(h2, 'text/html');
+// What an element looked like in the page as served: its own tag attributes and its text. A deletion is only made if the page still has exactly that there.
+const fpOf = (src, node) => { const t = document.createElement('template'); t.innerHTML = src.slice(node.start, node.end); return { attrs: node.attrs.replace(/\s+/g, ' ').trim(), text: t.content.textContent.replace(/\s+/g, ' ').trim().slice(0, 240) }; };
+const countHtml = (h2) => { const t = document.createElement('template'); t.innerHTML = h2; return t.content.querySelectorAll('*').length; };   // elements in a piece of markup
 // The indexer is only trusted if it sees exactly the same elements, in the same order, as the browser does. (Markup with unclosed
 // <p>/<li> tags and the like is read differently by the two, and then nothing is inserted automatically.)
 function assertSameStructure(src, idx) {
@@ -1919,7 +2185,7 @@ const domSig = (e) => ({ tag: e.localName, id: e.id || '', classes: [...e.classL
 function verifyInsert(before, after, L, nb = {}) {
   const A = parseDoc(before), B = parseDoc(after), hit = B.querySelectorAll('.' + L.cls);
   if (hit.length !== 1) throw new Error('the new element could not be found after inserting it');
-  if (B.querySelectorAll('*').length !== A.querySelectorAll('*').length + 1) throw new Error('the browser would read the result differently, so it was not applied');
+  if (B.querySelectorAll('*').length !== A.querySelectorAll('*').length + (L.kind === 'clone' ? countHtml(L.html) : 1)) throw new Error('the browser would read the result differently, so it was not applied');
   const par = hit[0].parentElement;
   if (L.where === 'deco') { if (par !== B.body) throw new Error('the browser would not put it directly in <body>'); }
   else if (!par || !sameSig(domSig(par), L.psig)) throw new Error('the browser would put it in a different box');
@@ -1928,14 +2194,14 @@ function verifyInsert(before, after, L, nb = {}) {
   if (nb.next === null ? next : nb.next && (!next || !sameSig(domSig(next), nb.next))) throw new Error('the browser would put it next to the wrong item');
   return after;
 }
-function placeInFlow(src, L, pagePath) {
+function placeInFlow(src, L, pagePath, ign = null) {
   const idx = indexHtml(src); assertSameStructure(src, idx);
   const body = findBody(idx); if (!body) throw new Error('no <body> found in the page');
-  const parent = srcAt(body, L.parent);
+  const parent = srcAt(body, L.parent, ign);
   if (!parent || !sameSig(srcSig(parent), L.psig)) throw new Error('the box it goes into is not where it was when you opened the editor (the page changed)');
   const kids = parent.children, a = L.anchor; let at, indent, nb;
   if (a.after) {
-    const sib = a.after.layer ? findByClass(idx, (state.layers.find((x) => x.id === a.after.layer) || {}).cls) : srcAt(body, a.after.path);
+    const sib = a.after.layer ? findByClass(idx, (state.layers.find((x) => x.id === a.after.layer) || {}).cls) : srcAt(body, a.after.path, ign);
     if (!sib || sib.parent !== parent || (a.after.sig && !sameSig(srcSig(sib), a.after.sig))) throw new Error('the item it should follow is not where it was');
     const i = kids.indexOf(sib); at = sib.end; indent = lineIndent(src, sib.start); nb = { prev: srcSig(sib), next: kids[i + 1] ? srcSig(kids[i + 1]) : null };
   } else if (a.start) { at = parent.openEnd; indent = kids.length ? lineIndent(src, kids[0].start) : lineIndent(src, parent.start) + '  '; nb = { prev: null, next: kids.length ? srcSig(kids[0]) : null }; }
@@ -1969,10 +2235,55 @@ function removeLayerFromSource(src, cls) {
   if (B.querySelector('.' + cls) || B.querySelectorAll('*').length !== A.querySelectorAll('*').length - gone) throw new Error('removing it would change something else, so it was not applied');
   return out;
 }
+// The text with one element cut out (and its line, if it was alone on it).
+function cutNode(src, node) {
+  let a = node.start, b = node.end;
+  const ls = src.lastIndexOf('\n', a - 1) + 1; let e = b; while (src[e] === ' ' || src[e] === '\t') e++;
+  if (/^[ \t]*$/.test(src.slice(ls, a)) && (src[e] === '\n' || e >= src.length)) { a = ls; b = e < src.length ? e + 1 : e; }
+  return src.slice(0, a) + src.slice(b);
+}
+const countEls = (n) => n.children.reduce((a, c) => a + 1 + countEls(c), 0);
+// Delete an element the editor marked for deletion: found by its path from <body> (not counting layers added in this same push)
+// and checked against its tag / id / classes. The result is re-read by the browser and must be exactly that many elements shorter.
+function removeElementFromSource(src, d, ign) {
+  const idx = indexHtml(src); assertSameStructure(src, idx);
+  const body = findBody(idx); if (!body) throw new Error('no <body> found in the page');
+  let node = body;
+  for (const i of d.path) { node = node.children.filter((c) => !classesOf(c).some((x) => ign.has(x)))[i]; if (!node) throw new Error('the element is not where it was when you opened the editor (the page changed)'); }
+  if (!sameSig(srcSig(node), d.sig)) throw new Error('the element is not where it was when you opened the editor (the page changed)');
+  if (d.fp) { const now = fpOf(src, node); if (now.attrs !== d.fp.attrs || now.text !== d.fp.text) throw new Error('the element’s content changed since you opened the editor (the page changed)'); }
+  const A = parseDoc(src), gone = 1 + countEls(node), out = cutNode(src, node), B = parseDoc(out);
+  if (B.querySelectorAll('*').length !== A.querySelectorAll('*').length - gone) throw new Error('removing it would change something else, so it was not applied');
+  return out;
+}
+// Style rules are written against the preview, which still contains the hidden deleted elements, so a rule that says
+// :nth-child(k) counts them. On the real page they are gone: rewrite each such selector for the page as it will be.
+function rekeyForDeletions(css, goneNodes) {
+  if (!goneNodes.length) return css;
+  // A copy of the preview with those elements really removed is how the page will look. Each live element is tagged so that its
+  // twin in the copy can be found; the tags are taken off the preview again before anything else happens.
+  const all = [...doc.querySelectorAll('*')]; all.forEach((e, i) => e.setAttribute('data-ed-ix', i));
+  const gix = goneNodes.map((g) => g.getAttribute('data-ed-ix')), fin = doc.cloneNode(true);
+  for (const i of gix) { const t = fin.querySelector(`[data-ed-ix="${i}"]`); if (t) t.remove(); }
+  const moves = [];
+  for (const sc of Object.keys(css)) for (const k of Object.keys(css[sc])) {
+    if (!/:nth-child\(/.test(k)) continue;
+    let m; try { m = [...doc.querySelectorAll(k)]; } catch { continue; }
+    const live = m.filter((n) => !goneNodes.some((g) => g.contains(n))); if (live.length !== 1) continue;
+    const twin = fin.querySelector(`[data-ed-ix="${live[0].getAttribute('data-ed-ix')}"]`); if (!twin) continue;
+    const nk = selectorFor(twin); if (nk !== k) moves.push([sc, k, nk]);
+  }
+  all.forEach((e) => e.removeAttribute('data-ed-ix'));
+  const moving = moves.map(([sc, k, nk]) => [sc, nk, css[sc][k]]);   // two passes: a shift moves li(2) to li(1) AND li(3) to li(2)
+  for (const [sc, k] of moves) delete css[sc][k];
+  for (const [sc, nk, props] of moving) for (const [p, v] of Object.entries(props)) setTweak(css, sc, nk, p, v);
+  return css;
+}
+const descPath = (a, b) => { for (let i = 0; i < Math.max(a.path.length, b.path.length); i++) { const x = a.path[i] ?? -1, y = b.path[i] ?? -1; if (x !== y) return y - x; } return 0; };
 const dropCss = (css, cls) => { for (const sc of Object.keys(css)) { for (const k of Object.keys(css[sc])) if (hasCls(k, cls)) delete css[sc][k]; if (!Object.keys(css[sc]).length) delete css[sc]; } };
 const copyCss = (from, to, cls) => { for (const [sc, sels] of Object.entries(from)) for (const [k, props] of Object.entries(sels)) if (hasCls(k, cls)) for (const [pr, v] of Object.entries(props)) setTweak(to, sc, k, pr, v); };
 const psigLabel = (g) => g.tag + (g.id ? '#' + g.id : '') + g.classes.slice(0, 3).map((c) => '.' + c).join('');
-const describeLayer = (l) => (l.kind === 'image' ? `image ${l.path}` : `“${stripTags(l.text)}”`) + (l.where === 'deco' ? ' (floating decoration)' : ` inside ${psigLabel(l.psig)}`);
+const describeLayer = (l) => l.kind === 'clone' ? `a copy of ${l.label}` + (l.where === 'deco' ? ' (floating decoration)' : ` right after it, inside ${psigLabel(l.psig)}`) : (l.kind === 'image' ? `image ${l.path}` : `“${stripTags(l.text)}”`) + (l.where === 'deco' ? ' (floating decoration)' : ` inside ${psigLabel(l.psig)}`);
 
 /* A replaced picture's src="…" is swapped for the new file's path. The old address must appear exactly once as a src
    attribute (it also appears in og:image / JSON-LD for the portrait, which is deliberately left alone). */
@@ -2019,20 +2330,29 @@ function applyFonts(src, merged) {
 function buildNewSource(remoteSrc) {
   const remoteCss = parseBlock(remoteSrc), merged = applyOps(remoteCss, diffCss(baseline, state.css));
   const t = applyTextEdits(remoteSrc, state.text), im = applyImageEdits(t.src, state.images, settings.path);
-  let out = im.src; const layersPlaced = [], layersFailed = [], removedDone = [], removedFailed = [];
+  let out = im.src; const layersPlaced = [], layersFailed = [], removedDone = [], removedFailed = [], deletedDone = [], deletedFailed = [];
+  // New layers go in first and deletions last: every path is measured on the preview, where the doomed elements are still present.
+  const placed = new Set();
+  for (const L of state.layers) {
+    try { out = L.where === 'deco' ? placeDecor(out, L, settings.path) : placeInFlow(out, L, settings.path, placed); layersPlaced.push(L); placed.add(L.cls); }
+    catch (err) { layersFailed.push({ L, why: err.message || String(err) }); dropCss(merged, L.cls); }
+  }
   for (const r of state.removed) {
     try { out = removeLayerFromSource(out, r.cls); removedDone.push(r); }
     catch (err) { if (err.message === 'not found') removedDone.push(r); else { removedFailed.push({ ...r, why: err.message }); copyCss(remoteCss, merged, r.cls); } }
   }
-  for (const L of state.layers) {
-    try { out = L.where === 'deco' ? placeDecor(out, L, settings.path) : placeInFlow(out, L, settings.path); layersPlaced.push(L); }
-    catch (err) { layersFailed.push({ L, why: err.message || String(err) }); dropCss(merged, L.cls); }
+  const ign = new Set(layersPlaced.map((l) => l.cls));
+  for (const d of [...state.deleted].sort(descPath)) {
+    try { out = removeElementFromSource(out, d, ign); deletedDone.push(d); }
+    catch (err) { deletedFailed.push({ ...d, why: err.message || String(err) }); }
   }
+  const goneNodes = [...deletedDone.map((d) => liveAt(d.path)), ...removedDone.flatMap((r) => [...doc.querySelectorAll('.' + r.cls)])].filter(Boolean);
+  rekeyForDeletions(merged, goneNodes);
   if (!/class="[^"]*\bed-deco\b/.test(stripBlock(out)) && merged['']) { delete merged[''][DECO_BASE]; if (!Object.keys(merged['']).length) delete merged['']; }
   let fonts = { added: [], removed: [], failed: '' };
   try { const fr = applyFonts(out, merged); out = fr.src; fonts = { added: fr.added, removed: fr.removed, failed: '' }; } catch (err) { fonts.failed = err.message || String(err); }
   out = replaceBlock(out, blockText(merged));
-  return { src: out, merged, fonts, applied: t.applied, failed: t.failed, imgApplied: im.applied, imgFailed: im.failed, layersPlaced, layersFailed, removedDone, removedFailed };
+  return { src: out, merged, fonts, applied: t.applied, failed: t.failed, imgApplied: im.applied, imgFailed: im.failed, layersPlaced, layersFailed, removedDone, removedFailed, deletedDone, deletedFailed };
 }
 function prBody(s, built) {
   const lines = ['Visual tweaks made with the page editor (`/editor/`).', ''];
@@ -2047,6 +2367,8 @@ function prBody(s, built) {
     for (const r of built.removedDone) lines.push(`- Deleted layer \`.${r.cls}\``);
     lines.push('');
   }
+  if (built.deletedDone.length) { lines.push('**Deleted elements**'); for (const d of built.deletedDone) lines.push(`- Deleted \`${d.sel}\` (\`${d.label}\`)`); lines.push(''); }
+  if (built.deletedFailed.length) { lines.push('**Elements that could not be deleted automatically** (delete by hand):'); for (const d of built.deletedFailed) lines.push(`- \`${d.sel}\`: ${d.why}`); lines.push(''); }
   if (built.fonts.added.length || built.fonts.removed.length) {
     lines.push('**Google Fonts**');
     if (built.fonts.added.length) lines.push(`- Now loaded in \`<head>\`: ${built.fonts.added.join(', ')}`);
@@ -2080,7 +2402,7 @@ async function pushChanges(title, statusEl, built0) {
     const remote = b64decode(file.content);
     const built = buildNewSource(remote);
     if (built.src === remote) {
-      const what = [built.failed.length && (built.failed.length === 1 ? 'your text edit' : 'your text edits'), built.imgFailed.length && (built.imgFailed.length === 1 ? 'your picture' : 'your pictures'), (built.layersFailed.length + built.removedFailed.length) && 'your layers'].filter(Boolean).join(' or ');
+      const what = [built.failed.length && (built.failed.length === 1 ? 'your text edit' : 'your text edits'), built.imgFailed.length && (built.imgFailed.length === 1 ? 'your picture' : 'your pictures'), (built.layersFailed.length + built.removedFailed.length) && 'your layers', built.deletedFailed.length && (built.deletedFailed.length === 1 ? 'your deletion' : 'your deletions')].filter(Boolean).join(' or ');
       const find = built.failed.length ? 'the original text' + (built.imgFailed.length ? ' or picture address' : '') : built.imgFailed.length ? 'the picture’s old address' : 'where they go';
       set(what
         ? `Couldn't place ${what}: ${find} isn't found exactly once in ${settings.path} on ${settings.base} (the page may have changed since you opened the editor). Nothing was pushed. Reload the editor and try again.`
@@ -2089,7 +2411,7 @@ async function pushChanges(title, statusEl, built0) {
     }
     const uploads = new Map();   // repo path -> asset (two pictures may share one file)
     for (const e of built.imgApplied) { const a = assets.get(e.path); if (a) uploads.set(e.path, a); }
-    for (const l of built.layersPlaced) if (l.kind === 'image') { const a = assets.get(l.path); if (a) uploads.set(l.path, a); }
+    for (const l of built.layersPlaced) { if (l.kind === 'image') { const a = assets.get(l.path); if (a) uploads.set(l.path, a); } for (const pth of l.assets || []) { const a = assets.get(pth); if (a) uploads.set(pth, a); } }
     set('Reading the base commit…');
     const baseCommit = await gh('GET', `${repoPath()}/git/commits/${baseSha}`);
     const entries = []; let n = 0;
@@ -2145,6 +2467,8 @@ function openReview() {
       h('ul', { class: 'thumbs' }, built.imgApplied.map((e) => h('li', {}, assets.get(e.path) ? h('img', { src: assets.get(e.path).url, alt: '' }) : h('span'),
         h('div', {}, h('div', {}, h('code', { text: e.path })), h('div', { class: 'muted', text: `${shortSrc(e.was)} → ${fmtBytes(e.bytes)}${e.w ? `, ${e.w}×${e.h}` : ''}` })))))] : null,
     (s.layers.length || s.removed.length) ? [h('div', { class: 'sub', text: 'Layers' }), h('ul', {}, [...built.layersPlaced.map((l) => h('li', {}, `Add ${describeLayer(l)}${l.kind === 'image' ? ` (uploads ${l.path})` : ''}`)), ...built.removedDone.map((r) => h('li', {}, `Delete layer .${r.cls}`))])] : null,
+    s.deleted.length ? [h('div', { class: 'sub', text: 'Deleted elements (removed from the page)' }), h('ul', {}, built.deletedDone.map((d) => h('li', {}, `Delete ${d.label}`)))] : null,
+    built.deletedFailed.length ? h('p', { class: 'warn', text: `${built.deletedFailed.length} deletion(s) can't be made automatically (${built.deletedFailed[0].why}). Those elements stay in the page; they're listed in the PR description.` }) : null,
     (built.layersFailed.length || built.removedFailed.length) ? h('p', { class: 'warn', text: `${built.layersFailed.length + built.removedFailed.length} layer change(s) can't be made automatically (${[...built.layersFailed.map((f) => f.why), ...built.removedFailed.map((f) => f.why)][0]}). They won't be applied; they're listed in the PR description.` }) : null,
     (built.fonts.added.length || built.fonts.removed.length) ? [h('div', { class: 'sub', text: 'Google Fonts (managed link in <head>)' }), h('ul', {}, [built.fonts.added.length ? h('li', {}, `Load: ${built.fonts.added.join(', ')}`) : null, built.fonts.removed.length ? h('li', {}, `Stop loading: ${built.fonts.removed.join(', ')}`) : null].filter(Boolean))] : null,
     built.fonts.failed ? h('p', { class: 'warn', text: `The Google Fonts link can't be written automatically (${built.fonts.failed}). The pull request will say which fonts to add by hand.` }) : null,
@@ -2178,7 +2502,7 @@ window.addEventListener('resize', () => { layoutFrame(); updateOverlay(); });
 layoutFrame(); loadPage();
 
 // handy for debugging and for the automated tests
-window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, applyImageEdits, applyFonts, applyCustom, safeCssValue, qInfo, gfQ, GFONTS, loadCustomFont, ensureFont, get pageFonts() { return pageFonts; }, indexHtml, placeInFlow, placeDecor, removeLayerFromSource, addLayer, addImageLayer, deleteLayer, layerOf, layerClass, pathOf, liveAt, containerFor, buildNewSource, ensurePush, pushTo, pageLen, replaceImage, prepareImage, assets, inkAlpha, inkFor, tokScope, get guarded() { return guarded; }, get doc() { return doc; }, get sel() { return sel; }, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
+window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, applyImageEdits, applyFonts, applyCustom, safeCssValue, qInfo, gfQ, GFONTS, loadCustomFont, ensureFont, get pageFonts() { return pageFonts; }, indexHtml, placeInFlow, placeDecor, removeLayerFromSource, addLayer, addImageLayer, deleteLayer, layerOf, layerClass, pathOf, liveAt, containerFor, buildNewSource, ensurePush, pushTo, pageLen, replaceImage, prepareImage, assets, inkAlpha, inkFor, tokScope, get guarded() { return guarded; }, get doc() { return doc; }, get sel() { return sel; }, get selMore() { return selMore; }, targets, selectMany, clearSel, toggleSel, deleteSelection, duplicateSelection, restoreDeleted, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
 })();
 </script>
 </body>

@@ -27,7 +27,9 @@ and it is never written into the page.
 | Drag a handle | Resize it |
 | Arrow keys (Shift = 10px) | Nudge the selection |
 | Double-click text (or press Enter) | Retype it. Enter saves, Esc cancels |
-| Ctrl/Cmd + click | Pick the innermost element instead of the one that's already selected |
+| Alt + click | Pick the innermost element instead of the one that's already selected |
+| Shift + click, Ctrl/Cmd + click | Select several elements: whatever you change in the panel then applies to all of them (see *Selecting several elements*) |
+| **Duplicate** / **Delete** (buttons at the top of the panel, or Del) | Copy an element right after itself / delete any element from the page (see below) |
 | Alt + ↑ ↓ ← → | Select parent / first child / previous / next sibling (or use the breadcrumb buttons) |
 | Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z | Undo, redo |
 | Drag the orange **⇅ push this & below** grip (or use **Move this & everything below** in the panel) | Move the element and everything under it together |
@@ -35,7 +37,6 @@ and it is never written into the page.
 | **Replace image…** in the panel, or drop an image file onto a picture | Swap a picture for your own file |
 | **Add layers** in the panel | Add new text, a heading or an image *inside a box*, or floating *decoration* |
 | The purple ✦ handle on a decorative layer, or the **Layers** list | Select a layer that sits behind the page content |
-| Delete (or the red button) on a layer | Delete a layer you added with the editor (including ones pushed earlier) |
 | **390 / 820 / 1280 / 1440 / 1920** or the Width box | Preview at that screen width |
 | **Review & push** | See exactly what will be written (and uploaded), then open the pull request |
 
@@ -47,6 +48,51 @@ The panel has number fields for position, size, padding, margin and spacing; the
 and **Layout** sections below; colour pickers for text and fill; opacity and the frosted-glass blur; an **All CSS** section; and a
 **Design tokens** section for the site-wide values (`--ink-c`, `--ink-m`, `--grain`, `--paper`, …). Drag a field's label
 sideways to scrub the number.
+
+### Selecting several elements
+
+**Ctrl/Cmd + click** adds an element to the selection, or takes it out again. **Shift + click** adds a run of like elements:
+if the one you click is a sibling of the active element, everything between them; if it sits in a different sibling of the
+same kind (a link in another list item), the same element in every sibling in between (so one Shift+click on the last link
+selects all three links of a list). If they aren't alike it just adds that one. **Alt + click** goes back to picking one
+innermost element. Esc deselects everything.
+
+The panel shows the **active** element, the last one you picked (it is highlighted in the list at the top of the panel; click
+another name there to make that one active). Whatever you change is written to **every** selected element, as a separate
+rule for each. Arrow keys and dragging move them all by the same amount; the **X / Y / W / H** fields give each of them the
+same value (X keeps each element's own Y). While several are selected the resize handles, *Move this & everything below*,
+*Add layers*, *Edit text* and the picture controls are hidden: they only make sense for one element.
+
+### Deleting elements
+
+**Delete** (the red button, or the Delete / Backspace key) deletes the selection: **any** element, not only layers. In the
+preview it disappears at once; **Ctrl/Cmd + Z** brings it back. When you push, it is cut out of `index.html` together with
+everything inside it. The editor finds it by its position from `<body>`, checks its tag, id, classes and a fingerprint of its
+text against what the page looked like when you opened the editor, removes it, and has the browser re-read the result: it must
+be exactly that many elements shorter. If anything doesn't line up (the page changed since) the element is **not** removed
+and is listed in the pull request.
+
+- Whatever was recorded for the element and what is inside it (tweaks, text edits, replaced pictures, layers) goes with it.
+  The **×** next to the deletion under *Recorded changes* brings the element back *with* all of that.
+- Style rules written for the element's later siblings by position (`:nth-child(3)`) are rewritten in the pushed block so
+  they still hit the same elements once it is gone.
+- Elements the page's own script looks up by id (`#motion-toggle`, say) can be deleted, but you are warned: the script may
+  stop working. An element inside a layer added in this session can't be deleted on its own: delete that layer.
+
+### Duplicating elements
+
+**Duplicate** (a button; there is deliberately no keyboard shortcut) adds a copy right after the selected element, or after
+each of them when several are selected. The copy is saved as it is at that moment and, like a layer, gets its own unique class
+(`ed-copy-xxxx`); it is written into the HTML right after the original when you push.
+
+- Ids inside the copy are made unique (`ux-h` becomes `ux-h-k3f9`) and the references inside it (`aria-labelledby`, `for`,
+  `href="#…"`, `url(#…)`) follow, so the page never has two elements with the same id.
+- Styles written for a class apply to the copy by themselves. Tweaks that belonged to the original alone (an id or a
+  position selector) are copied to the copy's class. Rules for later siblings by position are renumbered in the pushed block.
+- A picture you replaced in the original is shared with the copy (the file is uploaded once).
+- You can select, move, restyle and retype a copy like anything else (retyped text becomes part of the copy's markup). A
+  picture *inside* a copy can't be replaced: replace it in the original before copying, or delete the copy. A floating
+  decoration is copied 1.5rem lower, so it doesn't sit exactly on the original.
 
 ### Text styles
 
@@ -115,13 +161,16 @@ With nothing selected (or in the **Page & background** section when something is
 printed grid: **Grid** (both ink plates together, where 100% is the reference print and 50% is how the page ships),
 **Cyan** and **Magenta** on their own, and the **Grain** of the paper. Sliding back to the shipped value records nothing.
 
-Under them, **Header riso shift** controls the off-register printing on heading text (h1–h3 and the big sub-headline): a
-yellow and a magenta copy of the text, printed in opposite directions (yellow up-left, magenta down-right). **Yellow**
-goes from 0 to 2px, **Magenta** from 0 to 4px, and **Opacity** applies to both (the page ships at 2px, 4px and 20%; 0%
-switches the effect off). They write the tokens `--riso-yellow-shift`, `--riso-magenta-shift` and `--riso-text`, and the
-two colours (`--riso-yellow`, `--riso-magenta`) are in **Design tokens**. To change the effect on one heading only, select
-it and use its **Text shadow** controls; those read the page's two plates (the panel says "2 shadows here") and replace
-them with one when you edit.
+Under them, **Header riso shift** controls the off-register printing on heading text (h1, h2 and the big sub-headline): a
+yellow and a magenta copy of the text, printed in opposite directions (yellow up-left, magenta down-right), carrying the
+same paper grain as the page. **Yellow** goes from 0 to 2px, **Magenta** from 0 to 4px, and **Opacity** applies to both (the
+page ships at 2px, 4px and 20%; 0% switches the effect off). They write the tokens `--riso-yellow-shift`,
+`--riso-magenta-shift` and `--riso-text`, and the two colours (`--riso-yellow`, `--riso-magenta`) are in **Design tokens**.
+
+To change the plates of **one heading**, select it: the **Riso plates (this heading)** section has X, Y and opacity for each
+plate (opacity 0 hides a plate). They are written as `--riso-yellow-x / -y / -a` and `--riso-magenta-x / -y / -a` on that
+heading's rule. The **Text shadow** control on a heading adds a separate, flat shadow; it doesn't edit the plates. (The card
+title is the one heading with flat plates instead: its Text shadow control does edit them.)
 
 These are site-wide and are written inside `@media (prefers-contrast: no-preference)`, so visitors who ask for increased
 contrast still get the page's own calm, grain-free fallback (an `!important` rule outside that condition would override it).
@@ -239,6 +288,9 @@ end, so a failure part-way leaves no stray branch):
 4. **New layers**: in-flow layers are written into the HTML at the spot you chose; decorative layers into the managed decor
    block (see *Adding text and images*). Their CSS joins the managed block above.
 5. **Google Fonts**: one managed `<link>` in `<head>` (see *Text styles*).
+6. **Copies**: written as one piece of markup right after the original (see *Duplicating elements*).
+7. **Deletions**: the element and everything inside it are cut out of the HTML, always last, after everything above, so the
+   positions the other changes were measured at are still right.
 
 Nothing else in the file is touched.
 
@@ -251,8 +303,8 @@ move the rules into the main stylesheet and delete the block. Until then it is h
 
 - The preview shows the page **as deployed from `main`**. Changes in an unmerged pull request won't appear.
 - Your recorded tweaks are kept in this browser as a draft, so an accidental reload offers to restore them. Replaced
-  pictures and new layers are **not** kept in the draft (their image files are too big for it): after an accidental reload,
-  add them again. (The **Reload** button inside the editor keeps everything.) Closing the tab with unsent changes asks you to confirm.
+  pictures, new layers, copies and deletions are **not** kept in the draft (their image files are too big for it, and the
+  others are positions in the page): after an accidental reload, do them again. (The **Reload** button inside the editor keeps everything.) Closing the tab with unsent changes asks you to confirm.
 - The push uses GitHub's Git Data API (blobs, tree, commit, ref), which the same *Contents: Read and write* permission covers.
 - Pictures are not cropped for you: the page's own CSS fits them to their frames (`object-fit: cover`), and the focal point
   moves that crop. The tile-sized pictures use a ~170px frame, so very wide images will lose their sides.
