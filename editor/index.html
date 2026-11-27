@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- The editor talks to exactly two places: this site (to load the page being edited) and
      api.github.com (to open the pull request). Nothing else, so a pasted token can't be sent anywhere else. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://api.github.com; frame-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://api.github.com; img-src blob:; frame-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="robots" content="noindex, nofollow">
 <title>Page editor</title>
 <style>
@@ -84,6 +84,30 @@
   .fc .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; }
   .fc.on .x { visibility: visible; }
   .sub { margin: 10px 0 4px; color: var(--muted); font-size: 11px; }
+  .fr { display: grid; grid-template-columns: 54px minmax(0, 1fr) 52px 16px 14px; align-items: center; gap: 6px; margin-top: 8px; }
+  .fr .lab { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fr input[type=range] { width: 100%; min-width: 0; accent-color: var(--accent); }
+  .fr input[type=number] { width: 100%; background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; min-width: 0; }
+  .fr .u { color: var(--muted); font-size: 10px; }
+  .fr .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); line-height: 1; font-size: 14px; }
+  .fr.on .x { visibility: visible; }
+  .fr.on input[type=number] { border-color: #3d6fb7; }
+  .btnrow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .btnrow button { padding: 4px 9px; }
+  .tick { display: flex; gap: 7px; align-items: center; margin-top: 8px; color: var(--text); }
+  .readout { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+  .readout b { color: var(--text); font-weight: 600; }
+  .imginfo { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
+  .imginfo .ph { width: 56px; height: 56px; border-radius: 6px; border: 1px solid var(--line); background: #15171a; object-fit: cover; display: block; }
+  .imginfo code { font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; color: #9ec5ff; }
+  .fsel { display: grid; grid-template-columns: 54px minmax(0, 1fr) 14px; gap: 6px; align-items: center; margin-top: 6px; }
+  .fsel .lab { color: var(--muted); font-size: 12px; }
+  .fsel select { background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; min-width: 0; width: 100%; }
+  .fsel .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; }
+  .fsel.on .x { visibility: visible; }
+  .thumbs { list-style: none; margin: 0; padding: 0; }
+  .thumbs li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .thumbs img { width: 48px; height: 48px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); }
   .changes { list-style: none; margin: 0; padding: 0; }
   .changes li { display: grid; grid-template-columns: minmax(0, 1fr) 18px; gap: 6px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
   .changes code { font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
@@ -191,6 +215,16 @@ const MARK_END = '/* ===== editor tweaks: end ===== */';
 // Groups: 1 = leading newline(s), 2 = indentation, 3 = the CSS inside the markers.
 const BLOCK_RE = /(\n\n?)?([ \t]*)\/\* ===== editor tweaks: start[^\n]*?\*\/([\s\S]*?)\/\* ===== editor tweaks: end ===== \*\//;
 const LS = { settings: 'ct907-editor-settings', token: 'ct907-editor-token', draft: 'ct907-editor-draft' };
+// Site-wide tokens that the page itself overrides for people who ask for more contrast (--ink-c, --ink-m, --glass…) are
+// written inside this condition, so a tweak never defeats that accessibility fallback (an !important rule would).
+const GUARD = '(prefers-contrast: no-preference)';
+// The grid's two ink plates at full strength (the reference print). "Grid opacity" mixes each ink toward white (paper),
+// which under the page's multiply blending is exactly the same as printing it at that opacity. 50% = #acf0ff / #f0e0ee.
+const INKS = { '--ink-c': [0x59, 0xe1, 0xff], '--ink-m': [0xe1, 0xc1, 0xdd] };
+const MAX_PUSH = 20000;                       // px: a typo like 99999999 shouldn't make a page that long
+const IMG_DIR = 'assets/images';
+const IMG_TYPES = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/avif': 'avif' };
+const IMG_BY_EXT = { webp: 'image/webp', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', svg: 'image/svg+xml', avif: 'image/avif' };
 
 /* ---------- small helpers ---------- */
 const q = (s, r = document) => r.querySelector(s);
@@ -217,7 +251,7 @@ const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, 
 const b64decode = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
 const b64encode = (str) => { const b = new TextEncoder().encode(str); let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(bin); };
 const rangeFor = (w) => RANGES.find((r) => r.test(w)) || RANGES[2];
-const scopeLabel = (s) => (s === '' ? 'All widths' : (RANGES.find((r) => r.cond === s) || { label: s }).label);
+const scopeLabel = (s) => (s === '' || s === GUARD ? 'All widths' : (RANGES.find((r) => r.cond === s) || { label: s }).label);
 
 /* ---------- tweak model ---------- */
 function setTweak(css, scope, sel, prop, val) { ((css[scope] ||= {})[sel] ||= {})[prop] = val; }
@@ -321,8 +355,15 @@ let settings = Object.assign({ owner: 'ct907', repo: 'ct907-site', base: 'main',
 let token = settings.remember ? (lsGet(LS.token) || '') : '';
 let source0 = '';
 let baseline = {};                 // tweaks that are already in the deployed page
-let state = { css: {}, text: [] }; // baseline + this session's tweaks
+let state = { css: {}, text: [], images: [] }; // baseline + this session's tweaks (images: replaced pictures; the files live in `assets`)
 const originals = new Map();       // selector -> original innerHTML (text edits)
+const imgOrig = new Map();         // selector -> original src attribute (image replacements)
+const assets = new Map();          // repo path -> { blob, url, file, ... }: the replacement files (too big for the undo history)
+let guarded = new Set();           // site-wide tokens the page overrides for increased contrast (see GUARD)
+let tokBase = {};                  // grid / grain token values as the page loads (so sliding back to the shipped value records nothing)
+let push = null;                   // the "move this and everything below" session for the selected element
+let pushAuto = true, pushOpen = true, pushHot = false, gripHover = false;
+let imgOpts = { optimise: true, maxSide: 0 };   // maxSide 0 = work it out from the size the picture is shown at
 let history = [], hIndex = -1;
 
 let frameW = 1440, zoomMode = 'fit';
@@ -351,8 +392,8 @@ function commit() {
   afterChange(); saveDraft();
 }
 function restore(i) {
-  hIndex = i; state = JSON.parse(history[hIndex]);
-  renderLive(); afterChange(); saveDraft(); syncFields();
+  hIndex = i; state = JSON.parse(history[hIndex]); push = null;
+  renderLive(); afterChange(); saveDraft(); buildPanelSoon();
 }
 const undo = () => { if (hIndex > 0) restore(hIndex - 1); };
 const redo = () => { if (hIndex < history.length - 1) restore(hIndex + 1); };
@@ -408,6 +449,11 @@ function renderLive() {
     if (!node || (editing && editing.el === node)) continue;
     const want = t ? t.after : orig; if (node.innerHTML !== want) node.innerHTML = want;
   }
+  for (const [s, orig] of imgOrig) {
+    const e = state.images.find((x) => x.sel === s), node = doc.querySelector(s), a = e && assets.get(e.path);
+    const want = a ? a.url : orig;
+    if (node && want && node.getAttribute('src') !== want) { node.removeAttribute('srcset'); node.setAttribute('src', want); }
+  }
   updateOverlay(); schedulePanelSync();
 }
 function setProp(prop, value, scope = scopeKey(), el = sel) {
@@ -447,7 +493,9 @@ async function loadPage() {
     q('#empty').textContent = `Couldn't load ${settings.path} (${err.message}). Open this editor from the live site (…/editor/), not from a file on disk.`; return;
   }
   baseline = parseBlock(source0);
-  state = { css: clone(baseline), text: [] }; originals.clear(); history = []; hIndex = -1;
+  state = { css: clone(baseline), text: [], images: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1;
+  for (const a of assets.values()) URL.revokeObjectURL(a.url);
+  assets.clear(); push = null;
   sel = null; hover = null; editing = null;
   frame.src = url.href;
 }
@@ -463,12 +511,14 @@ function onFrameLoad() {
   doc.head.append(css);
   // The page's own managed tweaks are re-injected by the editor (baseline + session), so remove the static copy.
   for (const s of doc.querySelectorAll('style')) if (BLOCK_RE.test(s.textContent)) s.textContent = stripBlock(s.textContent);
+  guarded = scanGuarded(); push = null;
   // Read any saved draft BEFORE the first commit (an empty state would otherwise erase it).
   const draft = safeJSON(lsGet(LS.draft), null);
   const hasDraft = draft && draft.path === settings.path && history.length === 0 && (draft.ops.set.length || draft.ops.del.length || draft.text.length);
   if (hasDraft) pendingDraft = draft;
   buildOverlay(); bindFrameEvents();
-  renderLive(); commit(); layoutFrame(); buildPanel();
+  renderLive(); tokBase = {}; for (const n of [...Object.keys(INKS), '--grain']) tokBase[n] = tokenValue(n);
+  commit(); layoutFrame(); buildPanel();
   if (hasDraft) offerDraft(draft);
 }
 function offerDraft(d) {
@@ -495,12 +545,17 @@ function buildOverlay() {
   ov.sel = mk('position:fixed;display:none;outline:2px solid #3b8cff');
   ov.tag = mk('position:fixed;display:none;background:#3b8cff;color:#fff;padding:2px 6px;border-radius:3px;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis');
   ov.size = mk('position:fixed;display:none;background:#111;color:#fff;padding:1px 6px;border-radius:3px;white-space:nowrap');
+  ov.cutTint = mk('position:fixed;display:none;left:0;right:0;background:rgba(255,138,0,.07)');
+  ov.cut = mk('position:fixed;display:none;left:0;right:0;height:0;border-top:2px dashed #ff8a00');
+  ov.grip = mk('position:fixed;display:none;right:14px;background:#ff8a00;color:#111;padding:2px 9px;border-radius:999px;font-weight:600;white-space:nowrap;pointer-events:auto;cursor:ns-resize;box-shadow:0 1px 4px rgba(0,0,0,.35)');
+  ov.grip.dataset.h = 'push'; ov.grip.textContent = '⇅ push this & below';
+  ov.units = [];
   ov.handles = {};
   for (const hd of HANDLES) {
     const n = mk(`position:fixed;display:none;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;background:#fff;border:1.5px solid #3b8cff;border-radius:2px;pointer-events:auto;cursor:${CURSORS[hd]}`);
     n.dataset.h = hd; ov.handles[hd] = n; o.append(n);
   }
-  o.prepend(ov.hover, ov.sel, ov.tag, ov.size); root.append(o);
+  o.prepend(ov.hover, ov.sel, ov.tag, ov.size, ov.cutTint, ov.cut, ov.grip); root.append(o);
 }
 function isRotated(el) {
   const t = win.getComputedStyle(el).transform; if (!t || t === 'none') return false;
@@ -516,6 +571,7 @@ function updateOverlay() {
   const sr = sel && sel.isConnected ? sel.getBoundingClientRect() : null;
   ov.sel.style.display = sr ? 'block' : 'none'; ov.tag.style.display = ov.size.style.display = sr ? 'block' : 'none';
   for (const hd of HANDLES) ov.handles[hd].style.display = 'none';
+  updatePushOverlay(sr);
   if (!sr) return;
   place(ov.sel, sr);
   ov.tag.textContent = label(sel); ov.tag.style.left = sr.left + 'px'; ov.tag.style.top = Math.max(0, sr.top - 20) + 'px';
@@ -525,6 +581,24 @@ function updateOverlay() {
   const xs = { w: sr.left, e: sr.right, n: sr.left + sr.width / 2, s: sr.left + sr.width / 2, nw: sr.left, ne: sr.right, sw: sr.left, se: sr.right };
   const ys = { n: sr.top, s: sr.bottom, e: sr.top + sr.height / 2, w: sr.top + sr.height / 2, nw: sr.top, ne: sr.top, sw: sr.bottom, se: sr.bottom };
   for (const hd of HANDLES) { const n = ov.handles[hd]; n.style.display = 'block'; n.style.left = xs[hd] + 'px'; n.style.top = ys[hd] + 'px'; }
+}
+// The cut line, the tint over what will move, and the grip you can drag to push it all.
+function updatePushOverlay(sr) {
+  const show = !!sr && pushOpen && !editing;
+  const hot = show && (pushHot || gripHover || (drag && drag.type === 'push'));
+  ov.cut.style.display = ov.grip.style.display = show ? 'block' : 'none';
+  ov.cutTint.style.display = hot ? 'block' : 'none';
+  if (show) {
+    ov.cut.style.top = sr.top + 'px';
+    ov.grip.style.top = Math.max(2, sr.top - 11) + 'px';
+    ov.cutTint.style.top = sr.top + 'px'; ov.cutTint.style.height = Math.max(0, win.innerHeight - sr.top) + 'px';
+  }
+  const s = hot ? ensurePush() : null, list = s ? s.units.filter((u) => u.el !== sel) : [];
+  while (ov.units.length < list.length) { const n = doc.createElement('div'); n.style.cssText = 'position:fixed;outline:1px dashed #ff8a00;pointer-events:none'; ov.root.append(n); ov.units.push(n); }
+  ov.units.forEach((n, i) => {
+    const el = list[i] && list[i].el, r = el && el.isConnected ? el.getBoundingClientRect() : null;
+    n.style.display = r ? 'block' : 'none'; if (r) place(n, r);
+  });
 }
 let lastKey = '';
 (function tick() {
@@ -541,21 +615,21 @@ function deepestAt(x, y) {
 }
 function select(el, reveal = false) {
   if (editing) endTextEdit(true);
-  sel = el; lastKey = '';
+  sel = el; lastKey = ''; push = null; pushHot = false; gripHover = false;
   // Picked from the breadcrumbs / keyboard rather than clicked: scroll the preview to it if it's off-screen.
   if (reveal) { const r = el.getBoundingClientRect(); if (r.bottom < 0 || r.top > win.innerHeight) el.scrollIntoView({ block: 'center' }); }
   updateOverlay(); buildPanel();
 }
-function getTranslate(el) {
+function getTranslate(el, s = selectorFor(el)) {
   // Prefer the recorded rem value: converting through pixels and back would drift a little on every nudge.
-  const rec = state.css[scopeKey()]?.[selectorFor(el)]?.translate, m = rec && rec.match(/^(-?[\d.]+)rem\s+(-?[\d.]+)rem$/);
+  const rec = state.css[scopeKey()]?.[s]?.translate, m = rec && rec.match(/^(-?[\d.]+)rem\s+(-?[\d.]+)rem$/);
   if (m) { const rp = rootPx(); return { x: +m[1] * rp, y: +m[2] * rp }; }
   const t = win.getComputedStyle(el).translate; if (!t || t === 'none') return { x: 0, y: 0 };
   const p = t.split(/\s+/).map(parseFloat); return { x: p[0] || 0, y: p[1] || 0 };
 }
-function ensureMovable() { if (sel && win.getComputedStyle(sel).display === 'inline') setProp('display', 'inline-block'); }
+function ensureMovable(el = sel) { if (el && win.getComputedStyle(el).display === 'inline') setProp('display', 'inline-block', scopeKey(), el); }
 function setTranslatePx(x, y, el = sel) {
-  if (!el) return; ensureMovable(); const rp = rootPx();
+  if (!el) return; ensureMovable(el); const rp = rootPx();
   if (Math.abs(x) < 0.01 && Math.abs(y) < 0.01) resetProps(['translate'], el);
   else setProp('translate', `${r4(x / rp)}rem ${r4(y / rp)}rem`, scopeKey(), el);
 }
@@ -572,6 +646,70 @@ function setSize(axis, px, rp = rootPx()) {
   }
 }
 
+/* ---------- move this element and everything below it ----------
+   "Below" is geometric: every block whose top edge sits at or under the selected element's top edge. The group is the
+   outermost such blocks (a block that straddles the line is entered, so only its lower children move). Each one gets
+   its translate nudged by the same amount, and the page's length (body height) follows, so the canvas grows or shrinks
+   with the content. The group is worked out once per selection: if it were recomputed on every step, pulling content up
+   would start to "catch" things that used to be above it. */
+const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'NOSCRIPT', 'TEMPLATE', 'BR', 'WBR', 'TITLE', 'HEAD']);
+const docTop = (r) => r.top + win.scrollY;
+function computeGroup(anchor) {
+  const cut = docTop(anchor.getBoundingClientRect()) - 0.5, units = [];
+  const visit = (el) => {
+    if (SKIP_TAGS.has(el.tagName) || el.id === '__ed' || el.id === 'fx') return;
+    if (el === anchor) { units.push(el); return; }
+    const cs = win.getComputedStyle(el);
+    if (cs.display === 'none' || cs.position === 'fixed') return;
+    if (cs.display === 'contents' || el.contains(anchor)) { for (const c of el.children) visit(c); return; }
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height && !el.firstElementChild) return;
+    if (docTop(r) >= cut) units.push(el);
+    else if (r.bottom + win.scrollY > cut) for (const c of el.children) visit(c);
+  };
+  for (const c of doc.body.children) visit(c);
+  return units;
+}
+function ensurePush() {
+  if (!sel || !sel.isConnected) return null;
+  const sc = scopeKey();
+  if (push && push.anchor === sel && push.scope === sc && push.w === frameW) return push;
+  const units = computeGroup(sel).map((el) => {
+    const s = selectorFor(el), rec = state.css[sc]?.[s];
+    return { el, sel: s, rec0: rec?.translate, disp0: rec?.display, top: docTop(el.getBoundingClientRect()), inline: win.getComputedStyle(el).display === 'inline' };
+  });
+  push = { anchor: sel, scope: sc, w: frameW, units, applied: 0, minTop: Math.min(...units.map((u) => u.top)), len0: state.css[sc]?.body?.height, lenTouched: false, lenStart: pageLen() };
+  return push;
+}
+const pageLen = () => (doc ? parseFloat(win.getComputedStyle(doc.body).height) || 0 : 0);
+let pushNote = '';
+function pushTo(total) {
+  const s = ensurePush(); if (!s) return;
+  total = Math.round(total); pushNote = '';
+  const lo = -Math.floor(s.minTop);
+  if (total < lo) { total = lo; pushNote = 'Stopped at the top of the page: content can’t go above it.'; }
+  if (total > MAX_PUSH) { total = MAX_PUSH; pushNote = `Limited to ${MAX_PUSH} px.`; }
+  const delta = total - s.applied; if (!delta) return;
+  const rp = rootPx(), sc = s.scope, css = state.css;
+  for (const u of s.units) {
+    if (total === 0) {   // back where we started: put back exactly what was there, not a rounded copy
+      if (u.rec0 != null) setTweak(css, sc, u.sel, 'translate', u.rec0); else delTweak(css, sc, u.sel, 'translate');
+      if (u.disp0 != null) setTweak(css, sc, u.sel, 'display', u.disp0); else if (u.addedDisplay) delTweak(css, sc, u.sel, 'display');
+      u.addedDisplay = false;
+    } else {
+      const t = getTranslate(u.el, u.sel);
+      setTweak(css, sc, u.sel, 'translate', `${r4(t.x / rp)}rem ${r4((t.y + delta) / rp)}rem`);
+      if (u.inline && css[sc]?.[u.sel]?.display == null) { setTweak(css, sc, u.sel, 'display', 'inline-block'); u.addedDisplay = true; }
+    }
+  }
+  if (pushAuto || s.lenTouched) {
+    if (total === 0 && s.lenTouched) { if (s.len0 != null) setTweak(css, sc, 'body', 'height', s.len0); else delTweak(css, sc, 'body', 'height'); s.lenTouched = false; }
+    else if (pushAuto) { setTweak(css, sc, 'body', 'height', r4((pageLen() + delta) / rp) + 'rem'); s.lenTouched = true; }
+  }
+  s.applied = total; renderLive();
+}
+function revealSel() { if (!sel) return; const r = sel.getBoundingClientRect(); if (r.bottom < 0 || r.top > win.innerHeight) sel.scrollIntoView({ block: 'center' }); }
+
 function bindFrameEvents() {
   const EVENTS = ['pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'mouseover', 'mouseenter', 'mouseleave', 'mousemove', 'mousedown', 'mouseup', 'click', 'auxclick', 'contextmenu', 'dragstart'];
   // Capture everything first so the page's own scripts (cursor effects, read state, links) never see editor
@@ -584,6 +722,8 @@ function bindFrameEvents() {
   win.addEventListener('pointerup', onUp, true);
   win.addEventListener('pointercancel', onUp, true);
   win.addEventListener('dblclick', onDbl, true);
+  win.addEventListener('dragover', (e) => { e.stopImmediatePropagation(); e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; }, true);
+  win.addEventListener('drop', onDrop, true);
   win.addEventListener('keydown', onKey, true);
   win.addEventListener('scroll', () => updateOverlay(), { passive: true });
   win.addEventListener('resize', () => updateOverlay());
@@ -593,6 +733,7 @@ function onDown(e) {
   if (editing && editing.el.contains(e.target)) return;   // let the caret move
   if (e.button !== 0) return; if (e.cancelable) e.preventDefault();
   const hd = e.target.dataset && e.target.dataset.h;
+  if (hd === 'push' && sel) { const s = ensurePush(); if (s) { drag = { type: 'push', id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, base: s.applied }; try { e.target.setPointerCapture(e.pointerId); } catch {} updateOverlay(); } return; }
   if (hd && sel) { startDrag(e, 'resize', hd); return; }
   if (editing) endTextEdit(true);
   const under = deepestAt(e.clientX, e.clientY);
@@ -611,11 +752,13 @@ function onMove(e) {
   e.stopImmediatePropagation();
   if (editing && editing.el.contains(e.target) && !drag) return;
   if (!drag) {
+    const g = e.target === ov.grip; if (g !== gripHover) { gripHover = g; updateOverlay(); }
     const n = deepestAt(e.clientX, e.clientY); if (n !== hover) { hover = n; updateOverlay(); } return;
   }
   let dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
   if (!drag.moved && Math.hypot(dx, dy) < 3) return;
   drag.moved = true;
+  if (drag.type === 'push') { pushTo(drag.base + dy); syncFields(); return; }
   if (drag.type === 'move') {
     if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
     setTranslatePx(drag.t0.x + dx, drag.t0.y + dy);
@@ -633,7 +776,7 @@ function onMove(e) {
 }
 function onUp(e) {
   e.stopImmediatePropagation();
-  if (drag) { const moved = drag.moved; try { e.target.releasePointerCapture(drag.id); } catch {} drag = null; if (moved) commit(); }
+  if (drag) { const moved = drag.moved, was = drag.type; try { e.target.releasePointerCapture(drag.id); } catch {} drag = null; if (moved) commit(); if (was === 'push') { gripHover = e.target === ov.grip; updateOverlay(); buildPanelSoon(); } }
 }
 function onDbl(e) {
   e.stopImmediatePropagation(); e.preventDefault();
@@ -715,7 +858,7 @@ document.addEventListener('keydown', (e) => { if (!doc || typing(e.target) || e.
 let fields = [];
 const fmt = (v) => (Number.isFinite(v) ? String(Math.round(v * 100) / 100) : '');   // show at most 2 decimals; the saved rem keeps full precision
 function schedulePanelSync() { clearTimeout(panelTimer); panelTimer = setTimeout(syncFields, 30); }
-function syncFields() { if (!sel) return; for (const f of fields) f.sync(); }
+function syncFields() { for (const f of fields) f.sync(); }
 let buildTimer = 0;
 function buildPanelSoon() { clearTimeout(buildTimer); buildTimer = setTimeout(buildPanel, 20); }
 
@@ -735,18 +878,47 @@ function numField(spec) {
   const row = h('div', { class: 'f' }, lab, input, h('span', { class: 'u', text: spec.unit || '' }), reset);
   const f = {
     row,
-    sync() { if (!sel) return; if (document.activeElement !== input) input.value = fmt(spec.read(sel, win.getComputedStyle(sel))); row.classList.toggle('on', isTweaked(spec.props || [spec.prop])); },
+    sync() {
+      if (!sel && !spec.global) return;
+      if (document.activeElement !== input) input.value = fmt(spec.read(sel, sel ? win.getComputedStyle(sel) : null));
+      row.classList.toggle('on', spec.on ? spec.on() : isTweaked(spec.props || [spec.prop], spec.target ? spec.target() : sel));
+    },
   };
   input.addEventListener('input', () => { const v = parseFloat(input.value); if (Number.isFinite(v)) { spec.write(v); syncOthers(f); } });
   input.addEventListener('change', () => { commit(); syncFields(); });
   input.addEventListener('keydown', (e) => { if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.shiftKey) { e.preventDefault(); input.value = fmt((parseFloat(input.value) || 0) + (e.key === 'ArrowUp' ? 1 : -1) * (spec.step ?? 1) * 10); input.dispatchEvent(new Event('input')); input.dispatchEvent(new Event('change')); } });
-  reset.addEventListener('click', () => { resetProps(spec.props || [spec.prop]); commit(); syncFields(); });
+  reset.addEventListener('click', () => { if (spec.reset) spec.reset(); else resetProps(spec.props || [spec.prop], spec.target ? spec.target() : sel); commit(); syncFields(); });
   scrub(lab, input, spec.step ?? 1);
+  fields.push(f); return row;
+}
+function rangeField(spec) {
+  const aria = spec.aria || spec.label;
+  const range = h('input', { type: 'range', min: spec.min, max: spec.max, step: spec.step ?? 1, 'aria-label': aria });
+  const num = h('input', { type: 'number', min: spec.min, max: spec.max, step: spec.step ?? 1, inputmode: 'decimal', 'aria-label': aria + ' (number)' });
+  const reset = h('button', { class: 'x', type: 'button', title: 'Reset this tweak', 'aria-label': 'Reset', text: '×' });
+  const row = h('div', { class: 'fr' }, h('span', { class: 'lab', text: spec.label, title: spec.title || '' }), range, num, h('span', { class: 'u', text: spec.unit || '' }), reset);
+  const clamp = (v) => Math.max(spec.min, Math.min(spec.max, v));
+  const f = { sync() {
+    const v = spec.read();
+    if (document.activeElement !== range) range.value = v;
+    if (document.activeElement !== num) num.value = fmt(v);
+    row.classList.toggle('on', !!spec.on());
+  } };
+  range.addEventListener('input', () => { const v = +range.value; num.value = fmt(v); spec.write(v); syncOthers(f); });
+  num.addEventListener('input', () => { const v = parseFloat(num.value); if (Number.isFinite(v)) { range.value = clamp(v); spec.write(clamp(v)); syncOthers(f); } });
+  for (const i of [range, num]) i.addEventListener('change', () => { commit(); syncFields(); });
+  reset.addEventListener('click', () => { spec.reset(); commit(); syncFields(); });
   fields.push(f); return row;
 }
 function syncOthers(except) { for (const f of fields) if (f !== except) f.sync(); }
 
 function parseColor(c) {
+  c = (c || '').trim();
+  const hx = c.match(/^#([0-9a-f]{3,8})$/i);
+  if (hx) {
+    let x = hx[1]; if (x.length === 3 || x.length === 4) x = [...x].map((ch) => ch + ch).join('');
+    if (x.length === 6 || x.length === 8) return { hex: '#' + x.slice(0, 6).toLowerCase(), a: x.length === 8 ? parseInt(x.slice(6), 16) / 255 : 1 };
+  }
   const m = c.match(/rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.%]+))?\s*\)/); if (!m) return { hex: '#000000', a: 1 };
   const hex = '#' + [m[1], m[2], m[3]].map((v) => Math.round(+v).toString(16).padStart(2, '0')).join('');
   let a = m[4] == null ? 1 : (m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4]); return { hex, a };
@@ -762,45 +934,69 @@ function colorField(labelText, prop, opts = {}) {
   const reset = h('button', { class: 'x', type: 'button', 'aria-label': 'Reset', title: 'Reset this tweak', text: '×' });
   const row = h('div', { class: 'fc' }, h('span', { class: 'lab', text: labelText }), pick, text, alpha, reset);
   const read = () => (opts.token ? parseColor(opts.token.value) : parseColor(win.getComputedStyle(sel)[prop]));
-  const write = (hex, a) => { const v = colorSpec(hex, a); if (opts.token) { setTweak(state.css, '', ':root', opts.token.name, v); renderLive(); } else setProp(prop, v); };
+  const write = (hex, a) => { const v = colorSpec(hex, a); if (opts.token) { setTweak(state.css, tokScope(opts.token.name), ':root', opts.token.name, v); renderLive(); } else setProp(prop, v); };
   const f = { sync() {
     if (!opts.token && !sel) return; const c = read();
     if (document.activeElement !== pick) pick.value = c.hex;
     if (document.activeElement !== text) text.value = c.a >= 1 ? c.hex : colorSpec(c.hex, c.a);
     if (document.activeElement !== alpha) alpha.value = r3(c.a);
-    row.classList.toggle('on', opts.token ? state.css['']?.[':root']?.[opts.token.name] != null : isTweaked([prop]));
+    row.classList.toggle('on', opts.token ? state.css[tokScope(opts.token.name)]?.[':root']?.[opts.token.name] != null : isTweaked([prop]));
   } };
   pick.addEventListener('input', () => { write(pick.value, parseFloat(alpha.value) || 1); syncOthers(f); });
   alpha.addEventListener('input', () => { const a = Math.max(0, Math.min(1, parseFloat(alpha.value))); if (Number.isFinite(a)) { write(pick.value, a); } });
-  text.addEventListener('change', () => { const t = text.value.trim(); if (/^#[0-9a-f]{6}$/i.test(t)) write(t.toLowerCase(), parseFloat(alpha.value) || 1); else if (t) { if (opts.token) { setTweak(state.css, '', ':root', opts.token.name, t); renderLive(); } else setProp(prop, t); } commit(); syncFields(); });
+  text.addEventListener('change', () => { const t = text.value.trim(); if (/^#[0-9a-f]{6}$/i.test(t)) write(t.toLowerCase(), parseFloat(alpha.value) || 1); else if (t) { if (opts.token) { setTweak(state.css, tokScope(opts.token.name), ':root', opts.token.name, t); renderLive(); } else setProp(prop, t); } commit(); syncFields(); });
   for (const i of [pick, alpha]) i.addEventListener('change', () => { commit(); syncFields(); });
-  reset.addEventListener('click', () => { if (opts.token) { delTweak(state.css, '', ':root', opts.token.name); renderLive(); } else resetProps([prop]); commit(); syncFields(); });
+  reset.addEventListener('click', () => { if (opts.token) { delTweak(state.css, tokScope(opts.token.name), ':root', opts.token.name); renderLive(); } else resetProps([prop]); commit(); syncFields(); });
   fields.push(f); return row;
 }
 
 const remv = (px) => r4(px / rootPx()) + 'rem';
+function scanGuarded() {   // site-wide tokens the page overrides inside a prefers-contrast query
+  const out = new Set();
+  const walk = (rules, a11y) => {
+    for (const r of rules) {
+      if (r.type === 4) walk(r.cssRules, a11y || /prefers-contrast/.test(r.conditionText || (r.media && r.media.mediaText) || ''));
+      else if (r.type === 1) { if (a11y && r.selectorText === ':root') for (const p of r.style) if (p.startsWith('--')) out.add(p); }
+      else if (r.cssRules) walk(r.cssRules, a11y);
+    }
+  };
+  for (const sh of doc.styleSheets) { try { walk(sh.cssRules, false); } catch {} }
+  return out;
+}
+const tokScope = (name) => (guarded.has(name) ? GUARD : '');
+const tokenValue = (n) => win.getComputedStyle(root).getPropertyValue(n).trim();
+const rgb2hex = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+function inkAlpha(name, value) {   // how strong is this ink, 0..1, where 1 = the reference print's full-strength ink
+  const full = INKS[name], c = parseColor(value); if (!full) return 0;
+  const n = parseInt(c.hex.slice(1), 16), rgb = [n >> 16, (n >> 8) & 255, n & 255]; let num = 0, den = 0;
+  for (let i = 0; i < 3; i++) { const range = 255 - full[i]; if (range > 8) { num += 255 - rgb[i]; den += range; } }
+  return den ? Math.max(0, Math.min(1, num / den)) : 0;
+}
+const inkFor = (name, a) => rgb2hex(INKS[name].map((f) => 255 - (255 - f) * a));
+const fmtBytes = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+const sec = (title, open, ...kids) => { const d = h('details', {}, h('summary', { text: title }), h('div', { class: 'body' }, ...kids)); d.open = open; return d; };
+const g2 = (...c) => h('div', { class: 'grid2' }, ...c);
 const P = (label, prop, extra = {}) => ({ label, prop, unit: 'px', aria: `${prop.replace('-', ' ')} in pixels`, read: (e, cs) => parseFloat(cs[prop.replace(/-(\w)/g, (_, c) => c.toUpperCase())]) || 0, write: (v) => setProp(prop, remv(v)), ...extra });
 function buildPanel() {
   fields = []; panel.replaceChildren();
   const sections = [];
   if (!doc) return;
   if (!sel) {
-    panel.append(h('p', { class: 'hint', style: 'padding-top:12px' }, 'Click anything on the page to select it. Drag to move, use the handles to resize, arrow keys to nudge (Shift = 10px), double-click text to retype. Hold Ctrl/Cmd while clicking to pick the innermost element.'), tokensSection(), changesSection());
-    afterChange(); return;
+    panel.append(h('p', { class: 'hint', style: 'padding-top:12px' }, 'Click anything on the page to select it. Drag to move, use the handles to resize, arrow keys to nudge (Shift = 10px), double-click text to retype, drop an image file onto a picture to replace it. Hold Ctrl/Cmd while clicking to pick the innermost element.'), pageSection(true), tokensSection(), changesSection());
+    syncFields(); afterChange(); return;
   }
   const r = rangeFor(frameW), cs = win.getComputedStyle(sel);
   const head = h('div', { class: 'sel-head' },
     h('div', { class: 'muted', text: `Selected · tweaks apply to ${r.label}` }),
     h('code', { text: selectorFor(sel) }),
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
-      h('button', { text: 'Reset element', title: 'Remove this element’s tweaks at this width', onclick: () => { const s = selectorFor(sel); for (const p of Object.keys(state.css[scopeKey()]?.[s] || {})) delTweak(state.css, scopeKey(), s, p); state.text = state.text.filter((t) => t.sel !== s); renderLive(); commit(); syncFields(); } }),
+      h('button', { text: 'Reset element', title: 'Remove this element’s tweaks at this width', onclick: () => { const s = selectorFor(sel); for (const p of Object.keys(state.css[scopeKey()]?.[s] || {})) delTweak(state.css, scopeKey(), s, p); state.text = state.text.filter((t) => t.sel !== s); state.images = state.images.filter((x) => x.sel !== s); renderLive(); commit(); buildPanelSoon(); } }),
       isTextual(sel) ? h('button', { text: 'Edit text', onclick: () => startTextEdit(sel) }) : null,
       h('button', { text: 'Deselect', onclick: () => { sel = null; updateOverlay(); buildPanel(); } })),
     crumbs());
   panel.append(head);
+  const ib = imageBlock(); if (ib) panel.append(ib);   // a picture's own controls come first: replacing it is why you selected it
 
-  const sec = (title, open, ...kids) => { const d = h('details', {}, h('summary', { text: title }), h('div', { class: 'body' }, ...kids)); d.open = open; return d; };
-  const g2 = (...c) => h('div', { class: 'grid2' }, ...c);
   const showGap = /flex|grid/.test(cs.display);
   panel.append(
     sec('Position & size', true,
@@ -809,6 +1005,7 @@ function buildPanel() {
          numField({ label: 'W', aria: 'Width in pixels', prop: 'width', unit: 'px', read: (e, c) => parseFloat(c.width) || e.getBoundingClientRect().width, write: (v) => { ensureMovable(); setSize('width', v); } }),
          numField({ label: 'H', aria: 'Height in pixels', prop: 'height', unit: 'px', read: (e, c) => parseFloat(c.height) || e.getBoundingClientRect().height, write: (v) => { ensureMovable(); setSize('height', v); } })),
       h('p', { class: 'muted', style: 'margin:6px 0 0', text: 'Moves are saved as rem offsets, so they scale with the text.' })),
+    pushSection(),
     sec('Spacing', true,
       h('div', { class: 'sub', text: 'Padding' }),
       g2(numField(P('T', 'padding-top')), numField(P('R', 'padding-right')), numField(P('B', 'padding-bottom')), numField(P('L', 'padding-left'))),
@@ -825,9 +1022,173 @@ function buildPanel() {
       g2(numField({ label: 'Op', aria: 'Opacity', prop: 'opacity', unit: '0–1', step: 0.05, read: (e, c) => parseFloat(c.opacity), write: (v) => setProp('opacity', String(Math.max(0, Math.min(1, r3(v))))) }),
          numField({ label: 'R', aria: 'Corner radius in pixels', prop: 'border-radius', unit: 'px', read: (e, c) => parseFloat(c.borderTopLeftRadius) || 0, write: (v) => setProp('border-radius', remv(v)) }),
          numField({ label: 'Bl', aria: 'Frosted-glass blur in pixels (frosted plates only)', prop: '--blur', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.getPropertyValue('--blur')) || 0, write: (v) => setProp('--blur', r3(v) + 'px') }))),
-    tokensSection(), changesSection());
+    pageSection(false), tokensSection(), changesSection());
   syncFields(); afterChange();
 }
+function imageBlock() {
+  if (sel.localName === 'img') return imageSection(sel);
+  const imgs = sel.querySelectorAll('img');
+  if (imgs.length !== 1) return null;
+  return sec('Image', true, h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'This contains one picture.' }), h('button', { type: 'button', text: 'Select the picture', onclick: () => select(imgs[0], true) }));
+}
+/* ---- Move this element and everything below it ---- */
+function pushSection() {
+  const s = ensurePush(), n = s ? s.units.length : 0;
+  const field = numField({ label: '↕', aria: 'Push this element and everything below it, in pixels', unit: 'px', step: 1,
+    read: () => (push && push.anchor === sel ? push.applied : 0),
+    on: () => !!push && push.anchor === sel && push.applied !== 0,
+    write: (v) => pushTo(v), reset: () => pushTo(0) });
+  const step = (d) => () => { pushTo((ensurePush()?.applied || 0) + d); commit(); syncFields(); revealSel(); };
+  const bt = (text, d, tip) => h('button', { type: 'button', text, title: tip, 'aria-label': tip, onclick: step(d) });
+  const auto = h('input', { type: 'checkbox', checked: pushAuto, 'aria-label': 'Resize the page to fit' });
+  auto.addEventListener('change', () => { pushAuto = auto.checked; });
+  const readout = h('p', { class: 'readout' }), note = h('p', { class: 'readout warn' });
+  fields.push({ sync() {
+    const len = Math.round(pageLen()), diff = push && push.anchor === sel ? len - Math.round(push.lenStart) : 0;
+    readout.replaceChildren('Page length ', h('b', { text: len + ' px' }), diff ? ` (${diff > 0 ? '+' : '−'}${Math.abs(diff)} px)` : '');
+    note.textContent = pushNote;
+  } });
+  const body = h('div', {},
+    h('p', { class: 'muted', style: 'margin:0 0 6px', text: `Moves this element and everything that starts at or below its top edge (${n} element${n === 1 ? '' : 's'}), like inserting or removing space at the orange line. Pushing up pulls the rest of the page up with it.` }),
+    field,
+    h('div', { class: 'btnrow' }, bt('↑ 100', -100, 'Push up 100 pixels'), bt('↑ 10', -10, 'Push up 10 pixels'), bt('↓ 10', 10, 'Push down 10 pixels'), bt('↓ 100', 100, 'Push down 100 pixels')),
+    h('label', { class: 'tick' }, auto, 'Make the page longer or shorter to fit'),
+    readout, note);
+  const hot = (v) => () => { pushHot = v; updateOverlay(); };
+  body.addEventListener('mouseenter', hot(true)); body.addEventListener('mouseleave', hot(false));
+  body.addEventListener('focusin', hot(true)); body.addEventListener('focusout', hot(false));
+  const d = sec('Move this & everything below', pushOpen, body);
+  d.addEventListener('toggle', () => { if (pushOpen !== d.open) { pushOpen = d.open; updateOverlay(); } });
+  return d;
+}
+
+/* ---- Page & background: grid / grain opacity and the length of the page ---- */
+// Set a site-wide token. If the value is what the page already has, drop the tweak instead: sliding back is "no change".
+function setTok(n, v) {
+  const sc = tokScope(n), b = tokBase[n], same = b != null && (b.toLowerCase() === String(v).toLowerCase() || (b !== '' && +b === +v));
+  if (!same) setTweak(state.css, sc, ':root', n, v);
+  else if (baseline[sc]?.[':root']?.[n] != null) setTweak(state.css, sc, ':root', n, baseline[sc][':root'][n]);
+  else delTweak(state.css, sc, ':root', n);
+  renderLive();
+}
+function pageSection(open) {
+  const names = Object.keys(INKS);
+  const isSet = (ns) => ns.some((n) => diffCss(baseline, state.css).set.some((x) => x[1] === ':root' && x[2] === n) || diffCss(baseline, state.css).del.some((x) => x[1] === ':root' && x[2] === n));
+  const clear = (ns) => { for (const n of ns) delTweak(state.css, tokScope(n), ':root', n); renderLive(); };
+  const setInk = (ns, pct) => { for (const n of ns) setTok(n, inkFor(n, pct / 100)); };
+  const inkPct = (ns) => Math.round(100 * ns.reduce((t, n) => t + inkAlpha(n, tokenValue(n)), 0) / ns.length);
+  const ink = (label, aria, ns, title) => rangeField({ label, aria, title, min: 0, max: 100, step: 1, unit: '%', read: () => inkPct(ns), write: (v) => setInk(ns, v), on: () => isSet(ns), reset: () => clear(ns) });
+  return sec('Page & background', open,
+    h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'Opacity of the printed grid and the paper grain. These apply at every width; they are skipped for visitors who ask for increased contrast.' }),
+    ink('Grid', 'Grid line opacity in percent (100 is the full-strength reference print)', names, '100% is the reference print; the page ships at 50%'),
+    ink('Cyan', 'Cyan plate opacity in percent', ['--ink-c'], 'The cyan ink plate on its own'),
+    ink('Magenta', 'Magenta plate opacity in percent', ['--ink-m'], 'The magenta ink plate on its own'),
+    rangeField({ label: 'Grain', aria: 'Paper grain opacity in percent', min: 0, max: 100, step: 1, unit: '%',
+      read: () => Math.round(100 * (parseFloat(tokenValue('--grain')) || 0)),
+      write: (v) => setTok('--grain', String(r3(v / 100))),
+      on: () => isSet(['--grain']), reset: () => { delTweak(state.css, tokScope('--grain'), ':root', '--grain'); renderLive(); } }),
+    h('div', { class: 'sub', text: `Page length (${rangeFor(frameW).label})` }),
+    g2(numField({ label: 'Len', aria: 'Page length in pixels', unit: 'px', global: true, step: 10,
+      read: () => pageLen(), on: () => state.css[scopeKey()]?.body?.height != null,
+      write: (v) => { setTweak(state.css, scopeKey(), 'body', 'height', remv(Math.max(200, Math.min(100000, v)))); renderLive(); },
+      reset: () => { delTweak(state.css, scopeKey(), 'body', 'height'); renderLive(); } })));
+}
+
+/* ---- Image: replace, optimise, fit ---- */
+function shortSrc(src) {
+  try { const u = new URL(src, doc.baseURI), f = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || u.hostname); return f.length > 46 ? f.slice(0, 22) + '…' + f.slice(-20) : f; }
+  catch { return String(src).slice(0, 46); }
+}
+function imageSection(img) {
+  const s = selectorFor(img), entry = state.images.find((x) => x.sel === s), a = entry && assets.get(entry.path);
+  const file = h('input', { type: 'file', accept: 'image/*,.avif', hidden: true, 'aria-label': 'Choose a replacement image' });
+  file.addEventListener('change', () => { const f = file.files[0]; file.value = ''; if (f) replaceImage(img, f); });
+  const info = h('div', { class: 'imginfo' },
+    a ? h('img', { class: 'ph', src: a.url, alt: '' }) : h('div', { class: 'ph' }),
+    h('div', {},
+      entry ? h('div', {}, h('b', { text: 'Replaced' }), ` · ${fmtBytes(entry.bytes)}${entry.w ? ` · ${entry.w}×${entry.h}` : ''}`) : h('div', { class: 'muted', text: `Current · ${img.naturalWidth || '?'} × ${img.naturalHeight || '?'}` }),
+      h('code', { text: entry ? entry.path : shortSrc(imgOrig.get(s) ?? img.getAttribute('src') ?? '') })));
+  const pick = h('button', { type: 'button', class: 'primary', text: entry ? 'Choose another…' : 'Replace image…', onclick: () => file.click() });
+  const revert = entry ? h('button', { type: 'button', text: 'Revert', title: 'Go back to the original picture', onclick: () => { state.images = state.images.filter((x) => x.sel !== s); renderLive(); commit(); buildPanel(); } }) : null;
+  const opt = h('input', { type: 'checkbox', checked: imgOpts.optimise, 'aria-label': 'Optimise for the web' });
+  const ms = h('input', { type: 'number', min: 200, max: 6000, step: 100, placeholder: 'auto', value: imgOpts.maxSide || '', 'aria-label': 'Longest side in pixels (blank = automatic)', style: 'width:76px;background:#15171a;border:1px solid var(--line);border-radius:5px;padding:3px 5px' });
+  const again = () => { imgOpts = { optimise: opt.checked, maxSide: Math.round(+ms.value) || 0 }; ms.disabled = !opt.checked; if (a && a.file) replaceImage(img, a.file); };
+  ms.disabled = !imgOpts.optimise; opt.addEventListener('change', again); ms.addEventListener('change', again);
+  // fit & focal point: how the picture fills its frame
+  const fit = h('select', { 'aria-label': 'How the picture fills its frame' }, ...['cover', 'contain', 'fill', 'none', 'scale-down'].map((v) => h('option', { value: v, text: v })));
+  const fitReset = h('button', { class: 'x', type: 'button', title: 'Reset fit and focal point', 'aria-label': 'Reset fit', text: '×' });
+  const fitRow = h('div', { class: 'fsel' }, h('span', { class: 'lab', text: 'Fit' }), fit, fitReset);
+  fit.addEventListener('change', () => { setProp('object-fit', fit.value, scopeKey(), img); commit(); syncFields(); });
+  fitReset.addEventListener('click', () => { resetProps(['object-fit', 'object-position'], img); commit(); syncFields(); });
+  fields.push({ sync() { if (document.activeElement !== fit) fit.value = win.getComputedStyle(img).objectFit; fitRow.classList.toggle('on', isTweaked(['object-fit', 'object-position'], img)); } });
+  const pos = () => win.getComputedStyle(img).objectPosition.split(/\s+/).map((v) => (v.endsWith('%') ? parseFloat(v) : 50));
+  const posField = (label, aria, i) => numField({ label, aria, unit: '%', step: 5, props: ['object-position'], target: () => img,
+    read: () => pos()[i], write: (v) => { const p = pos(); p[i] = r3(v); setProp('object-position', `${p[0]}% ${p[1]}%`, scopeKey(), img); } });
+  return sec('Image', true, info, h('div', { class: 'btnrow' }, pick, revert), file,
+    h('label', { class: 'tick' }, opt, 'Optimise for the web (resize + WebP)'),
+    h('label', { class: 'tick', style: 'margin-top:4px' }, 'Longest side', ms, h('span', { class: 'muted', text: 'px (blank = automatic)' })),
+    fitRow, g2(posField('X', 'Focal point, horizontal in percent', 0), posField('Y', 'Focal point, vertical in percent', 1)),
+    h('p', { class: 'muted', style: 'margin:8px 0 0', text: 'The new file is uploaded to ' + IMG_DIR + '/ when you push. You can also drop an image file onto any picture.' }));
+}
+
+const slug = (n) => n.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'image';
+const imgTypeOf = (f) => (IMG_TYPES[f.type] ? f.type : IMG_BY_EXT[(f.name.split('.').pop() || '').toLowerCase()] || '');
+function decodeImage(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob), im = new Image();
+    im.onload = () => resolve({ im, url });
+    im.onerror = () => { URL.revokeObjectURL(url); reject(new Error('The browser couldn’t open that file as an image.')); };
+    im.src = url;
+  });
+}
+const canvasBlob = (cv, type, q) => new Promise((r) => cv.toBlob(r, type, q));
+const blobToBase64 = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
+// Turn the picked file into the file we'll upload: optionally resized and re-encoded as WebP (never bigger than it needs to be).
+async function prepareImage(file, o) {
+  const type = imgTypeOf(file);
+  if (!type) throw new Error('Pick a PNG, JPEG, WebP, GIF, AVIF or SVG image.');
+  if (file.size > 25 * 1048576) throw new Error('That image is over 25 MB: please shrink it first.');
+  const { im, url } = await decodeImage(file);
+  let blob = file, outType = type, w = im.naturalWidth || 0, h2 = im.naturalHeight || 0;
+  try {
+    if (o.optimise && w && h2 && type !== 'image/gif' && type !== 'image/svg+xml') {
+      const scale = Math.min(1, o.maxSide / Math.max(w, h2)), cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h2 * scale));
+      const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+      const ctx = cv.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(im, 0, 0, cw, ch);
+      let out = await canvasBlob(cv, 'image/webp', 0.86);
+      if (!out || out.type !== 'image/webp') out = await canvasBlob(cv, type === 'image/jpeg' ? 'image/jpeg' : 'image/png', 0.88);   // browsers that can't write WebP
+      if (out && (out.size < file.size || scale < 1)) { blob = out; outType = out.type; w = cw; h2 = ch; }
+    }
+  } finally { URL.revokeObjectURL(url); }
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()));
+  const hash = [...digest.slice(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const path = `${IMG_DIR}/${slug(file.name)}-${hash}.${IMG_TYPES[outType] || 'bin'}`;
+  return { path, blob, file, url: URL.createObjectURL(blob), bytes: blob.size, w, h: h2, type: outType, name: file.name };
+}
+async function replaceImage(img, file) {
+  const s = selectorFor(img);
+  const r = img.getBoundingClientRect(), auto = Math.min(2400, Math.max(800, Math.ceil((Math.max(r.width, r.height) * 3) / 100) * 100));
+  toast('Preparing the image…', 0);
+  let prep;
+  try { prep = await prepareImage(file, { optimise: imgOpts.optimise, maxSide: imgOpts.maxSide || auto }); }
+  catch (err) { toast(err.message || String(err), 4500, 'err'); return; }
+  if (!imgOrig.has(s)) imgOrig.set(s, img.getAttribute('src'));
+  assets.set(prep.path, prep);   // earlier replacements stay in `assets` so that undo can bring them back
+  state.images = state.images.filter((x) => x.sel !== s);
+  state.images.push({ sel: s, was: imgOrig.get(s), path: prep.path, name: prep.name, bytes: prep.bytes, w: prep.w, h: prep.h, type: prep.type });
+  renderLive(); commit(); if (sel === img) buildPanel();
+  toast(`Picture replaced (${fmtBytes(prep.bytes)}${prep.w ? `, ${prep.w}×${prep.h}` : ''}). It is uploaded when you push.`, 3600);
+}
+function onDrop(e) {
+  e.stopImmediatePropagation(); e.preventDefault();
+  const f = [...((e.dataTransfer && e.dataTransfer.files) || [])].find((x) => imgTypeOf(x));
+  if (!f) { toast('Drop an image file (PNG, JPEG, WebP, GIF, AVIF or SVG) onto a picture.', 3200, 'warn'); return; }
+  const n = doc.elementFromPoint(e.clientX, e.clientY);
+  const img = n && !n.closest('#__ed') && (n.localName === 'img' ? n : n.querySelectorAll('img').length === 1 ? n.querySelector('img') : null);
+  if (!img) { toast('Drop it onto the picture you want to replace.', 3000, 'warn'); return; }
+  select(img); replaceImage(img, f);
+}
+
 function crumbs() {
   const chain = []; for (let n = sel; n && n !== doc.body && n !== root; n = n.parentElement) chain.unshift(n);
   const box = h('div', { class: 'crumbs', role: 'group', 'aria-label': 'Select parent or child' });
@@ -856,9 +1217,9 @@ function tokensSection() {
     const inp = h('input', { type: 'text', spellcheck: 'false', value: v, 'aria-label': n });
     const reset = h('button', { class: 'x', type: 'button', text: '×', 'aria-label': 'Reset', title: 'Reset this tweak' });
     const row = h('div', { class: 'fc', style: 'grid-template-columns:90px minmax(0,1fr) 14px' }, h('span', { class: 'lab', text: n.replace(/^--/, ''), title: n }), inp, reset);
-    const f = { sync() { if (document.activeElement !== inp) inp.value = win.getComputedStyle(root).getPropertyValue(n).trim(); row.classList.toggle('on', state.css['']?.[':root']?.[n] != null); } };
-    inp.addEventListener('change', () => { if (inp.value.trim()) { setTweak(state.css, '', ':root', n, inp.value.trim()); renderLive(); commit(); syncFields(); } });
-    reset.addEventListener('click', () => { delTweak(state.css, '', ':root', n); renderLive(); commit(); syncFields(); });
+    const f = { sync() { if (document.activeElement !== inp) inp.value = win.getComputedStyle(root).getPropertyValue(n).trim(); row.classList.toggle('on', state.css[tokScope(n)]?.[':root']?.[n] != null); } };
+    inp.addEventListener('change', () => { if (inp.value.trim()) { setTweak(state.css, tokScope(n), ':root', n, inp.value.trim()); renderLive(); commit(); syncFields(); } });
+    reset.addEventListener('click', () => { delTweak(state.css, tokScope(n), ':root', n); renderLive(); commit(); syncFields(); });
     fields.push(f); body.append(row);
   }
   return d;
@@ -870,7 +1231,7 @@ function summary() {
   const ops = diffCss(baseline, state.css), base = flatten(baseline), rows = [];
   for (const [sc, sl, p, v] of ops.set) rows.push({ scope: sc, sel: sl, prop: p, value: v, was: base.get(JSON.stringify([sc, sl, p])) });
   for (const [sc, sl, p] of ops.del) rows.push({ scope: sc, sel: sl, prop: p, removed: true, was: base.get(JSON.stringify([sc, sl, p])) });
-  return { rows, text: state.text, count: rows.length + state.text.length };
+  return { rows, text: state.text, images: state.images, count: rows.length + state.text.length + state.images.length };
 }
 let changesHost = null;
 function changesSection() {
@@ -884,6 +1245,8 @@ function renderChanges() {
     h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { if (r.was != null) setTweak(state.css, r.scope, r.sel, r.prop, r.was); else delTweak(state.css, r.scope, r.sel, r.prop); renderLive(); commit(); syncFields(); } })));
   for (const t of s.text) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: 'Text' }), h('code', { text: `${t.sel}: “${stripTags(t.after)}”` })),
     h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { state.text = state.text.filter((x) => x !== t); renderLive(); commit(); } })));
+  for (const im of s.images) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: 'Image' }), h('code', { text: `${im.sel}: → ${im.path}` })),
+    h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { state.images = state.images.filter((x) => x !== im); renderLive(); commit(); buildPanelSoon(); } })));
   changesHost.replaceChildren(ul);
 }
 const stripTags = (s) => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
@@ -903,11 +1266,30 @@ function ghHelp(err) {
   return err.message || String(err);
 }
 const repoPath = () => `/repos/${encodeURIComponent(settings.owner)}/${encodeURIComponent(settings.repo)}`;
+/* A replaced picture's src="…" is swapped for the new file's path. The old address must appear exactly once as a src
+   attribute (it also appears in og:image / JSON-LD for the portrait, which is deliberately left alone). */
+const relPath = (from, to) => '../'.repeat(from.split('/').length - 1) + to;
+function applyImageEdits(src, edits, pagePath) {
+  let out = src; const applied = [], failed = [];
+  for (const e of edits) {
+    const hits = [];
+    for (const f of new Set([e.was, e.was.replace(/&/g, '&amp;')])) for (const q of ['"', "'"]) {
+      const needle = `src=${q}${f}${q}`; let i = -1;
+      while ((i = out.indexOf(needle, i + 1)) >= 0) if (i === 0 || /\s/.test(out[i - 1])) hits.push([i, needle, q]);
+    }
+    if (hits.length !== 1) { failed.push(e); continue; }
+    const [i, needle, q] = hits[0];
+    out = out.slice(0, i) + `src=${q}${relPath(pagePath, e.path)}${q}` + out.slice(i + needle.length);
+    applied.push(e);
+  }
+  return { src: out, applied, failed };
+}
 function buildNewSource(remoteSrc) {
   const merged = applyOps(parseBlock(remoteSrc), diffCss(baseline, state.css));
   let out = replaceBlock(remoteSrc, blockText(merged));
   const t = applyTextEdits(out, state.text);
-  return { src: t.src, merged, applied: t.applied, failed: t.failed };
+  const im = applyImageEdits(t.src, state.images, settings.path);
+  return { src: im.src, merged, applied: t.applied, failed: t.failed, imgApplied: im.applied, imgFailed: im.failed };
 }
 function prBody(s, built) {
   const lines = ['Visual tweaks made with the page editor (`/editor/`).', ''];
@@ -915,9 +1297,14 @@ function prBody(s, built) {
   for (const [sc, rows] of Object.entries(by)) { lines.push(`**${scopeLabel(sc)}**${sc ? ` \`@media ${sc}\`` : ''}`); for (const r of rows) lines.push(r.removed ? `- \`${r.sel}\`: removed \`${r.prop}\`` : `- \`${r.sel}\`: \`${r.prop}: ${r.value}\``); lines.push(''); }
   if (built.applied.length) { lines.push('**Text**'); for (const t of built.applied) lines.push(`- \`${t.sel}\`: “${stripTags(t.after)}”`); lines.push(''); }
   if (built.failed.length) { lines.push('**Text edits that could not be placed automatically** (edit by hand):'); for (const t of built.failed) lines.push(`- \`${t.sel}\`: “${stripTags(t.before)}” → “${stripTags(t.after)}”`); lines.push(''); }
+  if (built.imgApplied.length) { lines.push('**Images** (uploaded in this pull request)'); for (const e of built.imgApplied) lines.push(`- \`${e.sel}\`: \`${shortSrc(e.was)}\` → \`${e.path}\` (${fmtBytes(e.bytes)}${e.w ? `, ${e.w}×${e.h}` : ''})`); lines.push(''); }
+  if (built.imgFailed.length) { lines.push('**Images that could not be placed automatically** (not uploaded; the original address was not found exactly once as a `src`):'); for (const e of built.imgFailed) lines.push(`- \`${e.sel}\`: \`${shortSrc(e.was)}\``); lines.push(''); }
   lines.push('The style changes are in one managed block at the end of the page’s `<style>`, between the “editor tweaks” marker comments. They use `!important` so they always win; fold them into the main CSS whenever convenient.');
   return lines.join('\n');
 }
+const encPath = (p) => p.split('/').map(encodeURIComponent).join('/');
+/* Everything goes into ONE commit, built from objects first (blobs, tree, commit) and only then pointed at by a new branch.
+   If any step fails, no branch is left behind. Images are uploaded as git blobs (binary-safe), the page as text. */
 async function pushChanges(title, statusEl, built0) {
   const set = (m, kind = '') => statusEl.replaceChildren(h('span', { class: kind, text: m }));
   try {
@@ -925,26 +1312,42 @@ async function pushChanges(title, statusEl, built0) {
     await gh('GET', repoPath());
     // Pin to one commit: read the file at the exact commit the branch will be created from, so they can't disagree.
     const ref = await gh('GET', `${repoPath()}/git/ref/heads/${encodeURIComponent(settings.base)}`);
+    const baseSha = ref.object.sha;
     set('Reading ' + settings.path + ' from ' + settings.base + '…');
-    const file = await gh('GET', `${repoPath()}/contents/${settings.path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(ref.object.sha)}`);
+    const file = await gh('GET', `${repoPath()}/contents/${encPath(settings.path)}?ref=${encodeURIComponent(baseSha)}`);
     const remote = b64decode(file.content);
     const built = buildNewSource(remote);
     if (built.src === remote) {
-      set(built.failed.length
-        ? `Couldn't place ${built.failed.length === 1 ? 'your text edit' : 'your text edits'}: the original text isn't found exactly once in ${settings.path} on ${settings.base} (the page may have changed since you opened the editor). Nothing was pushed. Reload the editor and try again.`
+      const what = [built.failed.length && (built.failed.length === 1 ? 'your text edit' : 'your text edits'), built.imgFailed.length && (built.imgFailed.length === 1 ? 'your picture' : 'your pictures')].filter(Boolean).join(' or ');
+      const find = built.failed.length ? "the original text" + (built.imgFailed.length ? ' or picture address' : '') : 'the picture’s old address';
+      set(what
+        ? `Couldn't place ${what}: ${find} isn't found exactly once in ${settings.path} on ${settings.base} (the page may have changed since you opened the editor). Nothing was pushed. Reload the editor and try again.`
         : 'Nothing to change: the file on ' + settings.base + ' already matches.', 'warn');
       return null;
     }
-    set('Creating a branch…');
-    const d = new Date(), p2 = (n) => String(n).padStart(2, '0');
-    const branch = `editor/tweaks-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
-    await gh('POST', `${repoPath()}/git/refs`, { ref: 'refs/heads/' + branch, sha: ref.object.sha });
-    set('Committing…');
+    const uploads = new Map();   // repo path -> asset (two pictures may share one file)
+    for (const e of built.imgApplied) { const a = assets.get(e.path); if (a) uploads.set(e.path, a); }
+    set('Reading the base commit…');
+    const baseCommit = await gh('GET', `${repoPath()}/git/commits/${baseSha}`);
+    const entries = []; let n = 0;
+    for (const [path, a] of uploads) {
+      set(`Uploading image ${++n} of ${uploads.size}…`);
+      const blob = await gh('POST', `${repoPath()}/git/blobs`, { content: await blobToBase64(a.blob), encoding: 'base64' });
+      entries.push({ path, mode: '100644', type: 'blob', sha: blob.sha });
+    }
+    entries.push({ path: settings.path, mode: '100644', type: 'blob', content: built.src });
+    set('Writing the commit…');
+    const tree = await gh('POST', `${repoPath()}/git/trees`, { base_tree: baseCommit.tree.sha, tree: entries });
     const s = summary();
-    await gh('PUT', `${repoPath()}/contents/${settings.path.split('/').map(encodeURIComponent).join('/')}`, { message: `${title}\n\n${prBody(s, built).split('\n').slice(2, 14).join('\n')}`.trim(), content: b64encode(built.src), sha: file.sha, branch });
+    const message = `${title}\n\n${prBody(s, built).split('\n').slice(2, 16).join('\n')}`.trim();
+    const commitObj = await gh('POST', `${repoPath()}/git/commits`, { message, tree: tree.sha, parents: [baseSha] });
+    set('Creating the branch…');
+    const d = new Date(), p2 = (x) => String(x).padStart(2, '0');
+    const branch = `editor/tweaks-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+    await gh('POST', `${repoPath()}/git/refs`, { ref: 'refs/heads/' + branch, sha: commitObj.sha });
     set('Opening the pull request…');
     const pr = await gh('POST', `${repoPath()}/pulls`, { title, head: branch, base: settings.base, body: prBody(s, built) });
-    return { url: pr.html_url, number: pr.number, branch, failed: built.failed };
+    return { url: pr.html_url, number: pr.number, branch, failed: built.failed, imgFailed: built.imgFailed, uploaded: [...uploads.keys()] };
   } catch (err) { set(ghHelp(err), 'err'); return null; }
 }
 
@@ -972,10 +1375,13 @@ function openReview() {
   body.replaceChildren(...[
     h('label', { class: 'row', style: 'grid-template-columns:90px 1fr' }, 'PR title', title),
     h('p', { class: 'note', text: `A new branch will be created from ${settings.owner}/${settings.repo}@${settings.base}, with a pull request for ${settings.path}.` }),
-    h('div', { class: 'sub', text: 'Style changes (written into one managed block)' }),
-    h('pre', { text: blockText(built.merged) || '(none)' }),
+    summary().rows.length ? [h('div', { class: 'sub', text: 'Style changes (written into one managed block)' }), h('pre', { text: blockText(built.merged) })] : null,
     s.text.length ? [h('div', { class: 'sub', text: 'Text changes' }), h('ul', {}, state.text.map((t) => h('li', {}, `${t.sel}: “${stripTags(t.before)}” → “${stripTags(t.after)}”`)))] : null,
     built.failed.length ? h('p', { class: 'warn', text: `${built.failed.length} text edit(s) can't be placed automatically (the original text isn't found exactly once in the file). They'll be listed in the PR description for you to apply by hand.` }) : null,
+    s.images.length ? [h('div', { class: 'sub', text: `Images (${built.imgApplied.length} will be uploaded to ${IMG_DIR}/)` }),
+      h('ul', { class: 'thumbs' }, built.imgApplied.map((e) => h('li', {}, assets.get(e.path) ? h('img', { src: assets.get(e.path).url, alt: '' }) : h('span'),
+        h('div', {}, h('div', {}, h('code', { text: e.path })), h('div', { class: 'muted', text: `${shortSrc(e.was)} → ${fmtBytes(e.bytes)}${e.w ? `, ${e.w}×${e.h}` : ''}` })))))] : null,
+    built.imgFailed.length ? h('p', { class: 'warn', text: `${built.imgFailed.length} picture(s) can't be placed automatically (the old address isn't found exactly once as a src in the file). They won't be uploaded; they're listed in the PR description.` }) : null,
   ].flat().filter(Boolean));
   const go = h('button', { class: 'primary', type: 'button', text: 'Create pull request' });
   const copy = h('button', { type: 'button', text: 'Copy patch', title: 'Copy the style block and text edits to hand to someone else', onclick: async () => { try { await navigator.clipboard.writeText(blockText(built.merged) + (state.text.length ? '\n\n/* text edits */\n' + JSON.stringify(state.text, null, 2) : '')); toast('Copied.', 1500); } catch { toast('Copy failed.', 2000, 'err'); } } });
@@ -999,11 +1405,13 @@ q('#settings').addEventListener('click', openSettings); q('#review').addEventLis
 // Reload only the preview: the recorded tweaks live in the editor, so they are simply re-applied to the fresh page.
 q('#reload').addEventListener('click', () => { if (frame.contentWindow && frame.src) frame.contentWindow.location.reload(); else loadPage(); });
 frame.addEventListener('load', onFrameLoad);
+// A file dropped anywhere else would make the browser leave the editor and open the file: don't let it.
+window.addEventListener('dragover', (e) => e.preventDefault()); window.addEventListener('drop', (e) => e.preventDefault());
 window.addEventListener('resize', () => { layoutFrame(); updateOverlay(); });
 layoutFrame(); loadPage();
 
 // handy for debugging and for the automated tests
-window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, buildNewSource, get doc() { return doc; }, get sel() { return sel; }, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
+window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, applyImageEdits, buildNewSource, ensurePush, pushTo, pageLen, replaceImage, prepareImage, assets, inkAlpha, inkFor, tokScope, get guarded() { return guarded; }, get doc() { return doc; }, get sel() { return sel; }, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
 })();
 </script>
 </body>
