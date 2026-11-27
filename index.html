@@ -126,7 +126,10 @@
       --glass-quiet: rgb(0 0 0 / .05);       /* #000000 @ 5%: hover tint for non-clickable plates */
 
       --arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M0 7h22M16 1l6 6-6 6' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
-      --pad: clamp(1.25rem, 8vw, 5.25rem);
+      /* Side gutter inside the page column. Phones and tablets: ~5.5% of the width (about 20px on a phone, 42px on a tablet).
+         From 1100px up it is a fixed 5.25rem (see the media query below), so the desktop layout is one rigid design that
+         scales as a whole with the root font size. */
+      --pad: clamp(1.25rem, 5.5vw, 5.25rem);
       /* Type: Signika for headings and display text, Lora for body text (site-wide rule; the Slow Food Album pages keep their own look). */
       --display: "Signika", "Segoe UI", system-ui, -apple-system, sans-serif;
       --text: "Lora", Georgia, "Times New Roman", serif;
@@ -139,15 +142,19 @@
         --lc: round(max(1px, calc(var(--cell) * .044)), 1px);
       }
     }
+    @media (min-width: 1100px) { :root { --pad: 5.25rem; } }
     * { box-sizing: border-box; }
     html {
       -webkit-text-size-adjust: 100%;
       overflow-x: clip;
-      /* Fluid type scale: the root size glides from 14px on phones, through ~16px at
-         1440px wide, up to 24px on very large displays. Everything below is in rem/em,
-         so layout, grid cell and glass padding all scale together. The rem term keeps
-         the browser's text-size setting and page zoom working. */
-      font-size: clamp(.875rem, .775rem + .25vw, 1.5rem);
+      /* Fluid scale. Everything below is in rem/em, so changing the root size scales the WHOLE page in exact
+         proportion: type, images, the grid cell, spacing and glass padding.
+         Up to ~1080px the root glides gently from 14px (phones) to ~15px. From there it is 1.25vw (+ a little of the
+         browser's own text-size setting), so the composition grows with the screen and the side margins stay at about
+         11% of the width instead of ballooning (they were 18% at 1440px and 29% at 2560px). It reaches 28px at
+         ~2100px; beyond that the page stops growing and is centred. The rem terms keep the browser's text-size
+         setting and page zoom working. */
+      font-size: clamp(.875rem, max(.775rem + .25vw, .1rem + 1.25vw), 1.75rem);
     }
     /* Motion setting: <html data-motion="full|reduced"> is set by the script in <head>
        (saved choice, else the OS preference) and flipped by the toggle at the top right.
