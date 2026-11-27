@@ -112,8 +112,10 @@
       --grain-size: 1126px;        /* one tile of the paper texture, in CSS px. The file is 563px, so it is shown at 2x on purpose: a bigger, softer riso grain */
 
       /* Riso misregistration on heading text (h1, h2, h3 and the big sub-headline): a yellow and a magenta copy of the
-         text, printed slightly off-register in OPPOSITE directions (yellow up-left, magenta down-right). Max 2px and
-         4px, both at 20%. The editor's "Page & background" panel has sliders for all three numbers. */
+         text, printed slightly off-register in OPPOSITE directions (yellow up-left, magenta down-right), with the paper-grain
+         texture on them. Max 2px and 4px, both at 20%. The editor's "Page & background" panel has sliders for these numbers.
+         A single heading can override the plates with --riso-yellow-x / -y / -a and --riso-magenta-x / -y / -a (offsets in px
+         and opacity), which win over the shifts and --riso-text below; they are deliberately not declared here. */
       --riso-yellow: #ffe600;
       --riso-magenta: #ff3d9a;
       --riso-yellow-shift: 2px;    /* how far the yellow plate is off (0 to 2px) */
@@ -214,13 +216,36 @@
       background-image: url("assets/images/paper-texture.webp");
       background-size: var(--grain-size) var(--grain-size);
     }
-    /* Riso shift on heading text: two faint ghosts of the text behind it, yellow up-left and magenta down-right. A
-       text-shadow with no blur is a hard-edged copy of the glyphs, which is what an off-register plate looks like.
-       rgb(from ...) puts the --riso-text opacity onto the plate colours. Off for increased contrast and print (below). */
-    h1, h2, h3, .lede {
+    /* Riso shift on heading text: a yellow and a magenta ghost of the text behind it, printed off-register in opposite directions
+       and carrying the same paper-grain tile as the page, so they read as ink on paper rather than flat colour.
+       Each ghost is a pseudo-element holding a copy of the heading's text (the script at the bottom puts it in data-riso and keeps
+       it current), coloured, shifted, and masked by the grain tile: the mask is LUMINANCE, so the dark specks of the grain let the
+       paper show through the ink. Per heading, --riso-yellow-x/-y/-a and --riso-magenta-x/-y/-a override the offsets and the
+       opacity (colour opacity comes from rgb(from ...)). The card title (h3) keeps flat, hard-edged text-shadow plates, because
+       its card-wide link depends on the h3 not being positioned; so do browsers without the CSS used here (the script only
+       tags a heading when they have it). --riso-dy (set by the script) lines the ghosts up with the real text when something
+       in the heading, like the sub-headline's caret, pushes the text down within its first line. Both are off for increased contrast, forced colours and print (below). */
+    :is(h1, h2, h3, .lede):not([data-riso]) {
       text-shadow:
-        calc(var(--riso-yellow-shift) * -1) calc(var(--riso-yellow-shift) * -1) 0 rgb(from var(--riso-yellow) r g b / var(--riso-text)),
-        var(--riso-magenta-shift) var(--riso-magenta-shift) 0 rgb(from var(--riso-magenta) r g b / var(--riso-text));
+        var(--riso-yellow-x, calc(var(--riso-yellow-shift) * -1)) var(--riso-yellow-y, calc(var(--riso-yellow-shift) * -1)) 0 rgb(from var(--riso-yellow) r g b / var(--riso-yellow-a, var(--riso-text))),
+        var(--riso-magenta-x, var(--riso-magenta-shift)) var(--riso-magenta-y, var(--riso-magenta-shift)) 0 rgb(from var(--riso-magenta) r g b / var(--riso-magenta-a, var(--riso-text)));
+    }
+    @supports (color: rgb(from red r g b)) and ((mask-image: url(x)) or (-webkit-mask-image: url(x))) {
+      [data-riso] { position: relative; isolation: isolate; }
+      [data-riso]::before, [data-riso]::after {
+        content: attr(data-riso); content: attr(data-riso) / "";   /* the second form tells screen readers to skip it, where supported */
+        position: absolute; inset: 0; z-index: -1; box-sizing: border-box; padding: inherit; pointer-events: none; user-select: none;
+        -webkit-mask-image: url("assets/images/paper-texture.webp"); mask-image: url("assets/images/paper-texture.webp"); mask-mode: luminance;
+        -webkit-mask-size: var(--grain-size) var(--grain-size); mask-size: var(--grain-size) var(--grain-size);
+      }
+      [data-riso]::before {
+        color: rgb(from var(--riso-yellow) r g b / var(--riso-yellow-a, var(--riso-text)));
+        translate: var(--riso-yellow-x, calc(var(--riso-yellow-shift) * -1)) calc(var(--riso-yellow-y, calc(var(--riso-yellow-shift) * -1)) + var(--riso-dy, 0px));
+      }
+      [data-riso]::after {
+        color: rgb(from var(--riso-magenta) r g b / var(--riso-magenta-a, var(--riso-text)));
+        translate: var(--riso-magenta-x, var(--riso-magenta-shift)) calc(var(--riso-magenta-y, var(--riso-magenta-shift)) + var(--riso-dy, 0px));
+      }
     }
     a { color: inherit; -webkit-tap-highlight-color: transparent; }
     /* Solid ink ring: the orange accent is only ~2.5:1 on this background. */
@@ -517,14 +542,16 @@
     @media (prefers-contrast: more) {
       :root { --ink-c: #e1f6fd; --ink-m: #f6eef3; --paper: var(--bg); }
       body::after { display: none; }
-      h1, h2, h3, .lede { text-shadow: none; }   /* no off-register ghosts either: sharp, single-colour text */
+      :root :is(h1, h2, h3, .lede) { text-shadow: none; }   /* no off-register ghosts either: sharp, single-colour text */
+      [data-riso]::before, [data-riso]::after { display: none; }
     }
     /* Paper grain and the riso text shift are for screens: leave them out of printouts. */
-    @media print { body::after { display: none; } :root { --paper: var(--bg); } h1, h2, h3, .lede { text-shadow: none; } }
+    @media print { body::after { display: none; } :root { --paper: var(--bg); } :root :is(h1, h2, h3, .lede) { text-shadow: none; } [data-riso]::before, [data-riso]::after { display: none; } }
     /* Forced colours (Windows high contrast): system colours; hover/focus get an outline instead of a tint. */
     @media (forced-colors: active) {
       body::before, body::after { display: none; }
-      h1, h2, h3, .lede { text-shadow: none; }
+      :root :is(h1, h2, h3, .lede) { text-shadow: none; }
+      [data-riso]::before, [data-riso]::after { display: none; }
       .glass { -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask-image: none; mask-image: none; }
       a.glass:hover, a.glass:focus-visible { outline: 2px solid Highlight; }
     }
@@ -535,14 +562,14 @@
     .ed-deco-ci0u { left: 35% !important; top: 44.943rem !important; z-index: -1 !important; width: 12rem !important; }
     .ed-deco-j6r1 { left: 35% !important; top: 72.841rem !important; z-index: -1 !important; width: 12rem !important; }
     @media (min-width: 1100px) {
-      p.lede.glass { --blur: 2px !important; translate: 0.204rem 6.587rem !important; font-weight: 300 !important; padding-top: 0rem !important; text-shadow: -2px -1px 0px rgb(255 230 0 / 0.2) !important; }
-      h1.glass { --blur: 2px !important; translate: 0rem 7.25rem !important; font-weight: 600 !important; text-shadow: -2px -1px 0px rgb(255 230 0 / 0.15) !important; }
+      p.lede.glass { --blur: 2px !important; translate: 0.204rem 6.587rem !important; font-weight: 300 !important; padding-top: 0rem !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -1px !important; --riso-magenta-a: 0 !important; }
+      h1.glass { --blur: 2px !important; translate: 0rem 7.25rem !important; font-weight: 600 !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -1px !important; --riso-magenta-a: 0 !important; --riso-yellow-a: 0.15 !important; }
       #ux-portfolio { --blur: 2px !important; }
       h3 > a { --blur: 2px !important; border-style: solid !important; border-top-width: 1px !important; border-right-width: 1px !important; border-bottom-width: 1px !important; border-left-width: 1px !important; border-color: #127998 !important; text-shadow: none !important; }
       article.release.glass { --blur: 2px !important; translate: 0rem 7.5562rem !important; border-color: #8bcae0 !important; border-top-width: 2px !important; border-right-width: 2px !important; border-bottom-width: 2px !important; border-left-width: 2px !important; }
-      #ux-h { --blur: 2px !important; translate: -0.125rem 0.144rem !important; text-shadow: -2px -1px 0px rgb(255 230 0 / 0.2) !important; }
+      #ux-h { --blur: 2px !important; translate: -0.125rem 0.144rem !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -1px !important; --riso-magenta-a: 0 !important; }
       a.pill.glass { --blur: 2px !important; translate: 0.5rem 7.8687rem !important; font-family: "Merriweather", serif !important; }
-      #between-h { --blur: 2px !important; translate: 0rem 2.75rem !important; text-shadow: -2px -1px 0px rgb(255 230 0 / 0.2) !important; }
+      #between-h { --blur: 2px !important; translate: 0rem 2.75rem !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -1px !important; --riso-magenta-a: 0 !important; }
       #motion-toggle { translate: -10.9427rem 1.8rem !important; font-family: "Merriweather", serif !important; }
       div.portrait.glass { translate: -10.9198rem 7.25rem !important; }
       span.badge.sq { translate: 0.4375rem 1.375rem !important; background-color: #fe6545 !important; opacity: 0 !important; }
@@ -558,7 +585,7 @@
       #music-projects { translate: 0rem 1.2065rem !important; }
       hr.rule:nth-child(4) { translate: 0rem 8.7627rem !important; }
       #in-between { translate: 0rem 8.7627rem !important; }
-      #music-h { translate: -0.3125rem 6.5562rem !important; text-shadow: -2px -1px 0px rgb(255 230 0 / 0.2) !important; }
+      #music-h { translate: -0.3125rem 6.5562rem !important; --riso-yellow-x: -2px !important; --riso-yellow-y: -1px !important; --riso-magenta-a: 0 !important; }
       p.music-intro.glass { translate: 0rem 6.5562rem !important; font-family: "Merriweather", serif !important; font-weight: 300 !important; }
       p.label.glass:nth-child(4) { translate: 0rem 7.5562rem !important; }
       ul.tiles { translate: 0rem 7.5562rem !important; }
@@ -972,6 +999,52 @@
     paintAll();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintAll);
     window.addEventListener('load', paintAll);
+  })();
+
+  /* ---------- riso plates on headings ----------
+     The yellow and magenta ghosts of h1, h2 and the sub-headline are pseudo-elements that print a copy of the heading's text
+     (content: attr(data-riso)), so the copy has to be written down and kept current when the text changes (the page editor
+     retypes headings, and adds copies of them). Only done where the browser has the CSS the ghosts need; elsewhere the
+     headings keep flat text-shadow plates. The ghosts are laid out like a plain line of text, so where the real text sits lower
+     in its first line (the sub-headline's caret is raised and makes the line taller) the difference is measured and written
+     to --riso-dy. */
+  (function () {
+    if (!(window.CSS && CSS.supports && CSS.supports('color', 'rgb(from red r g b)') && (CSS.supports('mask-image', 'url(x)') || CSS.supports('-webkit-mask-image', 'url(x)')))) return;
+    var SEL = 'h1, h2, .lede', ro = window.ResizeObserver ? new ResizeObserver(function (l) { l.forEach(function (e) { nudge(e.target); }); }) : null;
+    function firstText(el) { var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); while (w.nextNode()) if (w.currentNode.nodeValue.trim()) return w.currentNode; return null; }
+    function nudge(el) {
+      var tn = firstText(el); if (!tn || !el.isConnected) return;
+      var r = document.createRange(), i = tn.nodeValue.search(/\S/); r.setStart(tn, i); r.setEnd(tn, i + 1);
+      var rr = r.getClientRects()[0], hr = el.getBoundingClientRect(); if (!rr || !hr.height) return;
+      var cs = getComputedStyle(el), fs = parseFloat(cs.fontSize), lh = parseFloat(cs.lineHeight); if (!(lh > 0)) lh = 1.2 * fs;
+      var dy = rr.top - (hr.top + parseFloat(cs.borderTopWidth) + parseFloat(cs.paddingTop) + (lh - rr.height) / 2);
+      var v = (Math.abs(dy) < .25 ? 0 : Math.round(dy * 100) / 100) + 'px';
+      if (el.style.getPropertyValue('--riso-dy') !== v) el.style.setProperty('--riso-dy', v);
+    }
+    function tag(el) {
+      var t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!t) { if (el.hasAttribute('data-riso')) el.removeAttribute('data-riso'); return; }
+      if (el.getAttribute('data-riso') !== t) el.setAttribute('data-riso', t);
+      nudge(el); if (ro) ro.observe(el);
+    }
+    function tagAll(root) {
+      if (root.matches && root.matches(SEL)) tag(root);
+      var l = root.querySelectorAll ? root.querySelectorAll(SEL) : [];
+      for (var i = 0; i < l.length; i++) tag(l[i]);
+    }
+    tagAll(document);
+    function again() { var l = document.querySelectorAll('[data-riso]'); for (var i = 0; i < l.length; i++) nudge(l[i]); }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
+    window.addEventListener('load', again);
+    if (!window.MutationObserver) return;
+    new MutationObserver(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        var m = list[i], n = m.target, el = n.nodeType === 1 ? n : n.parentElement;
+        if (!el || (el.closest && el.closest('#fx'))) continue;
+        var h = el.closest && el.closest(SEL); if (h) tag(h);
+        for (var j = 0; j < m.addedNodes.length; j++) if (m.addedNodes[j].nodeType === 1) tagAll(m.addedNodes[j]);
+      }
+    }).observe(document.body, { childList: true, characterData: true, subtree: true });
   })();
 </script>
 

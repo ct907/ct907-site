@@ -1342,6 +1342,20 @@ function shadowBlock(kind) {
 }
 
 /* ---- the Type section ---- */
+/* ---- Riso plates on one heading: offsets and opacity of its yellow (::before) and magenta (::after) ghosts ---- */
+function risoSection() {
+  const ghost = (which) => win.getComputedStyle(sel, which);
+  const off = (which) => { const t = ghost(which).translate, p = t && t !== 'none' ? t.split(/\s+/).map(parseFloat) : [0, 0]; return { x: p[0] || 0, y: (p[1] || 0) - (parseFloat(sel.style.getPropertyValue('--riso-dy')) || 0) }; };   // minus the alignment nudge the page adds
+  const alpha = (which) => Math.round(100 * parseColor(ghost(which).color).a);
+  const mk = (name, which, pre) => [
+    g2(numField({ label: 'X', aria: `Heading ${name.toLowerCase()} ghost X offset in pixels`, props: [`--riso-${pre}-x`], unit: 'px', step: 0.5, read: () => off(which).x, write: (v) => setProp(`--riso-${pre}-x`, r3(v) + 'px') }),
+       numField({ label: 'Y', aria: `Heading ${name.toLowerCase()} ghost Y offset in pixels`, props: [`--riso-${pre}-y`], unit: 'px', step: 0.5, read: () => off(which).y, write: (v) => setProp(`--riso-${pre}-y`, r3(v) + 'px') })),
+    g2(numField({ label: '%', aria: `Heading ${name.toLowerCase()} ghost opacity in percent`, props: [`--riso-${pre}-a`], unit: '%', step: 5, read: () => alpha(which), write: (v) => setProp(`--riso-${pre}-a`, String(r3(Math.max(0, Math.min(100, v)) / 100))) }))];
+  return sec('Riso plates (this heading)', false,
+    h('p', { class: 'muted', style: 'margin:0 0 4px', text: 'The off-register yellow and magenta copies of this heading, with the paper grain. Opacity 0 hides a plate. The sliders under Page & background set them for every heading.' }),
+    h('div', { class: 'sub', text: 'Yellow' }), ...mk('Yellow', '::before', 'yellow'),
+    h('div', { class: 'sub', text: 'Magenta' }), ...mk('Magenta', '::after', 'magenta'));
+}
 function typeSection() {
   const cs = () => win.getComputedStyle(sel), tw = () => state.css[scopeKey()]?.[selectorFor(sel)] || {};
   const famNow = () => cs().fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '');
@@ -1399,7 +1413,7 @@ function typeSection() {
        numField({ label: 'LH', aria: 'Line height (ratio)', prop: 'line-height', unit: '×', step: 0.05, read: (e, c) => (c.lineHeight === 'normal' ? 1.2 : parseFloat(c.lineHeight) / parseFloat(c.fontSize)), write: (v) => setProp('line-height', String(r3(v))) }),
        numField({ label: 'LS', aria: 'Letter spacing in em', prop: 'letter-spacing', unit: 'em', step: 0.01, read: (e, c) => (c.letterSpacing === 'normal' ? 0 : parseFloat(c.letterSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('letter-spacing', r3(v) + 'em') }),
        numField({ label: 'WS', aria: 'Word spacing in em', prop: 'word-spacing', unit: 'em', step: 0.05, read: (e, c) => (c.wordSpacing === 'normal' ? 0 : parseFloat(c.wordSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('word-spacing', r3(v) + 'em') })),
-    nested('Text shadow', shadowBlock('text')));
+    nested('Text shadow', sel.hasAttribute('data-riso') ? h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'This heading’s yellow and magenta plates (with the paper grain) are in the Riso plates section. A text shadow here is an extra, flat shadow.' }) : null, shadowBlock('text')));
 }
 
 /* ---- Border ---- */
@@ -1545,6 +1559,7 @@ function buildPanel() {
       g2(numField({ label: 'Op', aria: 'Opacity', prop: 'opacity', unit: '0–1', step: 0.05, read: (e, c) => parseFloat(c.opacity), write: (v) => setProp('opacity', String(Math.max(0, Math.min(1, r3(v))))) }),
          numField({ label: 'R', aria: 'Corner radius in pixels', prop: 'border-radius', unit: 'px', read: (e, c) => parseFloat(c.borderTopLeftRadius) || 0, write: (v) => setProp('border-radius', remv(v)) }),
          numField({ label: 'Bl', aria: 'Frosted-glass blur in pixels (frosted plates only)', prop: '--blur', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.getPropertyValue('--blur')) || 0, write: (v) => setProp('--blur', r3(v) + 'px') }))),
+    ...(!many && sel.hasAttribute('data-riso') ? [risoSection()] : []),
     borderSection(), fxSection(!!layerClass(sel)), layoutSection(), cssSection(),   // rotation lives here, and is a main control for a decorative layer
     ...[layersSection(), pageSection(false), tokensSection(), changesSection()].filter(Boolean));
   syncFields(); afterChange();
@@ -1613,7 +1628,7 @@ function pageSection(open) {
       write: (v) => setTok('--grain', String(r3(v / 100))),
       on: () => isSet(['--grain']), reset: () => { delTweak(state.css, tokScope('--grain'), ':root', '--grain'); renderLive(); } }),
     h('div', { class: 'sub', text: 'Header riso shift' }),
-    h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'A yellow and a magenta copy of heading text (h1–h3 and the big sub-headline), printed slightly off-register in opposite directions. Every width; skipped for increased contrast and print.' }),
+    h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'A yellow and a magenta copy of heading text (h1–h3 and the big sub-headline), printed slightly off-register in opposite directions and carrying the paper grain. Every width; skipped for increased contrast and print. Select a heading for its own plates.' }),
     ...RISO.map((r) => rangeField({ label: r.label, aria: r.aria, title: r.title, min: r.min, max: r.max, step: r.step, unit: r.unit,
       read: () => r.get(tokenValue(r.name)), write: (v) => setTok(r.name, r.put(v)), on: () => isSet([r.name]), reset: () => clear([r.name]) })),
     h('div', { class: 'sub', text: `Page length (${rangeFor(frameW).label})` }),
@@ -1776,10 +1791,11 @@ const ID_ATTRS = ['aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-
 function cleanClone(el, suffix) {
   const c = el.cloneNode(true), all = [c, ...c.querySelectorAll('*')];
   for (const n of all) {
-    for (const a of ['data-ed-layer', 'data-ed-gone', 'data-ed-del', 'contenteditable', 'spellcheck']) n.removeAttribute(a);
+    for (const a of ['data-ed-layer', 'data-ed-gone', 'data-ed-del', 'contenteditable', 'spellcheck', 'data-riso']) n.removeAttribute(a);
     for (const v of VOLATILE) n.classList.remove(v);
     if (n.hasAttribute('class') && !n.getAttribute('class').trim()) n.removeAttribute('class');
     if (n.style && n.style.getPropertyValue('--edge-mask')) n.style.removeProperty('--edge-mask');   // drawn by the page's script, never saved
+    if (n.style && n.style.getPropertyValue('--riso-dy')) n.style.removeProperty('--riso-dy');         // likewise the heading-ghost alignment
     if (n.hasAttribute('style') && !n.getAttribute('style').trim()) n.removeAttribute('style');
   }
   if (suffix) {

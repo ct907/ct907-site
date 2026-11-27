@@ -161,13 +161,16 @@ With nothing selected (or in the **Page & background** section when something is
 printed grid: **Grid** (both ink plates together, where 100% is the reference print and 50% is how the page ships),
 **Cyan** and **Magenta** on their own, and the **Grain** of the paper. Sliding back to the shipped value records nothing.
 
-Under them, **Header riso shift** controls the off-register printing on heading text (h1–h3 and the big sub-headline): a
-yellow and a magenta copy of the text, printed in opposite directions (yellow up-left, magenta down-right). **Yellow**
-goes from 0 to 2px, **Magenta** from 0 to 4px, and **Opacity** applies to both (the page ships at 2px, 4px and 20%; 0%
-switches the effect off). They write the tokens `--riso-yellow-shift`, `--riso-magenta-shift` and `--riso-text`, and the
-two colours (`--riso-yellow`, `--riso-magenta`) are in **Design tokens**. To change the effect on one heading only, select
-it and use its **Text shadow** controls; those read the page's two plates (the panel says "2 shadows here") and replace
-them with one when you edit.
+Under them, **Header riso shift** controls the off-register printing on heading text (h1, h2 and the big sub-headline): a
+yellow and a magenta copy of the text, printed in opposite directions (yellow up-left, magenta down-right), carrying the
+same paper grain as the page. **Yellow** goes from 0 to 2px, **Magenta** from 0 to 4px, and **Opacity** applies to both (the
+page ships at 2px, 4px and 20%; 0% switches the effect off). They write the tokens `--riso-yellow-shift`,
+`--riso-magenta-shift` and `--riso-text`, and the two colours (`--riso-yellow`, `--riso-magenta`) are in **Design tokens**.
+
+To change the plates of **one heading**, select it: the **Riso plates (this heading)** section has X, Y and opacity for each
+plate (opacity 0 hides a plate). They are written as `--riso-yellow-x / -y / -a` and `--riso-magenta-x / -y / -a` on that
+heading's rule. The **Text shadow** control on a heading adds a separate, flat shadow; it doesn't edit the plates. (The card
+title is the one heading with flat plates instead: its Text shadow control does edit them.)
 
 These are site-wide and are written inside `@media (prefers-contrast: no-preference)`, so visitors who ask for increased
 contrast still get the page's own calm, grain-free fallback (an `!important` rule outside that condition would override it).
