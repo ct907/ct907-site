@@ -111,6 +111,15 @@
       --grain: .4;                 /* paper texture opacity (40%) */
       --grain-size: 1126px;        /* one tile of the paper texture, in CSS px. The file is 563px, so it is shown at 2x on purpose: a bigger, softer riso grain */
 
+      /* Riso misregistration on heading text (h1, h2, h3 and the big sub-headline): a yellow and a magenta copy of the
+         text, printed slightly off-register in OPPOSITE directions (yellow up-left, magenta down-right). Max 2px and
+         4px, both at 20%. The editor's "Page & background" panel has sliders for all three numbers. */
+      --riso-yellow: #ffe600;
+      --riso-magenta: #ff3d9a;
+      --riso-yellow-shift: 2px;    /* how far the yellow plate is off (0 to 2px) */
+      --riso-magenta-shift: 4px;   /* how far the magenta plate is off (0 to 4px) */
+      --riso-text: .2;             /* opacity of both plates (20%) */
+
       /* Graph-paper grid. One cell is 2.25rem, so it grows and shrinks with the
          text (the root font-size below is fluid). Line widths are a share of the cell
          (as in the reference); --lv = vertical lines (both plates) and the magenta
@@ -190,20 +199,28 @@
       background-position: 0 calc(var(--lv) * -1), 0 0, 0 0, 0 0;
       background-blend-mode: multiply;
     }
-    /* Paper texture over everything, so the text and photos are printed on the same sheet. It is a seamless tile
-       (assets/images/paper-texture.webp, 563px, ~110KB) laid over the whole page at --grain opacity, shown at
+    /* Paper texture over everything, so the text and photos are printed on the same sheet. It is a seamless greyscale
+       tile (assets/images/paper-texture.webp, 563px, ~110KB) laid over the whole page at --grain opacity, shown at
        --grain-size (1126px, i.e. enlarged 2x) so the grain is coarse and a little soft, like a riso print. There is
        deliberately no sharper retina version: the softness is the look, and a second file would cost 380KB.
-       Each pixel is BLACK with an alpha of (255 - the texture's grey), which gives exactly the result of multiplying
-       the grey texture over the page (normal blending of black at alpha a is page x (1 - a), and multiply by grey g
-       is page x (g / 255)), but without mix-blend-mode: a blend mode makes the browser re-composite the whole page
-       every frame and roughly doubled scroll frame times in testing. It can only darken, so black text stays black.
-       It sits above all content but never takes a click, and it scrolls with the page like real paper. */
+       It is blended with OVERLAY, so the texture's dark specks darken the page and its white highlights lift it
+       (multiply could only darken). Overlay needs a real mix-blend-mode, which makes the browser re-composite the
+       page every frame: see CLAUDE.md for the measured cost. The overlay sits above all content but never takes a
+       click, and it scrolls with the page like real paper. */
     body::after {
       content: ""; position: absolute; inset: 0; z-index: 9999; pointer-events: none;
       opacity: var(--grain);
+      mix-blend-mode: overlay;
       background-image: url("assets/images/paper-texture.webp");
       background-size: var(--grain-size) var(--grain-size);
+    }
+    /* Riso shift on heading text: two faint ghosts of the text behind it, yellow up-left and magenta down-right. A
+       text-shadow with no blur is a hard-edged copy of the glyphs, which is what an off-register plate looks like.
+       rgb(from ...) puts the --riso-text opacity onto the plate colours. Off for increased contrast and print (below). */
+    h1, h2, h3, .lede {
+      text-shadow:
+        calc(var(--riso-yellow-shift) * -1) calc(var(--riso-yellow-shift) * -1) 0 rgb(from var(--riso-yellow) r g b / var(--riso-text)),
+        var(--riso-magenta-shift) var(--riso-magenta-shift) 0 rgb(from var(--riso-magenta) r g b / var(--riso-text));
     }
     a { color: inherit; -webkit-tap-highlight-color: transparent; }
     /* Solid ink ring: the orange accent is only ~2.5:1 on this background. */
@@ -500,12 +517,14 @@
     @media (prefers-contrast: more) {
       :root { --ink-c: #e1f6fd; --ink-m: #f6eef3; --paper: var(--bg); }
       body::after { display: none; }
+      h1, h2, h3, .lede { text-shadow: none; }   /* no off-register ghosts either: sharp, single-colour text */
     }
-    /* Paper grain is for screens: leave it out of printouts. */
-    @media print { body::after { display: none; } :root { --paper: var(--bg); } }
+    /* Paper grain and the riso text shift are for screens: leave them out of printouts. */
+    @media print { body::after { display: none; } :root { --paper: var(--bg); } h1, h2, h3, .lede { text-shadow: none; } }
     /* Forced colours (Windows high contrast): system colours; hover/focus get an outline instead of a tint. */
     @media (forced-colors: active) {
       body::before, body::after { display: none; }
+      h1, h2, h3, .lede { text-shadow: none; }
       .glass { -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask-image: none; mask-image: none; }
       a.glass:hover, a.glass:focus-visible { outline: 2px solid Highlight; }
     }

@@ -235,6 +235,12 @@ const GUARD = '(prefers-contrast: no-preference)';
 // The grid's two ink plates at full strength (the reference print). "Grid opacity" mixes each ink toward white (paper),
 // which under the page's multiply blending is exactly the same as printing it at that opacity. 50% = #acf0ff / #f0e0ee.
 const INKS = { '--ink-c': [0x59, 0xe1, 0xff], '--ink-m': [0xe1, 0xc1, 0xdd] };
+// The riso shift on heading text: yellow and magenta ghosts, off-register in opposite directions (see the page's --riso-* tokens).
+const RISO = [
+  { name: '--riso-yellow-shift', label: 'Yellow', aria: 'Riso yellow shift in pixels (up-left)', title: 'How far the yellow plate is off-register, up and to the left (0 to 2px)', min: 0, max: 2, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
+  { name: '--riso-magenta-shift', label: 'Magenta', aria: 'Riso magenta shift in pixels (down-right)', title: 'How far the magenta plate is off-register, down and to the right (0 to 4px)', min: 0, max: 4, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
+  { name: '--riso-text', label: 'Opacity', aria: 'Riso shift opacity in percent', title: 'Opacity of both plates (the page ships at 20%); 0 switches the effect off', min: 0, max: 100, step: 1, unit: '%', get: (v) => Math.round(100 * (parseFloat(v) || 0)), put: (v) => String(r3(v / 100)) },
+];
 const MAX_PUSH = 20000;                       // px: a typo like 99999999 shouldn't make a page that long
 const IMG_DIR = 'assets/images';
 // Layers added with the editor carry one unique class (ed-text-k3f9, ed-deco-t8x2 …). It is their identity everywhere:
@@ -701,7 +707,7 @@ function onFrameLoad() {
   const hasDraft = draft && draft.path === settings.path && history.length === 0 && (draft.ops.set.length || draft.ops.del.length || draft.text.length);
   if (hasDraft) pendingDraft = draft;
   buildOverlay(); bindFrameEvents();
-  renderLive(); tokBase = {}; for (const n of [...Object.keys(INKS), '--grain']) tokBase[n] = tokenValue(n);
+  renderLive(); tokBase = {}; for (const n of [...Object.keys(INKS), '--grain', ...RISO.map((r) => r.name)]) tokBase[n] = tokenValue(n);
   commit(); layoutFrame(); buildPanel();
   if (hasDraft) offerDraft(draft);
 }
@@ -1124,6 +1130,8 @@ function parseColor(c) {
     let x = hx[1]; if (x.length === 3 || x.length === 4) x = [...x].map((ch) => ch + ch).join('');
     if (x.length === 6 || x.length === 8) return { hex: '#' + x.slice(0, 6).toLowerCase(), a: x.length === 8 ? parseInt(x.slice(6), 16) / 255 : 1 };
   }
+  const sr = c.match(/^color\(\s*srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.%]+))?\s*\)$/i);   // colour(srgb 1 0.9 0 / 0.2): 0..1 channels
+  if (sr) { const hex = '#' + [sr[1], sr[2], sr[3]].map((v) => Math.round(Math.max(0, Math.min(1, +v)) * 255).toString(16).padStart(2, '0')).join(''); const a = sr[4] == null ? 1 : (sr[4].endsWith('%') ? parseFloat(sr[4]) / 100 : +sr[4]); return { hex, a }; }
   const m = c.match(/rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.%]+))?\s*\)/); if (!m) return { hex: '#000000', a: 1 };
   const hex = '#' + [m[1], m[2], m[3]].map((v) => Math.round(+v).toString(16).padStart(2, '0')).join('');
   let a = m[4] == null ? 1 : (m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4]); return { hex, a };
@@ -1245,9 +1253,9 @@ const ALIGN_SVG = (d) => `<svg width="14" height="12" viewBox="0 0 14 12" aria-h
 function shadowBlock(kind) {
   const prop = kind === 'text' ? 'text-shadow' : 'box-shadow', box = kind === 'box';
   const parse = () => {
-    const v = win.getComputedStyle(sel).getPropertyValue(prop), none = !v || v === 'none', col = /rgba?\([^)]*\)/.exec(v);
-    const nums = (v.replace(/rgba?\([^)]*\)/g, '').match(/-?[\d.]+(?=px)/g) || []).map(Number);
-    return { none, count: none ? 0 : (v.match(/rgba?\(/g) || []).length || 1, x: nums[0] || 0, y: nums[1] || 0, blur: nums[2] || 0, spread: box ? nums[3] || 0 : 0, color: col ? parseColor(col[0]) : { hex: '#000000', a: 0.25 }, inset: /\binset\b/.test(v) };
+    const v = win.getComputedStyle(sel).getPropertyValue(prop), none = !v || v === 'none', col = /(?:rgba?|color)\([^)]*\)/.exec(v);
+    const nums = (v.replace(/(?:rgba?|color)\([^)]*\)/g, '').match(/-?[\d.]+(?=px)/g) || []).map(Number);
+    return { none, count: none ? 0 : (v.match(/(?:rgba?|color)\(/g) || []).length || 1, x: nums[0] || 0, y: nums[1] || 0, blur: nums[2] || 0, spread: box ? nums[3] || 0 : 0, color: col ? parseColor(col[0]) : { hex: '#000000', a: 0.25 }, inset: /\binset\b/.test(v) };
   };
   const base = () => ({ x: 0, y: box ? 4 : 1, blur: box ? 12 : 2, spread: 0, color: { hex: '#000000', a: 0.25 }, inset: false });
   const compose = (o) => `${o.inset ? 'inset ' : ''}${r3(o.x)}px ${r3(o.y)}px ${r3(o.blur)}px ${box ? r3(o.spread) + 'px ' : ''}${colorSpec(o.color.hex, o.color.a)}`;
@@ -1533,6 +1541,10 @@ function pageSection(open) {
       read: () => Math.round(100 * (parseFloat(tokenValue('--grain')) || 0)),
       write: (v) => setTok('--grain', String(r3(v / 100))),
       on: () => isSet(['--grain']), reset: () => { delTweak(state.css, tokScope('--grain'), ':root', '--grain'); renderLive(); } }),
+    h('div', { class: 'sub', text: 'Header riso shift' }),
+    h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'A yellow and a magenta copy of heading text (h1–h3 and the big sub-headline), printed slightly off-register in opposite directions. Every width; skipped for increased contrast and print.' }),
+    ...RISO.map((r) => rangeField({ label: r.label, aria: r.aria, title: r.title, min: r.min, max: r.max, step: r.step, unit: r.unit,
+      read: () => r.get(tokenValue(r.name)), write: (v) => setTok(r.name, r.put(v)), on: () => isSet([r.name]), reset: () => clear([r.name]) })),
     h('div', { class: 'sub', text: `Page length (${rangeFor(frameW).label})` }),
     g2(numField({ label: 'Len', aria: 'Page length in pixels', unit: 'px', global: true, step: 10,
       read: () => pageLen(), on: () => state.css[scopeKey()]?.body?.height != null,
