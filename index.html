@@ -70,7 +70,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Josefin+Sans:wght@100..700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=Signika:wght@300..700&display=swap" rel="stylesheet">
 
   <!-- Runs before first paint: marks the page as JS-enabled and resolves the motion
        setting (saved choice, else the OS "reduce motion" preference) into
@@ -127,8 +127,9 @@
 
       --arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M0 7h22M16 1l6 6-6 6' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
       --pad: clamp(1.25rem, 8vw, 5.25rem);
-      --display: "Josefin Sans", "Avenir Next", "Century Gothic", system-ui, sans-serif;
-      --text: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      /* Type: Signika for headings and display text, Lora for body text (site-wide rule; the Slow Food Album pages keep their own look). */
+      --display: "Signika", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --text: "Lora", Georgia, "Times New Roman", serif;
     }
     /* Whole-pixel grid where round() is supported: keeps the lines crisp at any root size. */
     @supports (width: round(1px, 1px)) {
@@ -226,21 +227,21 @@
       font: 300 clamp(3.4rem, 12vw, 5.25rem)/1.1 var(--display);
       /* short windows (landscape phones): let the height cap the size too */
       font-size: clamp(3.4rem, min(12vw, 18svh), 5.25rem);
-      letter-spacing: -.06em;
+      letter-spacing: -.015em;   /* was -.06em for Josefin Sans; Signika is narrower */
       text-transform: uppercase;
       margin: 1.4rem 0 0;
     }
     :root:not([data-motion="reduced"]) h1 { animation: weight 6s infinite; }
     @media (prefers-reduced-motion: reduce) { :root:not(.js) h1 { animation: none; } }
     @keyframes weight {
-      0%   { font-weight: 100; }
+      0%   { font-weight: 300; }
       50%  { font-weight: 700; }
-      100% { font-weight: 100; }
+      100% { font-weight: 300; }
     }
     .lede {
       --gx: .3em; --gy: .12em; --gr: .35em;
       font: 400 clamp(1.7rem, 5.6vw, 3rem)/1.2 var(--display);
-      letter-spacing: -.05em;
+      letter-spacing: -.01em;
       margin: .7rem 0 0;
     }
     .caret {
@@ -330,7 +331,7 @@
     h2 {
       --gx: .4em; --gy: .1em; --gr: .3em;
       font: 400 clamp(2.2rem, 7vw, 3rem)/1.25 var(--display);
-      letter-spacing: -.05em;
+      letter-spacing: -.01em;
       margin: .9rem 0 1.4rem;
       text-wrap: balance;
     }

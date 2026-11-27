@@ -39,9 +39,56 @@ and it is never written into the page.
 | **390 / 820 / 1280 / 1440 / 1920** or the Width box | Preview at that screen width |
 | **Review & push** | See exactly what will be written (and uploaded), then open the pull request |
 
-The panel has number fields for position, size, padding, margin, font size, line height, letter spacing, corner
-radius, opacity and the frosted-glass blur; colour pickers for text and fill; and a **Design tokens** section for the
-site-wide values (`--ink-c`, `--ink-m`, `--grain`, `--paper`, …). Drag a field's label sideways to scrub the number.
+| **B** / **I** buttons in the **Type** section | Bold / italic: the selected words while you are editing text, otherwise the whole element |
+| **Border** in the panel | Border thickness, colour, style, each side, corner radius |
+| **All CSS** in the panel | Any CSS property the controls don't cover |
+
+The panel has number fields for position, size, padding, margin and spacing; the **Type**, **Border**, **Shadow, filters & transform**
+and **Layout** sections below; colour pickers for text and fill; opacity and the frosted-glass blur; an **All CSS** section; and a
+**Design tokens** section for the site-wide values (`--ink-c`, `--ink-m`, `--grain`, `--paper`, …). Drag a field's label
+sideways to scrub the number.
+
+### Text styles
+
+The **Type** section has:
+
+- **Font**: the site's two roles (*Heading font* = `var(--display)`, *Body font* = `var(--text)`), the fonts the page already loads,
+  and **Google Fonts only**: 54 popular families (sans-serif, serif, monospace, script & display), plus **Other Google font…** for
+  any family you type (e.g. *Bricolage Grotesque*). The editor asks Google for the most capable version first (variable weights and
+  italics) and falls back to simpler requests until Google accepts one, so a font always loads with the weights it really has.
+- **Weight**: only the weights that are actually loaded for the chosen font (Signika 300–700, Lora 400–700, Playfair Display 400–900 …).
+- **B**, **I**, **U**, **S** buttons: bold, italic, underline, strikethrough. **While you are editing text, B and I format the selected words**
+  (saved as clean `<strong>` / `<em>`); otherwise B and I make the whole element bold or italic. U and S always apply to the whole element.
+  There are no keyboard shortcuts for these; use the buttons.
+- **Alignment** (left, centre, right, justify), **Case** (as typed, UPPERCASE, lowercase, Capitalize), **font size**, **line height**,
+  **letter spacing**, **word spacing**, and a **text shadow** (X, Y, blur, colour).
+
+**How a font reaches the live page.** Picking a font loads it in the preview immediately. When you push, the editor adds **one**
+managed `<link>` to the page's `<head>`, between marker comments, asking Google for exactly the families you used:
+
+```html
+<!-- ===== editor fonts: start (managed by /editor/; safe to hand-edit) ===== -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+<!-- ===== editor fonts: end ===== -->
+```
+
+Fonts the page already loads (Signika and Lora) are never requested twice. A font that no CSS refers to any more is taken out of the
+link again, and the block disappears when it would be empty, so undoing every font choice gives back the original file byte for byte.
+Each font you add costs visitors a download, so use a few. (Keep the Slow Food Album pages' own fonts as they are; see `CLAUDE.md`.)
+
+### Border, shadow, filters, transform, layout
+
+- **Border**: thickness for all four sides (or each side on its own), style (solid, dashed, dotted, double …), colour with opacity, and the
+  radius of each corner. Setting a colour or a thickness on an element with no border gives it a visible 1px solid one.
+- **Shadow, filters & transform**: a box shadow (X, Y, blur, spread, colour, inner), filters (blur, brightness, contrast, saturation,
+  grayscale, hue), blend mode, rotation and scale. A filter the page already uses (such as a drop-shadow on a picture) is kept when you add another.
+  Rotated or scaled elements hide their resize handles (they would point the wrong way); use the W / H fields.
+- **Layout**: display (including *none* to hide it), position, z-index, overflow, and for flex/grid boxes direction, wrap, justify and align.
+- **All CSS**: type any property and value (the box suggests property names), for anything not covered above. The browser checks the
+  value before it is recorded, and a value can't contain `{ } ;` (outside quotes), `<`, or comment marks, so it can't break the stylesheet.
+  Under it, every declaration recorded for the selected element at this width is listed and can be edited as text or removed.
+
+While you work, the preview has CSS transitions switched off so that what you read back from a field is exactly what you set.
 
 ### Move this and everything below it
 
@@ -183,6 +230,7 @@ end, so a failure part-way leaves no stray branch):
 
 4. **New layers**: in-flow layers are written into the HTML at the spot you chose; decorative layers into the managed decor
    block (see *Adding text and images*). Their CSS joins the managed block above.
+5. **Google Fonts**: one managed `<link>` in `<head>` (see *Text styles*).
 
 Nothing else in the file is touched.
 

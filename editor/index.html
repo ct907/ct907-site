@@ -105,6 +105,20 @@
   .fsel select { background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; min-width: 0; width: 100%; }
   .fsel .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; }
   .fsel.on .x { visibility: visible; }
+  #panel .tg { display: inline-flex; }
+  #panel .tgb { min-width: 28px; padding: 4px 6px; border-radius: 0; margin-left: -1px; line-height: 1.1; }
+  #panel .tg .tgb:first-child { border-radius: 6px 0 0 6px; margin-left: 0; } #panel .tg .tgb:last-child { border-radius: 0 6px 6px 0; }
+  #panel .tgb[aria-pressed="true"] { background: var(--accent-2); border-color: var(--accent); color: #fff; }
+  #panel .btnrow .tg + .tg { margin-left: 6px; }
+  #panel .nest { margin-top: 10px; border-top: 1px dashed var(--line); border-bottom: 0; }
+  #panel .nest > summary { padding: 8px 0 2px; font-size: 11px; text-transform: none; letter-spacing: 0; }
+  #panel .nest > .nbody { padding: 2px 0 0; }
+  .customfont input { flex: 1; min-width: 0; background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
+  .cssadd { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 6px; }
+  .cssadd input, .cssrow input { background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; min-width: 0; width: 100%; }
+  .cssrow { display: grid; grid-template-columns: minmax(0, 38%) minmax(0, 1fr) 16px; gap: 6px; align-items: center; margin-top: 6px; }
+  .cssrow code { font: 11px/1.3 ui-monospace, Menlo, Consolas, monospace; color: #9ec5ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cssrow .x { padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; }
   .thumbs { list-style: none; margin: 0; padding: 0; }
   .thumbs li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--line); }
   .thumbs img { width: 48px; height: 48px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); }
@@ -262,7 +276,10 @@ const rangeFor = (w) => RANGES.find((r) => r.test(w)) || RANGES[2];
 const scopeLabel = (s) => (s === '' || s === GUARD ? 'All widths' : (RANGES.find((r) => r.cond === s) || { label: s }).label);
 
 /* ---------- tweak model ---------- */
-function setTweak(css, scope, sel, prop, val) { ((css[scope] ||= {})[sel] ||= {})[prop] = val; }
+// A shorthand (border-radius, border-width …) re-written after the longhands in the same rule would override them, so it is kept
+// where it wins correctly: a shorthand always moves to the END of the rule when set.
+const SHORTHANDS = new Set(['border', 'border-radius', 'border-width', 'border-style', 'border-color', 'padding', 'margin', 'font', 'background', 'gap', 'overflow', 'outline', 'text-decoration', 'inset']);
+function setTweak(css, scope, sel, prop, val) { const r = ((css[scope] ||= {})[sel] ||= {}); if (SHORTHANDS.has(prop)) delete r[prop]; r[prop] = val; }
 function delTweak(css, scope, sel, prop) {
   const s = css[scope]?.[sel]; if (!s) return;
   delete s[prop];
@@ -363,10 +380,11 @@ let settings = Object.assign({ owner: 'ct907', repo: 'ct907-site', base: 'main',
 let token = settings.remember ? (lsGet(LS.token) || '') : '';
 let source0 = '';
 let baseline = {};                 // tweaks that are already in the deployed page
-let state = { css: {}, text: [], images: [], layers: [], removed: [] }; // baseline + this session's tweaks (images: replaced pictures, files in `assets`; layers: new text/images; removed: pushed layers to delete)
+let state = { css: {}, text: [], images: [], layers: [], removed: [], fonts: [] }; // baseline + this session's tweaks (images: replaced pictures, files in `assets`; layers: new text/images; removed: pushed layers to delete)
 const originals = new Map();       // selector -> original innerHTML (text edits)
 const imgOrig = new Map();         // selector -> original src attribute (image replacements)
 const assets = new Map();          // repo path -> { blob, url, file, ... }: the replacement files (too big for the undo history)
+let pageFonts = new Map();         // Google fonts the page itself already loads (lower-case name -> weights/italics)
 let guarded = new Set();           // site-wide tokens the page overrides for increased contrast (see GUARD)
 let tokBase = {};                  // grid / grain token values as the page loads (so sliding back to the shipped value records nothing)
 let push = null;                   // the "move this and everything below" session for the selected element
@@ -421,7 +439,7 @@ function saveDraft() {
   if (pendingDraft) return;
   const all = diffCss(baseline, state.css), ops = { set: all.set.filter((x) => !newLayerSel(x[1])), del: all.del.filter((x) => !newLayerSel(x[1])) };
   if (!ops.set.length && !ops.del.length && !state.text.length) { lsDel(LS.draft); return; }
-  lsSet(LS.draft, JSON.stringify({ path: settings.path, ops, text: state.text, originals: [...originals] }));
+  lsSet(LS.draft, JSON.stringify({ path: settings.path, ops, text: state.text, originals: [...originals], fonts: state.fonts }));
 }
 window.addEventListener('beforeunload', (e) => { if (summary().count) { e.preventDefault(); e.returnValue = ''; } });
 
@@ -451,6 +469,116 @@ function selectorFor(e) {
 
 /* ---------- live preview ---------- */
 const scopeKey = () => rangeFor(frameW).cond;
+
+/* ---------- Google Fonts ----------
+   Font families come from Google Fonts only. The editor knows a curated list (every entry below was checked against the real
+   Google Fonts API), plus "Other Google font…" for any family you type. A font that the page doesn't already load is added to the
+   preview straight away and, when you push, to ONE managed <link> in the page's <head> (between marker comments). Fonts the page
+   already loads (Signika, Lora…) need nothing added. A font no CSS refers to any more is dropped from the link again. */
+const GFONTS = [
+  // sans-serif
+  { n: 'Inter', c: 'sans-serif', v: [100, 900], i: 1 }, { n: 'Roboto', c: 'sans-serif', v: [100, 900], i: 1 }, { n: 'Open Sans', c: 'sans-serif', v: [300, 800], i: 1 },
+  { n: 'Lato', c: 'sans-serif', w: [100, 300, 400, 700, 900], i: 1 }, { n: 'Montserrat', c: 'sans-serif', v: [100, 900], i: 1 }, { n: 'Poppins', c: 'sans-serif', w: [100, 200, 300, 400, 500, 600, 700, 800, 900], i: 1 },
+  { n: 'Raleway', c: 'sans-serif', v: [100, 900], i: 1 }, { n: 'Nunito', c: 'sans-serif', v: [200, 1000], i: 1 }, { n: 'Work Sans', c: 'sans-serif', v: [100, 900], i: 1 },
+  { n: 'DM Sans', c: 'sans-serif', v: [100, 1000], i: 1 }, { n: 'Manrope', c: 'sans-serif', v: [200, 800] }, { n: 'Space Grotesk', c: 'sans-serif', v: [300, 700] },
+  { n: 'Rubik', c: 'sans-serif', v: [300, 900], i: 1 }, { n: 'Karla', c: 'sans-serif', v: [200, 800], i: 1 }, { n: 'Josefin Sans', c: 'sans-serif', v: [100, 700], i: 1 },
+  { n: 'Signika', c: 'sans-serif', v: [300, 700] }, { n: 'Archivo', c: 'sans-serif', v: [100, 900], i: 1 }, { n: 'Outfit', c: 'sans-serif', v: [100, 900] },
+  { n: 'Plus Jakarta Sans', c: 'sans-serif', v: [200, 800], i: 1 }, { n: 'Public Sans', c: 'sans-serif', v: [100, 900], i: 1 }, { n: 'Mulish', c: 'sans-serif', v: [200, 1000], i: 1 },
+  { n: 'Figtree', c: 'sans-serif', v: [300, 900], i: 1 }, { n: 'Quicksand', c: 'sans-serif', v: [300, 700] }, { n: 'Oswald', c: 'sans-serif', v: [200, 700] },
+  { n: 'Barlow', c: 'sans-serif', w: [100, 200, 300, 400, 500, 600, 700, 800, 900], i: 1 }, { n: 'Bebas Neue', c: 'sans-serif', w: [400] }, { n: 'Anton', c: 'sans-serif', w: [400] },
+  // serif
+  { n: 'Lora', c: 'serif', v: [400, 700], i: 1 }, { n: 'Playfair Display', c: 'serif', v: [400, 900], i: 1 }, { n: 'Merriweather', c: 'serif', v: [300, 900], i: 1 },
+  { n: 'Source Serif 4', c: 'serif', v: [200, 900], i: 1 }, { n: 'Libre Baskerville', c: 'serif', w: [400, 700], i: 1 }, { n: 'EB Garamond', c: 'serif', v: [400, 800], i: 1 },
+  { n: 'Cormorant Garamond', c: 'serif', v: [300, 700], i: 1 }, { n: 'Crimson Pro', c: 'serif', v: [200, 900], i: 1 }, { n: 'DM Serif Display', c: 'serif', w: [400], i: 1 },
+  { n: 'Fraunces', c: 'serif', v: [100, 900], i: 1 }, { n: 'Bitter', c: 'serif', v: [100, 900], i: 1 }, { n: 'Noto Serif', c: 'serif', v: [100, 900], i: 1 },
+  { n: 'PT Serif', c: 'serif', w: [400, 700], i: 1 }, { n: 'Spectral', c: 'serif', w: [200, 300, 400, 500, 600, 700, 800], i: 1 }, { n: 'Instrument Serif', c: 'serif', w: [400], i: 1 },
+  { n: 'Abril Fatface', c: 'serif', w: [400] },
+  // monospace
+  { n: 'Space Mono', c: 'monospace', w: [400, 700], i: 1 }, { n: 'JetBrains Mono', c: 'monospace', v: [100, 800], i: 1 }, { n: 'IBM Plex Mono', c: 'monospace', w: [100, 200, 300, 400, 500, 600, 700], i: 1 },
+  { n: 'Fira Code', c: 'monospace', v: [300, 700] }, { n: 'Roboto Mono', c: 'monospace', v: [100, 700], i: 1 },
+  // display / handwriting
+  { n: 'Pacifico', c: 'cursive', w: [400] }, { n: 'Lobster', c: 'cursive', w: [400] }, { n: 'Caveat', c: 'cursive', v: [400, 700] },
+  { n: 'Dancing Script', c: 'cursive', v: [400, 700] }, { n: 'Permanent Marker', c: 'cursive', w: [400] }, { n: 'Righteous', c: 'sans-serif', w: [400] },
+  { n: 'Kalam', c: 'cursive', w: [300, 400, 700] }, { n: 'Comfortaa', c: 'sans-serif', v: [300, 700] },
+];
+const gfByName = new Map(GFONTS.map((f) => [f.n.toLowerCase(), f]));
+function gfQ(f) {   // the family= part of a Google Fonts CSS2 URL, with the axes the font really has
+  const nm = f.n.replace(/ /g, '+');
+  if (f.v) return f.i ? `${nm}:ital,wght@0,${f.v[0]}..${f.v[1]};1,${f.v[0]}..${f.v[1]}` : `${nm}:wght@${f.v[0]}..${f.v[1]}`;
+  const ws = f.w;
+  if (ws.length === 1 && ws[0] === 400 && !f.i) return nm;
+  if (f.i) return `${nm}:ital,wght@${ws.map((w) => '0,' + w).join(';')};${ws.map((w) => '1,' + w).join(';')}`;
+  return `${nm}:wght@${ws.join(';')}`;
+}
+const gfHref = (qs) => 'https://fonts.googleapis.com/css2?' + qs.map((q) => 'family=' + q).join('&') + '&display=swap';
+const FONTS_START = '<!-- ===== editor fonts: start (managed by /editor/; safe to hand-edit) ===== -->';
+const FONTS_END = '<!-- ===== editor fonts: end ===== -->';
+const FONTS_RE = /([ \t]*)<!-- ===== editor fonts: start[^\n]*?-->([\s\S]*?)<!-- ===== editor fonts: end ===== -->/;
+const fontKey = (n) => n.trim().toLowerCase();
+function qInfo(q) {   // what a family= value says about the font: its name, weight range or list, italics
+  const [fam, spec = ''] = q.split(':'), out = { family: decodeURIComponent(fam.replace(/\+/g, ' ')), weights: null, min: 400, max: 400, range: false, ital: /ital/.test(spec) };
+  const at = spec.split('@')[1]; if (!at) return out;
+  const nums = []; let range = false;
+  for (const tup of at.split(';')) { const w = tup.split(',').pop(); if (w.includes('..')) { range = true; nums.push(...w.split('..').map(Number)); } else nums.push(+w); }
+  out.min = Math.min(...nums); out.max = Math.max(...nums); out.range = range; out.weights = range ? null : [...new Set(nums)].sort((a, b) => a - b);
+  return out;
+}
+const familiesIn = (href) => { try { return new URL(href.replace(/&amp;/g, '&')).searchParams.getAll('family').map((q) => q.replace(/ /g, '+')); } catch { return []; } };
+function scanPageFonts() {   // families the page itself loads (its own <link>s, including a managed block pushed earlier)
+  const m = new Map();
+  for (const l of doc.querySelectorAll('link[href*="fonts.googleapis.com"]')) {
+    if ((l.id || '').startsWith('__ed_font_')) continue;
+    for (const q of familiesIn(l.getAttribute('href') || '')) { const i = qInfo(q); m.set(fontKey(i.family), i); }
+  }
+  return m;
+}
+function fontInfo(name) {   // what is known about a family's weights/italics, or null for a system font
+  const k = fontKey(name), s = state.fonts.find((f) => fontKey(f.family) === k);
+  if (s) return qInfo(s.q);
+  if (pageFonts.has(k)) return pageFonts.get(k);
+  const g = gfByName.get(k);
+  return g ? qInfo(gfQ(g)) : null;
+}
+const WEIGHT_NAMES = { 100: 'Thin', 200: 'Extra light', 300: 'Light', 400: 'Regular', 500: 'Medium', 600: 'Semi-bold', 700: 'Bold', 800: 'Extra bold', 900: 'Black', 1000: 'Ultra' };
+function weightChoices(name) {
+  const i = name ? fontInfo(name) : null, all = Object.keys(WEIGHT_NAMES).map(Number);
+  if (!i) return all.filter((w) => w <= 900);
+  if (i.weights) return i.weights.filter((w) => WEIGHT_NAMES[w]);
+  return all.filter((w) => w >= i.min && w <= i.max);
+}
+const famCss = (name) => { const g = gfByName.get(fontKey(name)), s = state.fonts.find((f) => fontKey(f.family) === fontKey(name)); return `"${name}", ${g ? g.c : (s && s.c) || 'sans-serif'}`; };
+function ensureFont(name) {   // make a Google font available to the page (a no-op if the page already loads it)
+  const k = fontKey(name); if (pageFonts.has(k) || state.fonts.some((f) => fontKey(f.family) === k)) return false;
+  const g = gfByName.get(k); if (!g) return false;
+  state.fonts.push({ family: g.n, q: gfQ(g), c: g.c }); return true;
+}
+function syncFonts() {   // keep a <link> in the preview for every font added in this session
+  if (!doc) return;
+  for (const f of state.fonts) {
+    const id = '__ed_font_' + f.family.replace(/[^a-z0-9]/gi, '_');
+    if (!doc.getElementById(id)) { const l = doc.createElement('link'); l.id = id; l.rel = 'stylesheet'; l.href = gfHref([f.q]); doc.head.append(l); }
+  }
+}
+const probeFont = (q) => new Promise((resolve) => {   // does Google Fonts accept this family request?
+  const l = doc.createElement('link'); l.rel = 'stylesheet'; l.href = gfHref([q]);
+  const t = setTimeout(() => { l.remove(); resolve(false); }, 8000);
+  l.onload = () => { clearTimeout(t); resolve(l); }; l.onerror = () => { clearTimeout(t); l.remove(); resolve(false); };
+  doc.head.append(l);
+});
+// Any Google font by name. Most-capable request first (variable weights + italics), then simpler ones, until Google accepts one.
+async function loadCustomFont(raw) {
+  const name = raw.trim().replace(/\s+/g, ' ');
+  if (!/^[A-Za-z0-9][A-Za-z0-9 ]{0,59}$/.test(name)) throw new Error('Type the name of a Google font, for example Bricolage Grotesque.');
+  const g = gfByName.get(fontKey(name)); if (g) { ensureFont(g.n); return g.n; }
+  const have = state.fonts.find((f) => fontKey(f.family) === fontKey(name)) || (pageFonts.has(fontKey(name)) && { family: pageFonts.get(fontKey(name)).family });
+  if (have) return have.family;
+  const key = name.replace(/ /g, '+');
+  for (const q of [`${key}:ital,wght@0,100..900;1,100..900`, `${key}:wght@100..900`, `${key}:ital,wght@0,400;0,700;1,400;1,700`, `${key}:wght@400;700`, key]) {
+    const l = await probeFont(q);
+    if (l) { l.id = '__ed_font_' + name.replace(/[^a-z0-9]/gi, '_'); state.fonts.push({ family: name, q, c: 'sans-serif' }); return name; }
+  }
+  throw new Error(`“${name}” wasn't found on Google Fonts. Check the spelling.`);
+}
 
 /* ---------- layers: new text / images ----------
    The page's own elements are addressed by their position among the page's elements (a "path" of child indexes from <body>,
@@ -496,7 +624,7 @@ function renderLive() {
   let st = doc.getElementById('__ed_live');
   if (!st) { st = doc.createElement('style'); st.id = '__ed_live'; doc.head.append(st); }
   st.textContent = cssText(state.css);
-  syncLayers();
+  syncFonts(); syncLayers();
   for (const [s, orig] of originals) {
     const t = state.text.find((x) => x.sel === s), node = doc.querySelector(s);
     if (!node || (editing && editing.el === node)) continue;
@@ -546,7 +674,7 @@ async function loadPage() {
     q('#empty').textContent = `Couldn't load ${settings.path} (${err.message}). Open this editor from the live site (…/editor/), not from a file on disk.`; return;
   }
   baseline = parseBlock(source0);
-  state = { css: clone(baseline), text: [], images: [], layers: [], removed: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1;
+  state = { css: clone(baseline), text: [], images: [], layers: [], removed: [], fonts: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1;
   for (const a of assets.values()) URL.revokeObjectURL(a.url);
   assets.clear(); push = null;
   sel = null; hover = null; editing = null;
@@ -560,11 +688,11 @@ function onFrameLoad() {
   root.setAttribute('data-motion', 'reduced'); root.classList.remove('fx');
   doc.querySelectorAll('.reveal').forEach((e) => e.classList.add('in'));
   const css = doc.createElement('style'); css.id = '__ed_css';
-  css.textContent = 'html .ed-deco{pointer-events:auto!important} html [data-ed-gone]{display:none!important} #fx{display:none!important} html{scroll-behavior:auto!important} .aside{opacity:1!important;transform:none!important;pointer-events:auto!important;transition:none!important}';
+  css.textContent = '*,*::before,*::after{transition:none!important} html .ed-deco{pointer-events:auto!important} html [data-ed-gone]{display:none!important} #fx{display:none!important} html{scroll-behavior:auto!important} .aside{opacity:1!important;transform:none!important;pointer-events:auto!important;transition:none!important}';
   doc.head.append(css);
   // The page's own managed tweaks are re-injected by the editor (baseline + session), so remove the static copy.
   for (const s of doc.querySelectorAll('style')) if (BLOCK_RE.test(s.textContent)) s.textContent = stripBlock(s.textContent);
-  guarded = scanGuarded(); push = null;
+  guarded = scanGuarded(); pageFonts = scanPageFonts(); push = null;
   // Read any saved draft BEFORE the first commit (an empty state would otherwise erase it).
   const draft = safeJSON(lsGet(LS.draft), null);
   const hasDraft = draft && draft.path === settings.path && history.length === 0 && (draft.ops.set.length || draft.ops.del.length || draft.text.length);
@@ -580,7 +708,7 @@ function offerDraft(d) {
   t.replaceChildren(h('span', { text: `Restore ${n} unsaved change${n > 1 ? 's' : ''} from last time?` }),
     h('button', { class: 'primary', text: 'Restore', onclick: () => {
       pendingDraft = null;
-      state.css = applyOps(baseline, d.ops); state.text = d.text; for (const [k, v] of d.originals) originals.set(k, v);
+      state.css = applyOps(baseline, d.ops); state.text = d.text; state.fonts = d.fonts || []; for (const [k, v] of d.originals) originals.set(k, v);
       renderLive(); commit(); t.classList.remove('on'); toast('Restored.', 1800);
     } }),
     h('button', { text: 'Discard', onclick: () => { pendingDraft = null; lsDel(LS.draft); t.classList.remove('on'); } }));
@@ -612,6 +740,7 @@ function buildOverlay() {
 }
 function isRotated(el) {
   const cs = win.getComputedStyle(el); if (cs.rotate && cs.rotate !== 'none' && parseFloat(cs.rotate) % 360) return true;
+  if (cs.scale && cs.scale !== 'none' && parseFloat(cs.scale) !== 1) return true;
   const t = cs.transform; if (!t || t === 'none') return false;
   try { const m = new win.DOMMatrixReadOnly(t); return Math.abs(m.b) > 1e-4 || Math.abs(m.c) > 1e-4 || Math.abs(m.a - 1) > 1e-3 || Math.abs(m.d - 1) > 1e-3; } catch { return false; }
 }
@@ -791,6 +920,7 @@ function bindFrameEvents() {
   win.addEventListener('pointerup', onUp, true);
   win.addEventListener('pointercancel', onUp, true);
   win.addEventListener('dblclick', onDbl, true);
+  win.document.addEventListener('selectionchange', () => { if (editingNow()) syncFields(); });
   win.addEventListener('dragover', (e) => { e.stopImmediatePropagation(); e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; }, true);
   win.addEventListener('drop', onDrop, true);
   win.addEventListener('keydown', onKey, true);
@@ -1005,20 +1135,37 @@ function colorField(labelText, prop, opts = {}) {
   const alpha = h('input', { type: 'number', min: 0, max: 1, step: 0.05, 'aria-label': labelText + ' opacity', title: 'Opacity 0–1' });
   const reset = h('button', { class: 'x', type: 'button', 'aria-label': 'Reset', title: 'Reset this tweak', text: '×' });
   const row = h('div', { class: 'fc' }, h('span', { class: 'lab', text: labelText }), pick, text, alpha, reset);
-  const read = () => (opts.token ? parseColor(opts.token.value) : parseColor(win.getComputedStyle(sel)[prop]));
-  const write = (hex, a) => { const v = colorSpec(hex, a); if (opts.token) { setTweak(state.css, tokScope(opts.token.name), ':root', opts.token.name, v); renderLive(); } else setProp(prop, v); };
+  // opts.read: the computed property to read (default `prop`); opts.write: the properties to write (default [prop]);
+  // opts.ensure: run before writing (e.g. make a border visible); opts.get/set/on/reset: a value that is part of a composite (a shadow)
+  const rd = opts.read || prop, wr = opts.write || [prop];
+  const read = () => (opts.get ? opts.get() : opts.token ? parseColor(opts.token.value) : parseColor(win.getComputedStyle(sel).getPropertyValue(rd)));
+  const isOn = () => (opts.on ? opts.on() : opts.token ? state.css[tokScope(opts.token.name)]?.[':root']?.[opts.token.name] != null : isTweaked(wr));
+  const write = (hex, a) => {
+    if (opts.set) { opts.set(hex, a); return; }
+    const v = colorSpec(hex, a);
+    if (opts.token) { setTweak(state.css, tokScope(opts.token.name), ':root', opts.token.name, v); renderLive(); }
+    else { if (opts.ensure) opts.ensure(); for (const p of wr) setProp(p, v); }
+  };
   const f = { sync() {
     if (!opts.token && !sel) return; const c = read();
     if (document.activeElement !== pick) pick.value = c.hex;
     if (document.activeElement !== text) text.value = c.a >= 1 ? c.hex : colorSpec(c.hex, c.a);
     if (document.activeElement !== alpha) alpha.value = r3(c.a);
-    row.classList.toggle('on', opts.token ? state.css[tokScope(opts.token.name)]?.[':root']?.[opts.token.name] != null : isTweaked([prop]));
+    row.classList.toggle('on', !!isOn());
   } };
   pick.addEventListener('input', () => { write(pick.value, parseFloat(alpha.value) || 1); syncOthers(f); });
   alpha.addEventListener('input', () => { const a = Math.max(0, Math.min(1, parseFloat(alpha.value))); if (Number.isFinite(a)) { write(pick.value, a); } });
-  text.addEventListener('change', () => { const t = text.value.trim(); if (/^#[0-9a-f]{6}$/i.test(t)) write(t.toLowerCase(), parseFloat(alpha.value) || 1); else if (t) { if (opts.token) { setTweak(state.css, tokScope(opts.token.name), ':root', opts.token.name, t); renderLive(); } else setProp(prop, t); } commit(); syncFields(); });
+  text.addEventListener('change', () => {
+    const t = text.value.trim();
+    if (/^#[0-9a-f]{6}$/i.test(t)) write(t.toLowerCase(), parseFloat(alpha.value) || 1);
+    else if (t && !opts.set) {
+      if (!safeCssValue(t)) { toast('A colour can’t contain { } ; < or comment marks.', 2600, 'warn'); syncFields(); return; }
+      if (opts.token) { setTweak(state.css, tokScope(opts.token.name), ':root', opts.token.name, t); renderLive(); } else { if (opts.ensure) opts.ensure(); for (const p of wr) setProp(p, t); }
+    }
+    commit(); syncFields();
+  });
   for (const i of [pick, alpha]) i.addEventListener('change', () => { commit(); syncFields(); });
-  reset.addEventListener('click', () => { if (opts.token) { delTweak(state.css, tokScope(opts.token.name), ':root', opts.token.name); renderLive(); } else resetProps([prop]); commit(); syncFields(); });
+  reset.addEventListener('click', () => { if (opts.reset) opts.reset(); else if (opts.token) { delTweak(state.css, tokScope(opts.token.name), ':root', opts.token.name); renderLive(); } else resetProps(wr); commit(); syncFields(); });
   fields.push(f); return row;
 }
 
@@ -1049,6 +1196,231 @@ const fmtBytes = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.
 const sec = (title, open, ...kids) => { const d = h('details', {}, h('summary', { text: title }), h('div', { class: 'body' }, ...kids)); d.open = open; return d; };
 const g2 = (...c) => h('div', { class: 'grid2' }, ...c);
 const P = (label, prop, extra = {}) => ({ label, prop, unit: 'px', aria: `${prop.replace('-', ' ')} in pixels`, read: (e, cs) => parseFloat(cs[prop.replace(/-(\w)/g, (_, c) => c.toUpperCase())]) || 0, write: (v) => setProp(prop, remv(v)), ...extra });
+/* ---------- style controls: type, border, shadow, filters, layout, and "any CSS property" ---------- */
+// A value typed by hand must not be able to break out of its rule or out of the page's <style> element.
+function safeCssValue(v) {
+  const bare = v.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""');
+  return !/[{};]|\/\*|\*\//.test(bare) && !v.includes('<');
+}
+const editingNow = () => !!editing && !!editing.el && editing.el.isConnected;
+function selectField(spec) {
+  const s = h('select', { 'aria-label': spec.aria || spec.label });
+  const reset = h('button', { class: 'x', type: 'button', title: 'Reset this tweak', 'aria-label': 'Reset', text: '×' });
+  const row = h('div', { class: 'fsel' }, h('span', { class: 'lab', text: spec.label, title: spec.title || '' }), s, reset);
+  let built = '';
+  const rebuild = () => {
+    const opts = spec.options(), key = JSON.stringify(opts); if (key === built) return; built = key; s.replaceChildren();
+    const add = (parent, [v, t]) => parent.append(h('option', { value: v, text: t }));
+    if (opts.length && Array.isArray(opts[0])) for (const o of opts) add(s, o);
+    else for (const g of opts) { const og = h('optgroup', { label: g.label }); for (const o of g.items) add(og, o); s.append(og); }
+  };
+  const f = { sync() {
+    if (!sel && !spec.global) return; rebuild();
+    const v = String(spec.read());
+    if (![...s.options].some((o) => o.value === v)) s.append(h('option', { value: v, text: spec.unknown ? spec.unknown(v) : v }));
+    if (document.activeElement !== s) s.value = v;
+    row.classList.toggle('on', spec.on ? spec.on() : isTweaked(spec.props || [spec.prop], spec.target ? spec.target() : sel));
+  } };
+  s.addEventListener('change', () => { spec.write(s.value); commit(); syncFields(); });
+  reset.addEventListener('click', () => { if (spec.reset) spec.reset(); else resetProps(spec.props || [spec.prop]); commit(); syncFields(); });
+  fields.push(f); return row;
+}
+// A pressed/unpressed button. mousedown is cancelled so that the focus (and the selected words) stay in the text being edited.
+function toggleBtn(o) {
+  const b = h('button', { type: 'button', class: 'tgb', 'aria-label': o.aria, title: o.title || o.aria, 'aria-pressed': 'false' });
+  if (o.html) b.innerHTML = o.html; else b.textContent = o.text;
+  if (o.style) b.style.cssText = o.style;
+  b.addEventListener('mousedown', (e) => e.preventDefault());
+  b.addEventListener('click', () => { o.click(); commit(); syncFields(); });
+  fields.push({ sync() { if (!sel) return; b.setAttribute('aria-pressed', String(!!o.pressed())); } });
+  return b;
+}
+const nested = (title, ...kids) => h('details', { class: 'nest' }, h('summary', { text: title }), h('div', { class: 'nbody' }, ...kids));
+const ALIGN_SVG = (d) => `<svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><path d="${d}" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`;
+
+/* one shadow (the first) as X / Y / blur / spread / colour, for text-shadow and box-shadow */
+function shadowBlock(kind) {
+  const prop = kind === 'text' ? 'text-shadow' : 'box-shadow', box = kind === 'box';
+  const parse = () => {
+    const v = win.getComputedStyle(sel).getPropertyValue(prop), none = !v || v === 'none', col = /rgba?\([^)]*\)/.exec(v);
+    const nums = (v.replace(/rgba?\([^)]*\)/g, '').match(/-?[\d.]+(?=px)/g) || []).map(Number);
+    return { none, count: none ? 0 : (v.match(/rgba?\(/g) || []).length || 1, x: nums[0] || 0, y: nums[1] || 0, blur: nums[2] || 0, spread: box ? nums[3] || 0 : 0, color: col ? parseColor(col[0]) : { hex: '#000000', a: 0.25 }, inset: /\binset\b/.test(v) };
+  };
+  const base = () => ({ x: 0, y: box ? 4 : 1, blur: box ? 12 : 2, spread: 0, color: { hex: '#000000', a: 0.25 }, inset: false });
+  const compose = (o) => `${o.inset ? 'inset ' : ''}${r3(o.x)}px ${r3(o.y)}px ${r3(o.blur)}px ${box ? r3(o.spread) + 'px ' : ''}${colorSpec(o.color.hex, o.color.a)}`;
+  const edit = (patch) => { const c = parse(); setProp(prop, compose({ ...(c.none ? base() : c), ...patch })); };
+  const nf = (label, aria, key, step = 1) => numField({ label, aria, props: [prop], unit: 'px', step, read: () => parse()[key], write: (v) => edit({ [key]: v }) });
+  const kids = [g2(nf('X', `${kind === 'text' ? 'Text' : 'Box'} shadow X offset in pixels`, 'x'), nf('Y', `${kind === 'text' ? 'Text' : 'Box'} shadow Y offset in pixels`, 'y')),
+    g2(nf('Bl', `${kind === 'text' ? 'Text' : 'Box'} shadow blur in pixels`, 'blur'), box ? nf('Sp', 'Box shadow spread in pixels', 'spread') : null),
+    colorField('Colour', null, { get: () => parse().color, set: (hex, a) => edit({ color: { hex, a } }), on: () => isTweaked([prop]), reset: () => resetProps([prop]) })];
+  if (box) {
+    const inset = h('input', { type: 'checkbox', 'aria-label': 'Inner shadow' });
+    inset.addEventListener('change', () => { edit({ inset: inset.checked }); commit(); syncFields(); });
+    fields.push({ sync() { if (sel) inset.checked = parse().inset; } });
+    kids.push(h('label', { class: 'tick' }, inset, 'Inner shadow'));
+  }
+  const none = h('button', { type: 'button', text: 'No shadow', title: `Switch off any ${prop} on this element`, onclick: () => { setProp(prop, 'none'); commit(); syncFields(); } });
+  const note = h('p', { class: 'muted', style: 'margin:6px 0 0' }); fields.push({ sync() { if (!sel) return; const c = parse(); note.textContent = c.count > 1 ? `${c.count} shadows here: editing these replaces them with one.` : ''; } });
+  kids.push(h('div', { class: 'btnrow' }, none), note);
+  return h('div', {}, ...kids.filter(Boolean));
+}
+
+/* ---- the Type section ---- */
+function typeSection() {
+  const cs = () => win.getComputedStyle(sel), tw = () => state.css[scopeKey()]?.[selectorFor(sel)] || {};
+  const famNow = () => cs().fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '');
+  const nameFor = (key) => { const k = key.replace(/^f:/, ''); const p = pageFonts.get(k), s = state.fonts.find((f) => fontKey(f.family) === k), g = gfByName.get(k); return (p && p.family) || (s && s.family) || (g && g.n) || k; };
+  // family: the site's two roles, fonts already on the page, then Google Fonts
+  const cin = h('input', { type: 'text', placeholder: 'e.g. Bricolage Grotesque', spellcheck: 'false', 'aria-label': 'Google font name' });
+  const cbtn = h('button', { type: 'button', class: 'primary', text: 'Use' }), cst = h('div', { class: 'muted', style: 'margin-top:4px' });
+  const custom = h('div', { class: 'customfont', style: 'display:none' }, h('div', { style: 'display:flex;gap:6px' }, cin, cbtn), cst);
+  const useCustom = async () => {
+    cst.className = 'muted'; cst.textContent = 'Checking Google Fonts…'; cbtn.disabled = true;
+    try { const name = await loadCustomFont(cin.value); setProp('font-family', famCss(name)); commit(); cst.className = 'ok'; cst.textContent = `✓ ${name} loaded`; custom.style.display = 'none'; cin.value = ''; syncFields(); }
+    catch (err) { cst.className = 'err'; cst.textContent = err.message || String(err); }
+    cbtn.disabled = false;
+  };
+  cbtn.addEventListener('click', useCustom); cin.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); useCustom(); } });
+  const groups = () => {
+    const out = [{ label: 'Site fonts', items: [['var(--display)', 'Heading font (site)'], ['var(--text)', 'Body font (site)']] }];
+    const onPage = [...pageFonts.values()].map((i) => i.family); if (onPage.length) out.push({ label: 'On this page', items: onPage.map((n) => ['f:' + fontKey(n), n]) });
+    const added = state.fonts.filter((f) => !pageFonts.has(fontKey(f.family))).map((f) => f.family); if (added.length) out.push({ label: 'Added in this session', items: added.map((n) => ['f:' + fontKey(n), n]) });
+    const taken = new Set([...onPage, ...added].map(fontKey));
+    for (const [cat, title] of [['sans-serif', 'sans-serif'], ['serif', 'serif'], ['monospace', 'monospace'], ['cursive', 'script & display']]) {
+      const items = GFONTS.filter((g) => g.c === cat && !taken.has(fontKey(g.n))).map((g) => ['f:' + fontKey(g.n), g.n]); if (items.length) out.push({ label: 'Google Fonts · ' + title, items });
+    }
+    out.push({ label: 'More', items: [['__custom', 'Other Google font…']] }); return out;
+  };
+  const family = selectField({ label: 'Font', aria: 'Font family (Google Fonts)', props: ['font-family'], options: groups,
+    read: () => { const r = tw()['font-family']; return r === 'var(--display)' || r === 'var(--text)' ? r : 'f:' + fontKey(famNow()); },
+    unknown: (v) => (v.startsWith('f:') ? v.slice(2) + ' (not a Google font)' : v),
+    write: (v) => {
+      if (v === '__custom') { custom.style.display = 'block'; cin.focus(); return; }
+      if (v === 'var(--display)' || v === 'var(--text)') { setProp('font-family', v); return; }
+      const name = nameFor(v); ensureFont(name); setProp('font-family', famCss(name));
+    } });
+  const weight = selectField({ label: 'Wt', aria: 'Font weight', props: ['font-weight'],
+    options: () => weightChoices(famNow()).map((w) => [String(w), `${w} ${WEIGHT_NAMES[w]}`]),
+    read: () => String(Math.round((parseFloat(cs().fontWeight) || 400) / 100) * 100), write: (v) => setProp('font-weight', v) });
+  const heavy = () => (parseFloat(cs().fontWeight) || 400) >= 600, italic = () => /italic|oblique/.test(cs().fontStyle);
+  const lines = () => (cs().textDecorationLine || '').split(/\s+/);
+  const toggleLine = (ln) => { const cur = new Set(lines().filter((x) => x === 'underline' || x === 'line-through')); cur.has(ln) ? cur.delete(ln) : cur.add(ln); setProp('text-decoration-line', cur.size ? [...cur].join(' ') : 'none'); };
+  const norm = (a) => (a === 'start' ? 'left' : a === 'end' ? 'right' : a);
+  const fmt1 = h('div', { class: 'tg', role: 'group', 'aria-label': 'Text style' },
+    toggleBtn({ text: 'B', aria: 'Bold', title: 'Bold: the selected words while you are editing text, otherwise the whole element', style: 'font-weight:700', pressed: () => (editingNow() ? doc.queryCommandState('bold') : heavy()), click: () => (editingNow() ? doc.execCommand('bold') : setProp('font-weight', heavy() ? '400' : '700')) }),
+    toggleBtn({ text: 'I', aria: 'Italic', title: 'Italic: the selected words while you are editing text, otherwise the whole element', style: 'font-style:italic', pressed: () => (editingNow() ? doc.queryCommandState('italic') : italic()), click: () => (editingNow() ? doc.execCommand('italic') : setProp('font-style', italic() ? 'normal' : 'italic')) }),
+    toggleBtn({ text: 'U', aria: 'Underline', title: 'Underline the whole element', style: 'text-decoration:underline', pressed: () => lines().includes('underline'), click: () => toggleLine('underline') }),
+    toggleBtn({ text: 'S', aria: 'Strikethrough', title: 'Strike through the whole element', style: 'text-decoration:line-through', pressed: () => lines().includes('line-through'), click: () => toggleLine('line-through') }));
+  const al = (v, d, label) => toggleBtn({ html: ALIGN_SVG(d), aria: label, pressed: () => norm(cs().textAlign) === v, click: () => setProp('text-align', v) });
+  const fmt2 = h('div', { class: 'tg', role: 'group', 'aria-label': 'Alignment' },
+    al('left', 'M1 1.5h12M1 4.5h8M1 7.5h12M1 10.5h6', 'Align left'), al('center', 'M1 1.5h12M3 4.5h8M1 7.5h12M4 10.5h6', 'Align centre'),
+    al('right', 'M1 1.5h12M5 4.5h8M1 7.5h12M7 10.5h6', 'Align right'), al('justify', 'M1 1.5h12M1 4.5h12M1 7.5h12M1 10.5h12', 'Justify'));
+  const hint = h('p', { class: 'muted', style: 'margin:4px 0 0', text: 'While you edit text, B and I format the selected words.' });
+  return sec('Type', true,
+    family, custom, weight, h('div', { class: 'btnrow', style: 'align-items:center' }, fmt1, fmt2), hint,
+    selectField({ label: 'Case', aria: 'Text case', props: ['text-transform'], options: () => [['none', 'As typed'], ['uppercase', 'UPPERCASE'], ['lowercase', 'lowercase'], ['capitalize', 'Capitalize']], read: () => cs().textTransform, write: (v) => setProp('text-transform', v) }),
+    g2(numField({ label: 'Aa', aria: 'Font size in pixels', prop: 'font-size', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.fontSize), write: (v) => setProp('font-size', remv(v)) }),
+       numField({ label: 'LH', aria: 'Line height (ratio)', prop: 'line-height', unit: '×', step: 0.05, read: (e, c) => (c.lineHeight === 'normal' ? 1.2 : parseFloat(c.lineHeight) / parseFloat(c.fontSize)), write: (v) => setProp('line-height', String(r3(v))) }),
+       numField({ label: 'LS', aria: 'Letter spacing in em', prop: 'letter-spacing', unit: 'em', step: 0.01, read: (e, c) => (c.letterSpacing === 'normal' ? 0 : parseFloat(c.letterSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('letter-spacing', r3(v) + 'em') }),
+       numField({ label: 'WS', aria: 'Word spacing in em', prop: 'word-spacing', unit: 'em', step: 0.05, read: (e, c) => (c.wordSpacing === 'normal' ? 0 : parseFloat(c.wordSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('word-spacing', r3(v) + 'em') })),
+    nested('Text shadow', shadowBlock('text')));
+}
+
+/* ---- Border ---- */
+function borderSection() {
+  const SIDES = ['top', 'right', 'bottom', 'left'], CORNERS = ['top-left', 'top-right', 'bottom-right', 'bottom-left'], cs = () => win.getComputedStyle(sel);
+  const bw = (s) => parseFloat(cs().getPropertyValue(`border-${s}-width`)) || 0, widest = () => Math.max(...SIDES.map(bw));
+  const isNone = () => /^(none|hidden)$/.test(cs().borderTopStyle);
+  // A border needs a style and a width to show at all: setting a colour or a thickness makes the border visible.
+  const visible = () => { const was = isNone(), w0 = widest(); if (was) setProp('border-style', 'solid'); if (was || w0 === 0) for (const s of SIDES) setProp(`border-${s}-width`, '1px'); };
+  const side = (s) => numField({ label: s[0].toUpperCase(), aria: `Border ${s} thickness in pixels`, props: [`border-${s}-width`], unit: 'px', step: 0.5, read: () => bw(s), write: (v) => { if (v > 0 && isNone()) setProp('border-style', 'solid'); setProp(`border-${s}-width`, r3(v) + 'px'); } });
+  const corner = (c) => numField({ label: c.split('-').map((x) => x[0].toUpperCase()).join(''), aria: `${c.replace('-', ' ')} corner radius in pixels`, props: [`border-${c}-radius`], unit: 'px', step: 1, read: () => parseFloat(cs().getPropertyValue(`border-${c}-radius`)) || 0, write: (v) => setProp(`border-${c}-radius`, r3(v) + 'px') });
+  return sec('Border', false,
+    numField({ label: 'W', aria: 'Border thickness in pixels (all sides)', props: SIDES.map((s) => `border-${s}-width`), unit: 'px', step: 0.5, read: widest, write: (v) => { if (v > 0 && isNone()) setProp('border-style', 'solid'); for (const s of SIDES) setProp(`border-${s}-width`, r3(v) + 'px'); } }),
+    selectField({ label: 'Line', aria: 'Border style', props: ['border-style'], options: () => ['none', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset'].map((v) => [v, v]), read: () => cs().borderTopStyle,
+      write: (v) => { const was = isNone(); setProp('border-style', v); if (v !== 'none' && was) for (const s of SIDES) setProp(`border-${s}-width`, '1px'); } }),
+    colorField('Colour', 'border-color', { read: 'border-top-color', write: ['border-color'], ensure: visible }),
+    nested('Each side', g2(...SIDES.map(side))), nested('Corner radius', g2(...CORNERS.map(corner))));
+}
+
+/* ---- Shadow, filters & transform ---- */
+const FILTER_DEF = { blur: 0, brightness: 100, contrast: 100, saturate: 100, grayscale: 0, 'hue-rotate': 0 };
+function parseFilter(str) { const out = [], re = /([a-z-]+)\(((?:[^()]|\([^()]*\))*)\)/gi; let m; if (!str || str === 'none') return out; while ((m = re.exec(str))) out.push([m[1].toLowerCase(), m[2]]); return out; }
+function filterState() {
+  const m = {}, rest = [];
+  for (const [fn, a] of parseFilter(win.getComputedStyle(sel).filter)) { if (fn in FILTER_DEF) { const n = parseFloat(a); m[fn] = fn === 'blur' || fn === 'hue-rotate' ? n : /%/.test(a) ? n : n * 100; } else rest.push(`${fn}(${a})`); }
+  return { m, rest };
+}
+// Only our six functions are rebuilt; anything else the page put in `filter` (a drop-shadow, say) is kept as it was.
+function setFilter(fn, v) {
+  const { m, rest } = filterState(); m[fn] = v;
+  const parts = Object.keys(FILTER_DEF).filter((k) => (m[k] ?? FILTER_DEF[k]) !== FILTER_DEF[k]).map((k) => `${k}(${k === 'blur' ? r3(m[k]) + 'px' : k === 'hue-rotate' ? r3(m[k]) + 'deg' : r3(m[k] / 100)})`);
+  setProp('filter', [...parts, ...rest].join(' ') || 'none');
+}
+function fxSection(open = false) {
+  const cs = () => win.getComputedStyle(sel);
+  const ff = (fn, label, aria, unit, step) => numField({ label, aria, props: ['filter'], unit, step, read: () => filterState().m[fn] ?? FILTER_DEF[fn], write: (v) => setFilter(fn, v) });
+  return sec('Shadow, filters & transform', open,
+    nested('Box shadow', shadowBlock('box')),
+    h('div', { class: 'sub', text: 'Filters (× resets them all)' }),
+    g2(ff('blur', 'Bl', 'Filter blur in pixels', 'px', 0.5), ff('brightness', 'Br', 'Filter brightness in percent', '%', 5), ff('contrast', 'Co', 'Filter contrast in percent', '%', 5),
+       ff('saturate', 'Sa', 'Filter saturation in percent', '%', 5), ff('grayscale', 'Gs', 'Filter grayscale in percent', '%', 5), ff('hue-rotate', 'Hu', 'Filter hue rotation in degrees', '°', 5)),
+    selectField({ label: 'Blend', aria: 'Blend mode', props: ['mix-blend-mode'], options: () => ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'].map((v) => [v, v]), read: () => cs().mixBlendMode, write: (v) => setProp('mix-blend-mode', v) }),
+    h('div', { class: 'sub', text: 'Transform' }),
+    g2(numField({ label: '↻', aria: 'Rotation in degrees', prop: 'rotate', unit: '°', step: 1, read: (e, c) => parseFloat(c.rotate) || 0, write: (v) => setProp('rotate', r3(v) + 'deg') }),
+       numField({ label: '⤢', aria: 'Scale in percent', prop: 'scale', unit: '%', step: 5, read: (e, c) => (c.scale === 'none' ? 100 : Math.round((parseFloat(c.scale) || 1) * 100)), write: (v) => setProp('scale', r3(v / 100)) })));
+}
+
+/* ---- Layout ---- */
+function layoutSection() {
+  const cs = () => win.getComputedStyle(sel), d = cs().display, flexy = /flex/.test(d), gridy = /grid/.test(d);
+  const sf = (label, aria, prop, vals, extra = {}) => selectField({ label, aria, props: [prop], options: () => vals.map((v) => [v, v]), read: () => cs().getPropertyValue(prop), write: (v) => { setProp(prop, v); if (extra.rebuild) buildPanelSoon(); } });
+  return sec('Layout', false,
+    sf('Show', 'Display', 'display', ['block', 'inline', 'inline-block', 'flex', 'inline-flex', 'grid', 'none'], { rebuild: true }),
+    h('p', { class: 'muted', style: 'margin:2px 0 6px', text: 'A hidden element (display: none) can’t be clicked: undo, or pick it from the breadcrumbs.' }),
+    sf('Pos', 'Position', 'position', ['static', 'relative', 'absolute', 'fixed', 'sticky']),
+    g2(numField({ label: 'Z', aria: 'Stacking order (z-index)', prop: 'z-index', unit: '', step: 1, read: (e, c) => (c.zIndex === 'auto' ? 0 : parseFloat(c.zIndex)), write: (v) => setProp('z-index', String(Math.round(v))) })),
+    sf('Ovf', 'Overflow', 'overflow', ['visible', 'hidden', 'auto', 'scroll', 'clip']),
+    flexy ? sf('Dir', 'Flex direction', 'flex-direction', ['row', 'column', 'row-reverse', 'column-reverse']) : null,
+    flexy ? sf('Wrap', 'Flex wrap', 'flex-wrap', ['nowrap', 'wrap', 'wrap-reverse']) : null,
+    flexy || gridy ? sf('Just', 'Justify content', 'justify-content', ['normal', 'flex-start', 'center', 'flex-end', 'space-between', 'space-around', 'space-evenly']) : null,
+    flexy || gridy ? sf('Align', 'Align items', 'align-items', ['normal', 'stretch', 'flex-start', 'center', 'flex-end', 'baseline']) : null);
+}
+
+/* ---- Any CSS property ---- */
+const CSS_PROPS = ['accent-color', 'align-content', 'align-items', 'align-self', 'animation', 'aspect-ratio', 'backdrop-filter', 'background', 'background-blend-mode', 'background-clip', 'background-color', 'background-image', 'background-position', 'background-repeat', 'background-size', 'border', 'border-bottom', 'border-collapse', 'border-color', 'border-image', 'border-left', 'border-radius', 'border-right', 'border-spacing', 'border-style', 'border-top', 'border-width', 'bottom', 'box-decoration-break', 'box-shadow', 'box-sizing', 'caret-color', 'clip-path', 'color', 'column-count', 'column-gap', 'columns', 'cursor', 'display', 'fill', 'filter', 'flex', 'flex-basis', 'flex-direction', 'flex-flow', 'flex-grow', 'flex-shrink', 'flex-wrap', 'float', 'font', 'font-family', 'font-feature-settings', 'font-kerning', 'font-size', 'font-stretch', 'font-style', 'font-variant', 'font-variant-caps', 'font-variant-numeric', 'font-variation-settings', 'font-weight', 'gap', 'grid-area', 'grid-auto-flow', 'grid-column', 'grid-row', 'grid-template-areas', 'grid-template-columns', 'grid-template-rows', 'height', 'hyphens', 'image-rendering', 'inset', 'isolation', 'justify-content', 'justify-items', 'justify-self', 'left', 'letter-spacing', 'line-height', 'list-style', 'list-style-type', 'margin', 'margin-bottom', 'margin-left', 'margin-right', 'margin-top', 'mask-image', 'max-height', 'max-width', 'min-height', 'min-width', 'mix-blend-mode', 'object-fit', 'object-position', 'opacity', 'order', 'outline', 'outline-color', 'outline-offset', 'outline-style', 'outline-width', 'overflow', 'overflow-wrap', 'overflow-x', 'overflow-y', 'padding', 'padding-bottom', 'padding-left', 'padding-right', 'padding-top', 'perspective', 'place-content', 'place-items', 'pointer-events', 'position', 'resize', 'right', 'rotate', 'row-gap', 'scale', 'scroll-behavior', 'stroke', 'stroke-width', 'tab-size', 'text-align', 'text-align-last', 'text-decoration', 'text-decoration-color', 'text-decoration-line', 'text-decoration-style', 'text-decoration-thickness', 'text-indent', 'text-overflow', 'text-shadow', 'text-transform', 'text-underline-offset', 'text-wrap', 'top', 'transform', 'transform-origin', 'transition', 'translate', 'user-select', 'vertical-align', 'visibility', 'white-space', 'width', 'will-change', 'word-break', 'word-spacing', 'writing-mode', 'z-index'];
+// Returns an error message, or '' when the declaration was accepted and applied.
+function applyCustom(p, v) {
+  p = p.trim().toLowerCase(); v = v.trim().replace(/\s*!important\s*$/i, '').replace(/;+\s*$/, '');
+  if (!/^(--[\w-]+|-?[a-z][a-z-]*)$/.test(p)) return 'Type a CSS property name, like text-underline-offset.';
+  if (!v) return 'Type a value.';
+  if (!safeCssValue(v)) return 'A value can’t contain { } ; < or comment marks.';
+  if (!p.startsWith('--') && !win.CSS.supports(p, v)) return `The browser doesn’t understand “${p}: ${v}”.`;
+  setProp(p, v); return '';
+}
+function cssSection() {
+  if (!document.getElementById('ed-cssprops')) { const dl = h('datalist', { id: 'ed-cssprops' }, CSS_PROPS.map((p) => h('option', { value: p }))); document.body.append(dl); }
+  const prop = h('input', { type: 'text', list: 'ed-cssprops', placeholder: 'property, e.g. text-underline-offset', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'CSS property' });
+  const val = h('input', { type: 'text', placeholder: 'value, e.g. 0.2em', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'CSS value' });
+  const msg = h('p', { class: 'readout warn', style: 'min-height:1.2em' }), host = h('div', { class: 'cssrows' });
+  const add = () => { const r = applyCustom(prop.value, val.value); msg.textContent = r; if (!r) { prop.value = val.value = ''; commit(); syncFields(); prop.focus(); } };
+  for (const i of [prop, val]) i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+  let key = '';
+  fields.push({ sync() {   // this element's recorded declarations, each editable as plain text
+    if (!sel) return; const cur = state.css[scopeKey()]?.[selectorFor(sel)] || {}, k = JSON.stringify(cur);
+    if (k === key || host.contains(document.activeElement)) return; key = k;
+    host.replaceChildren(...Object.entries(cur).map(([p, v]) => {
+      const inp = h('input', { type: 'text', value: v, spellcheck: 'false', 'aria-label': `${p} value` });
+      inp.addEventListener('change', () => { const r = applyCustom(p, inp.value); msg.textContent = r; if (r) inp.value = v; else { commit(); syncFields(); } });
+      return h('div', { class: 'cssrow' }, h('code', { text: p, title: p }), inp, h('button', { class: 'x', type: 'button', title: 'Remove this declaration', 'aria-label': `Remove ${p}`, text: '×', onclick: () => { delTweak(state.css, scopeKey(), selectorFor(sel), p); renderLive(); commit(); syncFields(); } }));
+    }));
+  } });
+  return sec('All CSS', false,
+    h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'Any CSS property, for anything the controls above don’t cover. The browser checks the value before it is recorded.' }),
+    h('div', { class: 'cssadd' }, prop, val, h('button', { type: 'button', class: 'primary', text: 'Set', onclick: add })), msg,
+    h('div', { class: 'sub', text: 'Recorded for this element at this width' }), host);
+}
+
 function buildPanel() {
   fields = []; panel.replaceChildren();
   const sections = [];
@@ -1085,16 +1457,14 @@ function buildPanel() {
       h('div', { class: 'sub', text: 'Margin' }),
       g2(numField(P('T', 'margin-top')), numField(P('R', 'margin-right')), numField(P('B', 'margin-bottom')), numField(P('L', 'margin-left'))),
       showGap ? [h('div', { class: 'sub', text: 'Gap' }), g2(numField(P('G', 'gap', { read: (e, c) => parseFloat(c.rowGap) || 0 })))] : null),
-    sec('Type', true,
-      g2(numField({ label: 'Aa', aria: 'Font size in pixels', prop: 'font-size', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.fontSize), write: (v) => setProp('font-size', remv(v)) }),
-         numField({ label: 'LH', aria: 'Line height (ratio)', prop: 'line-height', unit: '×', step: 0.05, read: (e, c) => (c.lineHeight === 'normal' ? 1.2 : parseFloat(c.lineHeight) / parseFloat(c.fontSize)), write: (v) => setProp('line-height', String(r3(v))) }),
-         numField({ label: 'LS', aria: 'Letter spacing in em', prop: 'letter-spacing', unit: 'em', step: 0.01, read: (e, c) => (c.letterSpacing === 'normal' ? 0 : parseFloat(c.letterSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('letter-spacing', r3(v) + 'em') }))),
+    typeSection(),
     sec('Colour & effects', true,
       colorField('Text', 'color'), colorField('Fill', 'background-color'),
       h('div', { class: 'sub', text: 'Effects' }),
       g2(numField({ label: 'Op', aria: 'Opacity', prop: 'opacity', unit: '0–1', step: 0.05, read: (e, c) => parseFloat(c.opacity), write: (v) => setProp('opacity', String(Math.max(0, Math.min(1, r3(v))))) }),
          numField({ label: 'R', aria: 'Corner radius in pixels', prop: 'border-radius', unit: 'px', read: (e, c) => parseFloat(c.borderTopLeftRadius) || 0, write: (v) => setProp('border-radius', remv(v)) }),
          numField({ label: 'Bl', aria: 'Frosted-glass blur in pixels (frosted plates only)', prop: '--blur', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.getPropertyValue('--blur')) || 0, write: (v) => setProp('--blur', r3(v) + 'px') }))),
+    borderSection(), fxSection(!!layerClass(sel)), layoutSection(), cssSection(),   // rotation lives here, and is a main control for a decorative layer
     ...[layersSection(), pageSection(false), tokensSection(), changesSection()].filter(Boolean));
   syncFields(); afterChange();
 }
@@ -1286,7 +1656,6 @@ function layerSection(el) {
     const zNow = () => (parseInt(win.getComputedStyle(el).zIndex, 10) >= 0 ? '20' : '-1');
     z.value = zNow(); z.addEventListener('change', () => { setTweak(state.css, '', '.' + c, 'z-index', z.value); renderLive(); commit(); });
     kids.push(h('label', { class: 'fsel', style: 'grid-template-columns:54px minmax(0,1fr)' }, h('span', { class: 'lab', text: 'Order' }), z));
-    kids.push(g2(numField({ label: '↻', aria: 'Rotation in degrees', prop: 'rotate', unit: '°', step: 1, read: (e, cs) => parseFloat(cs.rotate) || 0, write: (v) => setProp('rotate', `${r3(v)}deg`) })));
   }
   kids.push(h('div', { class: 'btnrow' }, h('button', { type: 'button', text: 'Delete layer', title: 'Delete (Del)', style: 'color:#ff8b8b', onclick: () => deleteLayer(el) })));
   return sec('Layer', true, ...kids);
@@ -1416,7 +1785,11 @@ function tokensSection() {
     const reset = h('button', { class: 'x', type: 'button', text: '×', 'aria-label': 'Reset', title: 'Reset this tweak' });
     const row = h('div', { class: 'fc', style: 'grid-template-columns:90px minmax(0,1fr) 14px' }, h('span', { class: 'lab', text: n.replace(/^--/, ''), title: n }), inp, reset);
     const f = { sync() { if (document.activeElement !== inp) inp.value = win.getComputedStyle(root).getPropertyValue(n).trim(); row.classList.toggle('on', state.css[tokScope(n)]?.[':root']?.[n] != null); } };
-    inp.addEventListener('change', () => { if (inp.value.trim()) { setTweak(state.css, tokScope(n), ':root', n, inp.value.trim()); renderLive(); commit(); syncFields(); } });
+    inp.addEventListener('change', () => {
+      const v = inp.value.trim(); if (!v) return;
+      if (!safeCssValue(v)) { toast('A value can’t contain { } ; < or comment marks.', 2800, 'warn'); syncFields(); return; }
+      setTweak(state.css, tokScope(n), ':root', n, v); renderLive(); commit(); syncFields();
+    });
     reset.addEventListener('click', () => { delTweak(state.css, tokScope(n), ':root', n); renderLive(); commit(); syncFields(); });
     fields.push(f); body.append(row);
   }
@@ -1604,6 +1977,30 @@ function applyImageEdits(src, edits, pagePath) {
   }
   return { src: out, applied, failed };
 }
+/* The Google Fonts <link> for fonts picked in the editor: one managed block in <head>. Fonts the page already loads are not added;
+   fonts no CSS mentions any more are taken out again; the block disappears when it would be empty. */
+function applyFonts(src, merged) {
+  const m = FONTS_RE.exec(src), outside = m ? src.replace(FONTS_RE, '') : src, loaded = new Set();
+  for (const mm of outside.matchAll(/<link\b[^>]*href=(["'])([^"']*fonts\.googleapis\.com[^"']*)\1[^>]*>/gi)) for (const q of familiesIn(mm[2])) loaded.add(fontKey(qInfo(q).family));
+  const mine = (text) => [...text.matchAll(/href=(["'])([^"']*)\1/g)].flatMap((x) => familiesIn(x[2]));
+  const keep = new Map(); for (const q of m ? mine(m[2]) : []) keep.set(fontKey(qInfo(q).family), q);
+  for (const f of state.fonts) if (!loaded.has(fontKey(f.family))) keep.set(fontKey(f.family), f.q);
+  const css = (stripBlock(src).match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n') + '\n' + blockText(merged);
+  const used = (fam) => new RegExp('[\'"]' + fam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[\'"]', 'i').test(css);
+  const final = [...keep.values()].filter((q) => used(qInfo(q).family));
+  const before = (m ? mine(m[2]) : []).map((q) => qInfo(q).family), after = final.map((q) => qInfo(q).family);
+  const added = after.filter((n) => !before.some((b) => fontKey(b) === fontKey(n))), removed = before.filter((n) => !after.some((a) => fontKey(a) === fontKey(n)));
+  if (!added.length && !removed.length) return { src, added, removed };
+  let out;
+  if (!final.length) { const y = m.index + m[0].length; out = src.slice(0, m.index) + src.slice(src[y] === '\n' ? y + 1 : y); }
+  else {
+    const ind = m ? m[1] : '  ', block = `${ind}${FONTS_START}\n${ind}<link href="${gfHref(final)}" rel="stylesheet">\n${ind}${FONTS_END}`;
+    if (m) out = src.replace(FONTS_RE, () => block);
+    else { const i = src.indexOf('</head>'); if (i < 0) throw new Error('no </head> found in the page'); out = src.slice(0, i) + block + '\n' + src.slice(i); }
+    const D2 = parseDoc(out); if (!D2.querySelector('head link[href*="fonts.googleapis.com"]')) throw new Error('the fonts link would not end up in <head>');
+  }
+  return { src: out, added, removed };
+}
 function buildNewSource(remoteSrc) {
   const remoteCss = parseBlock(remoteSrc), merged = applyOps(remoteCss, diffCss(baseline, state.css));
   const t = applyTextEdits(remoteSrc, state.text), im = applyImageEdits(t.src, state.images, settings.path);
@@ -1617,8 +2014,10 @@ function buildNewSource(remoteSrc) {
     catch (err) { layersFailed.push({ L, why: err.message || String(err) }); dropCss(merged, L.cls); }
   }
   if (!/class="[^"]*\bed-deco\b/.test(stripBlock(out)) && merged['']) { delete merged[''][DECO_BASE]; if (!Object.keys(merged['']).length) delete merged['']; }
+  let fonts = { added: [], removed: [], failed: '' };
+  try { const fr = applyFonts(out, merged); out = fr.src; fonts = { added: fr.added, removed: fr.removed, failed: '' }; } catch (err) { fonts.failed = err.message || String(err); }
   out = replaceBlock(out, blockText(merged));
-  return { src: out, merged, applied: t.applied, failed: t.failed, imgApplied: im.applied, imgFailed: im.failed, layersPlaced, layersFailed, removedDone, removedFailed };
+  return { src: out, merged, fonts, applied: t.applied, failed: t.failed, imgApplied: im.applied, imgFailed: im.failed, layersPlaced, layersFailed, removedDone, removedFailed };
 }
 function prBody(s, built) {
   const lines = ['Visual tweaks made with the page editor (`/editor/`).', ''];
@@ -1633,6 +2032,13 @@ function prBody(s, built) {
     for (const r of built.removedDone) lines.push(`- Deleted layer \`.${r.cls}\``);
     lines.push('');
   }
+  if (built.fonts.added.length || built.fonts.removed.length) {
+    lines.push('**Google Fonts**');
+    if (built.fonts.added.length) lines.push(`- Now loaded in \`<head>\`: ${built.fonts.added.join(', ')}`);
+    if (built.fonts.removed.length) lines.push(`- No longer loaded (nothing uses them): ${built.fonts.removed.join(', ')}`);
+    lines.push('');
+  }
+  if (built.fonts.failed) { lines.push(`**The Google Fonts link could not be written automatically** (${built.fonts.failed}); add the fonts to \`<head>\` by hand.`, ''); }
   if (built.layersFailed.length || built.removedFailed.length) {
     lines.push('**Layers that could not be added or removed automatically** (do by hand):');
     for (const f of built.layersFailed) lines.push(`- ${describeLayer(f.L)}: ${f.why}`);
@@ -1725,6 +2131,8 @@ function openReview() {
         h('div', {}, h('div', {}, h('code', { text: e.path })), h('div', { class: 'muted', text: `${shortSrc(e.was)} → ${fmtBytes(e.bytes)}${e.w ? `, ${e.w}×${e.h}` : ''}` })))))] : null,
     (s.layers.length || s.removed.length) ? [h('div', { class: 'sub', text: 'Layers' }), h('ul', {}, [...built.layersPlaced.map((l) => h('li', {}, `Add ${describeLayer(l)}${l.kind === 'image' ? ` (uploads ${l.path})` : ''}`)), ...built.removedDone.map((r) => h('li', {}, `Delete layer .${r.cls}`))])] : null,
     (built.layersFailed.length || built.removedFailed.length) ? h('p', { class: 'warn', text: `${built.layersFailed.length + built.removedFailed.length} layer change(s) can't be made automatically (${[...built.layersFailed.map((f) => f.why), ...built.removedFailed.map((f) => f.why)][0]}). They won't be applied; they're listed in the PR description.` }) : null,
+    (built.fonts.added.length || built.fonts.removed.length) ? [h('div', { class: 'sub', text: 'Google Fonts (managed link in <head>)' }), h('ul', {}, [built.fonts.added.length ? h('li', {}, `Load: ${built.fonts.added.join(', ')}`) : null, built.fonts.removed.length ? h('li', {}, `Stop loading: ${built.fonts.removed.join(', ')}`) : null].filter(Boolean))] : null,
+    built.fonts.failed ? h('p', { class: 'warn', text: `The Google Fonts link can't be written automatically (${built.fonts.failed}). The pull request will say which fonts to add by hand.` }) : null,
     built.imgFailed.length ? h('p', { class: 'warn', text: `${built.imgFailed.length} picture(s) can't be placed automatically (the old address isn't found exactly once as a src in the file). They won't be uploaded; they're listed in the PR description.` }) : null,
   ].flat().filter(Boolean));
   const go = h('button', { class: 'primary', type: 'button', text: 'Create pull request' });
@@ -1755,7 +2163,7 @@ window.addEventListener('resize', () => { layoutFrame(); updateOverlay(); });
 layoutFrame(); loadPage();
 
 // handy for debugging and for the automated tests
-window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, applyImageEdits, indexHtml, placeInFlow, placeDecor, removeLayerFromSource, addLayer, addImageLayer, deleteLayer, layerOf, layerClass, pathOf, liveAt, containerFor, buildNewSource, ensurePush, pushTo, pageLen, replaceImage, prepareImage, assets, inkAlpha, inkFor, tokScope, get guarded() { return guarded; }, get doc() { return doc; }, get sel() { return sel; }, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
+window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, applyImageEdits, applyFonts, applyCustom, safeCssValue, qInfo, gfQ, GFONTS, loadCustomFont, ensureFont, get pageFonts() { return pageFonts; }, indexHtml, placeInFlow, placeDecor, removeLayerFromSource, addLayer, addImageLayer, deleteLayer, layerOf, layerClass, pathOf, liveAt, containerFor, buildNewSource, ensurePush, pushTo, pageLen, replaceImage, prepareImage, assets, inkAlpha, inkFor, tokScope, get guarded() { return guarded; }, get doc() { return doc; }, get sel() { return sel; }, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
 })();
 </script>
 </body>
