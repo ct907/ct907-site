@@ -117,16 +117,13 @@
       --lv: 1px;
       --lc: 2px;
 
-      /* Frosted plates behind text and buttons (pictures have none: see "pictures" below).
+      /* Frosted plates behind text, buttons and picture LINKS (pictures that aren't links have none: see "pictures" below).
          Figma "background blur 8" = CSS blur(4px): Figma's number is twice the CSS radius. */
       --blur: 4px;
       --edge: 4px;                            /* soft edge: the blur fades from full strength to none over this width at the plate's border (0 = hard edge) */
       --glass: rgb(242 238 234 / .05);       /* #F2EEEA @ 5%  */
       --glass-hover: rgb(255 129 3 / .2);    /* #FF8103 @ 20% */
       --glass-press: rgb(0 180 255 / .2);    /* #00B4FF @ 20% */
-
-      /* Picture links: a colour-shifted shadow, like a misregistered print: a yellow plate offset 2px and a magenta plate offset 4px. */
-      --shift-y: #ffe600; --shift-m: #ff3d9a; --shift-1: 2px; --shift-2: 4px;
 
       --arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M0 7h22M16 1l6 6-6 6' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
       /* Side gutter inside the page column. Phones and tablets: ~5.5% of the width (about 20px on a phone, 42px on a tablet).
@@ -398,21 +395,20 @@
     .tiles a {
       --gx: .4rem; --gy: .4rem; --gr: .8rem;
       display: block; width: auto;
-      transition: transform .25s, box-shadow .25s, background-color .18s;
     }
-    .tiles a:hover, .tiles a:focus-visible { box-shadow: 0 8px 16px rgba(0,0,0,.2); }
-    :root:not([data-motion="reduced"]) .tiles a:is(:hover, :focus-visible) { transform: translateY(-4px); }
+    /* The lift and the drop shadow sit on the <li>, not the link: the link's soft-edge mask would clip a shadow drawn outside it. */
+    .tiles li { border-radius: .8rem; transition: transform .25s, box-shadow .25s; }
+    .tiles li:hover { box-shadow: 0 8px 16px rgba(0,0,0,.2); }
+    .tiles li:has(a:focus-visible) { box-shadow: 0 8px 16px rgba(0,0,0,.2); }
+    :root:not([data-motion="reduced"]) .tiles li:hover { transform: translateY(-4px); }
+    :root:not([data-motion="reduced"]) .tiles li:has(a:focus-visible) { transform: translateY(-4px); }
     .tiles img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: .4rem; }
 
     /* ---------- pictures ----------
-       Pictures are not frosted. Pictures that aren't links (the icon grid, the portrait, the photo strip)
-       have no plate and no blur at all. Picture LINKS (the album covers) keep their hover/press tint but have
-       no blur either; instead the picture gets a colour-shifted shadow: a yellow copy offset 2px and a
-       magenta copy offset 4px behind it, like a misregistered print. The album card is a text card (title,
-       year, link) and keeps its frosted plate. */
+       Only pictures that are LINKS (the album covers above) sit on a frosted plate, like every other clickable thing.
+       Pictures that aren't links (the icon grid, the portrait, the photo strip) have no plate and no blur at all.
+       Pictures added with the editor follow the same rule: no plate unless "Frosted plate behind it" is ticked. */
     :is(.art, .portrait, .strip figure).glass { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: transparent; }
-    .tiles a.glass { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: var(--fill, transparent); }
-    .tiles img { box-shadow: var(--shift-1) var(--shift-1) 0 var(--shift-y), var(--shift-2) var(--shift-2) 0 var(--shift-m); }
     .earlier { --gx: 1rem; --gy: .55rem; --gr: .9rem; font-size: .9rem; color: var(--muted); margin: .9rem 0 0; max-width: 40rem; }
     .pill {
       --gx: 1.4rem; --gy: .5rem; --gr: .5rem;
@@ -923,7 +919,7 @@
      an SVG (its exact size and corner radius, inset by half the edge and blurred by a quarter of it, so the
      opacity runs from ~0% at the border to ~100% 4px in) and used as a mask-image, which fades both the
      backdrop blur and the plate's fill. Plates with a visible border (the album card, the Artist Pages button)
-     keep their crisp edge; pictures have no blur. Without script, or in contrast modes, plates keep a hard edge. */
+     keep their crisp edge; pictures that aren't links have no blur. Without script, or in contrast modes, plates keep a hard edge. */
   (function () {
     var root = document.documentElement;
     if (!('maskImage' in root.style || 'webkitMaskImage' in root.style)) return;
