@@ -94,14 +94,25 @@
       --ink: #0b0b0b;
       --muted: #55524f;
       --accent: #ff6546;
-      --green: #1f6b2d;            /* was #2c8a3d; darkened so the label stays >= 4.5:1 on the tinted hover/press plates */
-      --grid-line: #adcedd;
+      --green: #1c6429;            /* was #2c8a3d; darkened so the label stays >= 4.5:1 on the tinted hover/press plates, even on the darkest grain speck */
       --rule: #117b9a;             /* section dividers */
 
+      /* Risograph paper + inks. The grid is printed as two ink plates, cyan and magenta,
+         that multiply where they overlap (the verticals come out blue). The inks are the
+         colours measured from the reference print's peaks, corrected for this paper and grain.
+         --paper is a hair lighter than --bg on purpose: the grain on top darkens the page
+         by ~2%, so the page averages out to exactly --bg (#F2EEEA). */
+      --paper: #f8f4ef;
+      --ink-c: #59e1ff;
+      --ink-m: #e1c1dd;
+
       /* Graph-paper grid. One cell is 2.25rem, so it grows and shrinks with the
-         text (the root font-size below is fluid). */
+         text (the root font-size below is fluid). Line widths are a share of the cell
+         (as in the reference); --lv = vertical lines (both plates) and the magenta
+         horizontal, --lc = the cyan horizontal, which prints a little heavier. */
       --cell: 2.25rem;
-      --line: 1px;
+      --lv: 1px;
+      --lc: 2px;
 
       /* Frosted plates behind text, images and buttons.
          Figma "background blur 8" = CSS blur(4px): Figma's number is twice the CSS radius. */
@@ -121,7 +132,8 @@
     @supports (width: round(1px, 1px)) {
       :root {
         --cell: round(2.25rem, 1px);
-        --line: round(max(1px, calc(var(--cell) * .04)), 1px);
+        --lv: round(max(1px, calc(var(--cell) * .036)), 1px);
+        --lc: round(max(1px, calc(var(--cell) * .044)), 1px);
       }
     }
     * { box-sizing: border-box; }
@@ -141,15 +153,43 @@
     :root[data-motion="full"] { scroll-behavior: smooth; }
     :root[data-motion="reduced"] { scroll-behavior: auto; }
     body {
+      position: relative;                        /* anchors the paper layers below */
+      min-height: 100vh; min-height: 100svh;
       margin: 0;
-      background-color: var(--bg);
-      background-image:
-        linear-gradient(to right,  var(--grid-line) var(--line), transparent 0),
-        linear-gradient(to bottom, var(--grid-line) var(--line), transparent 0);
-      background-size: var(--cell) var(--cell);
+      background-color: var(--bg);               /* canvas colour (overscroll); the paper itself is ::before */
       color: var(--ink);
       font: 400 1rem/1.6 var(--text);
       overflow-x: clip;
+    }
+    /* The printed grid: four layers (magenta and cyan, each vertical + horizontal) multiplied
+       onto the paper. The magenta plate is registered one line-width ABOVE the cyan one, so
+       each horizontal line splits into a magenta line sitting on a cyan line, while the
+       verticals overlap into one blue line. The offset and widths are shares of the grid cell,
+       so the misregistration scales with the text. Sits behind all content. */
+    body::before {
+      content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      background-color: var(--paper);
+      background-image:
+        linear-gradient(to bottom, var(--ink-m) var(--lv), transparent 0),   /* magenta, horizontal */
+        linear-gradient(to right,  var(--ink-m) var(--lv), transparent 0),   /* magenta, vertical   */
+        linear-gradient(to bottom, var(--ink-c) var(--lc), transparent 0),   /* cyan, horizontal    */
+        linear-gradient(to right,  var(--ink-c) var(--lv), transparent 0);   /* cyan, vertical      */
+      background-size: var(--cell) var(--cell);
+      background-position: 0 calc(var(--lv) * -1), 0 0, 0 0, 0 0;
+      background-blend-mode: multiply;
+    }
+    /* Paper grain over everything, so the text and photos are printed on the same sheet.
+       Two layers of fractal noise: a fine grain (0.8 base frequency) plus a soft, large-scale
+       mottling (0.09), tuned against the reference's contrast, colour speckle and dark-speck
+       skew, then sized for the page's real scale (the reference is a ~5x zoom). Each tile is
+       stitched, and the two tile sizes differ (300 / 420px) so no repeat shows. It only ever
+       darkens, so black text stays black. */
+    body::after {
+      content: ""; position: absolute; inset: 0; z-index: 60; pointer-events: none;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1.55 0 0 0 -.525  0 1.4 0 0 -.450  0 0 2.2 0 -.830  0 0 0 .13 -.049'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.09' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .25  0 0 0 0 .25  0 0 0 0 .28  0 0 0 .09 -.034'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 300px 300px, 420px 420px;
     }
     a { color: inherit; -webkit-tap-highlight-color: transparent; }
     /* Solid ink ring: the orange accent is only ~2.5:1 on this background. */
@@ -428,10 +468,16 @@
       :root { --glass: rgb(242 238 234 / .92); --glass-hover: #f5d8bc; --glass-press: #c2e2ee; --glass-quiet: #e6e2de; }
       .glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
-    @media (prefers-contrast: more) { :root { --grid-line: #d3e4ec; } }
+    /* Increased contrast: pale inks, and no grain, so text sits on clean paper. */
+    @media (prefers-contrast: more) {
+      :root { --ink-c: #c3ecfb; --ink-m: #ecdde6; --paper: var(--bg); }
+      body::after { display: none; }
+    }
+    /* Paper grain is for screens: leave it out of printouts. */
+    @media print { body::after { display: none; } :root { --paper: var(--bg); } }
     /* Forced colours (Windows high contrast): system colours; hover/focus get an outline instead of a tint. */
     @media (forced-colors: active) {
-      body { background-image: none; }
+      body::before, body::after { display: none; }
       .glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
       a.glass:hover, a.glass:focus-visible { outline: 2px solid Highlight; }
     }
