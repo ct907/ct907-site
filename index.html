@@ -92,6 +92,7 @@
       /* Frosted plates behind text, images and buttons.
          Figma "background blur 8" = CSS blur(4px): Figma's number is twice the CSS radius. */
       --blur: 4px;
+      --blur-hover: 12px;                    /* non-clickable plates on hover: Figma 24 */
       --glass: rgb(242 238 234 / .05);       /* #F2EEEA @ 5%  */
       --glass-hover: rgb(255 129 3 / .2);    /* #FF8103 @ 20% */
       --glass-press: rgb(0 180 255 / .2);    /* #00B4FF @ 20% */
@@ -149,7 +150,7 @@
       background-color: var(--fill, var(--glass));
       -webkit-backdrop-filter: blur(var(--blur));
       backdrop-filter: blur(var(--blur));
-      transition: background-color .18s ease;
+      transition: background-color .18s ease, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
     }
 
     /* ---------- hero ---------- */
@@ -322,7 +323,10 @@
     .strip-outer { margin: 0 calc(-1 * var(--pad)); overflow-x: auto; overflow-y: hidden; padding: 1rem 0 1.4rem; scrollbar-width: none; }
     .strip-outer::-webkit-scrollbar { display: none; }
     .strip { display: flex; align-items: flex-end; width: max-content; min-width: 100%; padding: 0 1rem; justify-content: safe center; }
-    .strip figure { --gx: .35rem; --gy: .35rem; --gr: .85rem; margin: 0 -.9rem 0 0; flex: none; transition: transform .25s; }
+    .strip figure {
+      --gx: .35rem; --gy: .35rem; --gr: .85rem; margin: 0 -.9rem 0 0; flex: none;
+      transition: transform .25s, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
+    }
     .strip figure:hover { transform: translateY(-6px) scale(1.03); z-index: 5; position: relative; }
     .strip img { height: 100%; width: 100%; object-fit: cover; border-radius: .5rem; filter: drop-shadow(1px 5px 1px rgba(0, 14, 37, .58)); }
     .strip .rot { transform: rotate(10deg); }
@@ -343,6 +347,11 @@
     }
     a.glass:focus-visible { --fill: var(--glass-hover); }
     a.glass:active, .release:active { --fill: var(--glass-press); }
+    /* Plates that aren't clickable don't take the orange/blue tint (that would suggest they're
+       links). Instead the blur deepens on hover, so the grid seems to vanish behind them. */
+    @media (hover: hover) {
+      .glass:not(a, .release, .aside):hover { --blur: var(--blur-hover); }
+    }
     /* Whole-card link: ring the card instead of just the title. */
     @supports selector(:has(*)) {
       .release:has(a:focus-visible) { --fill: var(--glass-hover); outline: 2px solid var(--ink); outline-offset: 3px; }
