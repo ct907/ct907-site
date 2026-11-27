@@ -223,6 +223,14 @@ const GUARD = '(prefers-contrast: no-preference)';
 const INKS = { '--ink-c': [0x59, 0xe1, 0xff], '--ink-m': [0xe1, 0xc1, 0xdd] };
 const MAX_PUSH = 20000;                       // px: a typo like 99999999 shouldn't make a page that long
 const IMG_DIR = 'assets/images';
+// Layers added with the editor carry one unique class (ed-text-k3f9, ed-deco-t8x2 …). It is their identity everywhere:
+// the CSS tweaks are keyed on it, the editor recognises them by it, and it is what lets a pushed layer be found and deleted later.
+const LAYER_RE = /^ed-(text|heading|image|deco)-[a-z0-9]{4}$/;
+const DECOR_START = '<!-- ===== editor decor: start (managed by /editor/; safe to hand-edit) ===== -->';
+const DECOR_END = '<!-- ===== editor decor: end ===== -->';
+const DECOR_RE = /<!-- ===== editor decor: start[^\n]*?-->([\s\S]*?)<!-- ===== editor decor: end ===== -->/;
+const CONTAINERS = new Set(['div', 'section', 'article', 'aside', 'header', 'footer', 'main', 'nav', 'li', 'figure', 'blockquote', 'details']);
+const DECO_BASE = '.ed-deco';   // the one shared rule for every decorative layer
 const IMG_TYPES = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/avif': 'avif' };
 const IMG_BY_EXT = { webp: 'image/webp', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', svg: 'image/svg+xml', avif: 'image/avif' };
 
@@ -355,7 +363,7 @@ let settings = Object.assign({ owner: 'ct907', repo: 'ct907-site', base: 'main',
 let token = settings.remember ? (lsGet(LS.token) || '') : '';
 let source0 = '';
 let baseline = {};                 // tweaks that are already in the deployed page
-let state = { css: {}, text: [], images: [] }; // baseline + this session's tweaks (images: replaced pictures; the files live in `assets`)
+let state = { css: {}, text: [], images: [], layers: [], removed: [] }; // baseline + this session's tweaks (images: replaced pictures, files in `assets`; layers: new text/images; removed: pushed layers to delete)
 const originals = new Map();       // selector -> original innerHTML (text edits)
 const imgOrig = new Map();         // selector -> original src attribute (image replacements)
 const assets = new Map();          // repo path -> { blob, url, file, ... }: the replacement files (too big for the undo history)
@@ -363,6 +371,7 @@ let guarded = new Set();           // site-wide tokens the page overrides for in
 let tokBase = {};                  // grid / grain token values as the page loads (so sliding back to the shipped value records nothing)
 let push = null;                   // the "move this and everything below" session for the selected element
 let pushAuto = true, pushOpen = true, pushHot = false, gripHover = false;
+let addPos = 'after';              // where a new in-flow layer goes: after the selected item | at the start | at the end of its container
 let imgOpts = { optimise: true, maxSide: 0 };   // maxSide 0 = work it out from the size the picture is shown at
 let history = [], hIndex = -1;
 
@@ -382,9 +391,12 @@ function toast(msg, ms = 3200, kind = '') {
 }
 
 /* ---------- history ---------- */
-function commit() {
+let freshLayer = null;   // a text layer just added: its first text edit amends the "add" step instead of being a step of its own
+function commit(amend = false) {
   const snap = JSON.stringify(state);
   if (history[hIndex] === snap) return;
+  if (amend && hIndex >= 0) { history[hIndex] = snap; afterChange(); saveDraft(); return; }
+  freshLayer = null;
   history = history.slice(0, hIndex + 1); history.push(snap); if (history.length > 300) history.shift();
   hIndex = history.length - 1;
   // Starting to edit without answering the "restore?" offer means "start fresh".
@@ -407,7 +419,7 @@ function afterChange() {
 let pendingDraft = null;   // a saved draft we're offering to restore: don't overwrite it until the user decides
 function saveDraft() {
   if (pendingDraft) return;
-  const ops = diffCss(baseline, state.css);
+  const all = diffCss(baseline, state.css), ops = { set: all.set.filter((x) => !newLayerSel(x[1])), del: all.del.filter((x) => !newLayerSel(x[1])) };
   if (!ops.set.length && !ops.del.length && !state.text.length) { lsDel(LS.draft); return; }
   lsSet(LS.draft, JSON.stringify({ path: settings.path, ops, text: state.text, originals: [...originals] }));
 }
@@ -419,6 +431,7 @@ function stableClasses(e) { return [...e.classList].filter((c) => !VOLATILE.has(
 function selectorFor(e) {
   const d = e.ownerDocument, W = d.defaultView;
   const part = (n) => {
+    const lc = layerClass(n); if (lc) return '.' + lc;
     if (n.id) return '#' + W.CSS.escape(n.id);
     let p = n.localName + stableClasses(n).map((c) => '.' + W.CSS.escape(c)).join('');
     const sibs = [...n.parentElement.children];
@@ -438,12 +451,52 @@ function selectorFor(e) {
 
 /* ---------- live preview ---------- */
 const scopeKey = () => rangeFor(frameW).cond;
+
+/* ---------- layers: new text / images ----------
+   The page's own elements are addressed by their position among the page's elements (a "path" of child indexes from <body>,
+   ignoring what the page script or the editor inject, and ignoring layers, so a layer never shifts anybody's path). */
+const layerClass = (el) => (el && el.classList ? [...el.classList].find((c) => LAYER_RE.test(c)) || null : null);
+const layerOf = (el) => { const c = layerClass(el); return c ? state.layers.find((l) => l.cls === c) || null : null; };
+const kept = (n) => [...n.children].filter((c) => c.id !== 'fx' && !(c.id || '').startsWith('__ed') && !c.hasAttribute('data-ed-layer'));
+function pathOf(el) { const p = []; for (let n = el; n && n !== doc.body; n = n.parentElement) { if (!n.parentElement) return null; p.unshift(kept(n.parentElement).indexOf(n)); } return p; }
+function liveAt(path) { let n = doc.body; for (const i of path) { n = n && kept(n)[i]; } return n || null; }
+const sigOf = (el) => ({ tag: el.localName, id: el.id || '', classes: stableClasses(el).sort() });
+const hasCls = (sel, c) => sel === '.' + c || sel.startsWith('.' + c + ' ') || sel.startsWith('.' + c + ':');
+// CSS that belongs to a layer being added or deleted (its own rules, and the shared decoration rule) is part of that change, not a change of its own.
+const newLayerSel = (sel) => state.layers.some((l) => hasCls(sel, l.cls)) || state.removed.some((r) => hasCls(sel, r.cls)) || (sel === DECO_BASE && (state.layers.some((l) => l.where === 'deco') || state.removed.length > 0));
+function placeNode(n, l, parent) {
+  const a = l.anchor;
+  if (a.after) { const ref = a.after.layer ? doc.querySelector(`[data-ed-layer="${a.after.layer}"]`) : liveAt(a.after.path); if (ref && ref.parentElement === parent) { ref.after(n); return; } }
+  if (a.start) parent.prepend(n); else parent.append(n);
+}
+function syncLayers() {
+  if (!doc) return;
+  const want = new Set(state.layers.map((l) => l.id));
+  for (const n of doc.querySelectorAll('[data-ed-layer]')) if (!want.has(n.getAttribute('data-ed-layer'))) n.remove();
+  for (const l of state.layers) {
+    const parent = l.where === 'deco' ? doc.body : liveAt(l.parent); if (!parent) continue;
+    let n = doc.querySelector(`[data-ed-layer="${l.id}"]`), fresh = false;
+    if (!n) { n = doc.createElement(l.tag); n.setAttribute('data-ed-layer', l.id); fresh = true; }
+    const cls = l.classes.join(' '); if (n.getAttribute('class') !== cls) n.setAttribute('class', cls);
+    if (l.kind === 'image') {
+      const a = assets.get(l.path); if (a && n.getAttribute('src') !== a.url) n.setAttribute('src', a.url);
+      n.setAttribute('alt', l.where === 'deco' ? '' : l.alt || ''); if (l.w) { n.setAttribute('width', l.w); n.setAttribute('height', l.h); }
+    } else if (!(editing && editing.el === n) && n.innerHTML !== l.text) n.innerHTML = l.text;
+    if (l.where === 'deco') n.setAttribute('aria-hidden', 'true');
+    if (fresh) { if (l.where === 'deco') doc.body.append(n); else placeNode(n, l, parent); }
+  }
+  // pushed layers marked for deletion stay in the preview's DOM (so undo is trivial) but are hidden
+  const gone = new Set(state.removed.map((r) => r.cls));
+  for (const n of doc.querySelectorAll('[data-ed-gone]')) if (!gone.has(layerClass(n))) n.removeAttribute('data-ed-gone');
+  for (const c of gone) for (const n of doc.querySelectorAll('.' + c)) n.setAttribute('data-ed-gone', '');
+}
 const rootPx = () => parseFloat(win.getComputedStyle(root).fontSize) || 16;
 function renderLive() {
   if (!doc) return;
   let st = doc.getElementById('__ed_live');
   if (!st) { st = doc.createElement('style'); st.id = '__ed_live'; doc.head.append(st); }
   st.textContent = cssText(state.css);
+  syncLayers();
   for (const [s, orig] of originals) {
     const t = state.text.find((x) => x.sel === s), node = doc.querySelector(s);
     if (!node || (editing && editing.el === node)) continue;
@@ -493,7 +546,7 @@ async function loadPage() {
     q('#empty').textContent = `Couldn't load ${settings.path} (${err.message}). Open this editor from the live site (…/editor/), not from a file on disk.`; return;
   }
   baseline = parseBlock(source0);
-  state = { css: clone(baseline), text: [], images: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1;
+  state = { css: clone(baseline), text: [], images: [], layers: [], removed: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1;
   for (const a of assets.values()) URL.revokeObjectURL(a.url);
   assets.clear(); push = null;
   sel = null; hover = null; editing = null;
@@ -507,7 +560,7 @@ function onFrameLoad() {
   root.setAttribute('data-motion', 'reduced'); root.classList.remove('fx');
   doc.querySelectorAll('.reveal').forEach((e) => e.classList.add('in'));
   const css = doc.createElement('style'); css.id = '__ed_css';
-  css.textContent = '#fx{display:none!important} html{scroll-behavior:auto!important} .aside{opacity:1!important;transform:none!important;pointer-events:auto!important;transition:none!important}';
+  css.textContent = 'html .ed-deco{pointer-events:auto!important} html [data-ed-gone]{display:none!important} #fx{display:none!important} html{scroll-behavior:auto!important} .aside{opacity:1!important;transform:none!important;pointer-events:auto!important;transition:none!important}';
   doc.head.append(css);
   // The page's own managed tweaks are re-injected by the editor (baseline + session), so remove the static copy.
   for (const s of doc.querySelectorAll('style')) if (BLOCK_RE.test(s.textContent)) s.textContent = stripBlock(s.textContent);
@@ -549,7 +602,7 @@ function buildOverlay() {
   ov.cut = mk('position:fixed;display:none;left:0;right:0;height:0;border-top:2px dashed #ff8a00');
   ov.grip = mk('position:fixed;display:none;right:14px;background:#ff8a00;color:#111;padding:2px 9px;border-radius:999px;font-weight:600;white-space:nowrap;pointer-events:auto;cursor:ns-resize;box-shadow:0 1px 4px rgba(0,0,0,.35)');
   ov.grip.dataset.h = 'push'; ov.grip.textContent = '⇅ push this & below';
-  ov.units = [];
+  ov.units = []; ov.chips = [];
   ov.handles = {};
   for (const hd of HANDLES) {
     const n = mk(`position:fixed;display:none;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;background:#fff;border:1.5px solid #3b8cff;border-radius:2px;pointer-events:auto;cursor:${CURSORS[hd]}`);
@@ -558,14 +611,30 @@ function buildOverlay() {
   o.prepend(ov.hover, ov.sel, ov.tag, ov.size, ov.cutTint, ov.cut, ov.grip); root.append(o);
 }
 function isRotated(el) {
-  const t = win.getComputedStyle(el).transform; if (!t || t === 'none') return false;
+  const cs = win.getComputedStyle(el); if (cs.rotate && cs.rotate !== 'none' && parseFloat(cs.rotate) % 360) return true;
+  const t = cs.transform; if (!t || t === 'none') return false;
   try { const m = new win.DOMMatrixReadOnly(t); return Math.abs(m.b) > 1e-4 || Math.abs(m.c) > 1e-4 || Math.abs(m.a - 1) > 1e-3 || Math.abs(m.d - 1) > 1e-3; } catch { return false; }
 }
 const resizable = (el) => win.getComputedStyle(el).display !== 'inline' && !isRotated(el);
 function place(n, r) { n.style.left = r.left + 'px'; n.style.top = r.top + 'px'; n.style.width = r.width + 'px'; n.style.height = r.height + 'px'; }
 const label = (el) => el.localName + (el.id ? '#' + el.id : '') + stableClasses(el).slice(0, 3).map((c) => '.' + c).join('');
+// Decoration sits behind the page, where the page's own full-width boxes would swallow every click. So each decorative layer
+// gets a small handle in the editor's overlay: click it to select the layer, drag it to move it.
+function updateChips() {
+  const els = [...doc.querySelectorAll('.ed-deco')].filter((e) => layerClass(e) && !e.hasAttribute('data-ed-gone') && e !== sel);
+  while (ov.chips.length < els.length) {
+    const c = doc.createElement('div'); c.dataset.h = 'chip'; c.title = 'Decorative layer: click to select, drag to move';
+    c.style.cssText = 'position:fixed;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#a855f7;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);pointer-events:auto;cursor:grab;color:#fff;font:700 9px/12px system-ui;text-align:center';
+    c.textContent = '✦'; ov.root.append(c); ov.chips.push(c);
+  }
+  ov.chips.forEach((c, i) => {
+    const e = els[i], r = e && e.isConnected ? e.getBoundingClientRect() : null;
+    c.style.display = r ? 'block' : 'none'; if (r) { c._el = e; c.style.left = r.left + 'px'; c.style.top = r.top + 'px'; }
+  });
+}
 function updateOverlay() {
   if (!ov.root || !ov.root.isConnected) return;
+  updateChips();
   const hr = hover && hover !== sel && hover.isConnected ? hover.getBoundingClientRect() : null;
   ov.hover.style.display = hr ? 'block' : 'none'; if (hr) place(ov.hover, hr);
   const sr = sel && sel.isConnected ? sel.getBoundingClientRect() : null;
@@ -733,6 +802,7 @@ function onDown(e) {
   if (editing && editing.el.contains(e.target)) return;   // let the caret move
   if (e.button !== 0) return; if (e.cancelable) e.preventDefault();
   const hd = e.target.dataset && e.target.dataset.h;
+  if (hd === 'chip' && e.target._el) { select(e.target._el); startDrag(e, 'move'); return; }
   if (hd === 'push' && sel) { const s = ensurePush(); if (s) { drag = { type: 'push', id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, base: s.applied }; try { e.target.setPointerCapture(e.pointerId); } catch {} updateOverlay(); } return; }
   if (hd && sel) { startDrag(e, 'resize', hd); return; }
   if (editing) endTextEdit(true);
@@ -809,7 +879,7 @@ function sanitize(node) {
 }
 function startTextEdit(el) {
   if (!isTextual(el)) { toast("This element has no editable text. Double-click the text itself.", 2600); return; }
-  const s = selectorFor(el); if (!originals.has(s)) originals.set(s, el.innerHTML);
+  const s = selectorFor(el); if (!layerOf(el) && !originals.has(s)) originals.set(s, el.innerHTML);
   editing = { el, sel: s, start: el.innerHTML };
   el.setAttribute('contenteditable', 'true'); el.spellcheck = false;
   const paste = (ev) => { ev.preventDefault(); doc.execCommand('insertText', false, (ev.clipboardData || win.clipboardData).getData('text/plain')); };
@@ -822,6 +892,7 @@ function endTextEdit(save) {
   el.removeEventListener('paste', paste); el.removeAttribute('contenteditable'); el.blur();
   if (!save) { el.innerHTML = start; updateOverlay(); return; }
   const after = sanitize(el); el.innerHTML = after;
+  const L = layerOf(el); if (L) { L.text = after || L.text; const amend = freshLayer === L.id; freshLayer = null; renderLive(); commit(amend); return; }
   const orig = originals.get(s), tmp = doc.createElement('div'); tmp.innerHTML = orig;
   state.text = state.text.filter((t) => t.sel !== s);
   if (after !== sanitize(tmp)) state.text.push({ sel: s, before: orig, after });
@@ -843,6 +914,7 @@ function onKey(e) {
   if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
   if (e.key === 'Escape') { sel = null; updateOverlay(); buildPanel(); return; }
   if (!sel) return;
+  if ((e.key === 'Delete' || e.key === 'Backspace') && layerClass(sel)) { e.preventDefault(); deleteLayer(sel); return; }
   const step = e.shiftKey ? 10 : 1;
   if (e.altKey && e.key === 'ArrowUp' && sel.parentElement && sel.parentElement !== doc.body) { e.preventDefault(); select(sel.parentElement, true); return; }
   if (e.altKey && e.key === 'ArrowDown' && sel.firstElementChild) { e.preventDefault(); select(sel.firstElementChild, true); return; }
@@ -982,7 +1054,7 @@ function buildPanel() {
   const sections = [];
   if (!doc) return;
   if (!sel) {
-    panel.append(h('p', { class: 'hint', style: 'padding-top:12px' }, 'Click anything on the page to select it. Drag to move, use the handles to resize, arrow keys to nudge (Shift = 10px), double-click text to retype, drop an image file onto a picture to replace it. Hold Ctrl/Cmd while clicking to pick the innermost element.'), pageSection(true), tokensSection(), changesSection());
+    panel.append(h('p', { class: 'hint', style: 'padding-top:12px' }, 'Click anything on the page to select it. Drag to move, use the handles to resize, arrow keys to nudge (Shift = 10px), double-click text to retype, drop an image file onto a picture to replace it. Hold Ctrl/Cmd while clicking to pick the innermost element.'), addSection(), layersSection(), pageSection(true), tokensSection(), changesSection());
     syncFields(); afterChange(); return;
   }
   const r = rangeFor(frameW), cs = win.getComputedStyle(sel);
@@ -995,7 +1067,8 @@ function buildPanel() {
       h('button', { text: 'Deselect', onclick: () => { sel = null; updateOverlay(); buildPanel(); } })),
     crumbs());
   panel.append(head);
-  const ib = imageBlock(); if (ib) panel.append(ib);   // a picture's own controls come first: replacing it is why you selected it
+  const ib = layerClass(sel) ? layerSection(sel) : imageBlock(); if (ib) panel.append(ib);   // a picture's / layer's own controls come first
+  panel.append(addSection());
 
   const showGap = /flex|grid/.test(cs.display);
   panel.append(
@@ -1022,11 +1095,11 @@ function buildPanel() {
       g2(numField({ label: 'Op', aria: 'Opacity', prop: 'opacity', unit: '0–1', step: 0.05, read: (e, c) => parseFloat(c.opacity), write: (v) => setProp('opacity', String(Math.max(0, Math.min(1, r3(v))))) }),
          numField({ label: 'R', aria: 'Corner radius in pixels', prop: 'border-radius', unit: 'px', read: (e, c) => parseFloat(c.borderTopLeftRadius) || 0, write: (v) => setProp('border-radius', remv(v)) }),
          numField({ label: 'Bl', aria: 'Frosted-glass blur in pixels (frosted plates only)', prop: '--blur', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.getPropertyValue('--blur')) || 0, write: (v) => setProp('--blur', r3(v) + 'px') }))),
-    pageSection(false), tokensSection(), changesSection());
+    ...[layersSection(), pageSection(false), tokensSection(), changesSection()].filter(Boolean));
   syncFields(); afterChange();
 }
 function imageBlock() {
-  if (sel.localName === 'img') return imageSection(sel);
+  if (sel.localName === 'img') return layerOf(sel) ? null : imageSection(sel);
   const imgs = sel.querySelectorAll('img');
   if (imgs.length !== 1) return null;
   return sec('Image', true, h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'This contains one picture.' }), h('button', { type: 'button', text: 'Select the picture', onclick: () => select(imgs[0], true) }));
@@ -1092,6 +1165,131 @@ function pageSection(open) {
       read: () => pageLen(), on: () => state.css[scopeKey()]?.body?.height != null,
       write: (v) => { setTweak(state.css, scopeKey(), 'body', 'height', remv(Math.max(200, Math.min(100000, v)))); renderLive(); },
       reset: () => { delTweak(state.css, scopeKey(), 'body', 'height'); renderLive(); } })));
+}
+
+/* ---- Add layers: text / images inside a box, or floating decoration ---- */
+function containerFor(el) {
+  for (let n = el; n && n !== doc.body && n !== root; n = n.parentElement) if (CONTAINERS.has(n.localName) && !n.closest('svg')) return n;   // a selected layer climbs to the box it sits in
+  return null;
+}
+function newLayerId() {
+  const a = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  for (;;) {
+    let id = ''; for (let i = 0; i < 4; i++) id += a[Math.floor(Math.random() * a.length)];
+    if (!state.layers.some((l) => l.id === id) && !source0.includes('-' + id) && !doc.querySelector(`[class*="-${id}"]`)) return id;
+  }
+}
+const DEFAULT_TEXT = { text: 'New text', heading: 'New heading', deco: 'Decorative text' };
+// o = { where: 'in' | 'deco', kind: 'text' | 'heading' | 'image', prep? }
+function addLayer(o) {
+  const deco = o.where === 'deco', image = o.kind === 'image';
+  let C = null;
+  if (!deco) { C = sel ? containerFor(sel) : null; if (!C) { toast('Select a div, section or other box first: new text and images go inside it.', 3800, 'warn'); return null; } }
+  const id = newLayerId(), cls = deco ? `ed-deco-${id}` : `ed-${o.kind}-${id}`;
+  const L = { id, cls, where: o.where, kind: image ? 'image' : 'text', tag: image ? 'img' : o.kind === 'heading' ? 'h3' : deco ? 'span' : 'p',
+    classes: deco ? ['ed-deco', cls] : image ? [cls] : ['glass', cls], text: image ? '' : DEFAULT_TEXT[deco ? 'deco' : o.kind], alt: '', path: '', w: 0, h: 0 };
+  if (image) { Object.assign(L, { path: o.prep.path, w: o.prep.w, h: o.prep.h }); assets.set(o.prep.path, o.prep); }
+  const css = state.css, S = '.' + cls, rp = rootPx();
+  if (deco) {
+    L.parent = []; L.anchor = { end: true };
+    if (!css['']?.[DECO_BASE]) for (const [p, v] of [['position', 'absolute'], ['pointer-events', 'none'], ['user-select', 'none'], ['margin', '0']]) setTweak(css, '', DECO_BASE, p, v);
+    setTweak(css, '', S, 'left', '35%'); setTweak(css, '', S, 'top', r4((win.scrollY + win.innerHeight * 0.3) / rp) + 'rem'); setTweak(css, '', S, 'z-index', '-1');
+    if (image) setTweak(css, '', S, 'width', '12rem');
+    else for (const [p, v] of [['font-family', 'var(--display)'], ['font-weight', '300'], ['font-size', '4rem'], ['line-height', '1'], ['white-space', 'nowrap']]) setTweak(css, '', S, p, v);
+  } else {
+    L.parent = pathOf(C); L.psig = sigOf(C);
+    if (addPos === 'after' && sel !== C) {
+      let ref = sel; while (ref.parentElement !== C) ref = ref.parentElement;
+      const rl = layerOf(ref);
+      L.anchor = rl ? { after: { layer: rl.id } } : { after: { path: pathOf(ref), sig: sigOf(ref) } };
+    } else L.anchor = addPos === 'start' ? { start: true } : { end: true };
+    if (image) setTweak(css, '', S, 'width', '12rem');
+  }
+  state.layers.push(L); renderLive();
+  const n = doc.querySelector(`[data-ed-layer="${id}"]`); if (!n) return null;
+  select(n, true); commit();
+  if (!image) { freshLayer = id; startTextEdit(n); }
+  return n;
+}
+async function addImageLayer(where, file) {
+  toast('Preparing the image…', 0);
+  try { const prep = await prepareImage(file, { optimise: imgOpts.optimise, maxSide: imgOpts.maxSide || (where === 'deco' ? 1200 : 1600) }); addLayer({ where, kind: 'image', prep }); toast(`Added (${fmtBytes(prep.bytes)}). ${where === 'deco' ? 'Drag it into place.' : 'Describe it in the Layer section.'}`, 3600); }
+  catch (err) { toast(err.message || String(err), 4500, 'err'); }
+}
+function deleteLayer(el) {
+  const c = layerClass(el);
+  if (!c) { toast('Only layers added with the editor can be deleted.', 3000, 'warn'); return; }
+  const L = layerOf(el);
+  if (L) {
+    for (const o of state.layers) if (o.anchor.after && o.anchor.after.layer === L.id) o.anchor = clone(L.anchor);   // whatever followed it now follows what it followed
+    state.layers = state.layers.filter((x) => x !== L);
+  } else state.removed.push({ cls: c });
+  for (const sc of Object.keys(state.css)) { for (const k of Object.keys(state.css[sc])) if (hasCls(k, c)) delete state.css[sc][k]; if (!Object.keys(state.css[sc]).length) delete state.css[sc]; }
+  if (![...doc.querySelectorAll('.ed-deco')].some((n) => n !== el && !n.hasAttribute('data-ed-gone'))) { if (state.css['']) { delete state.css[''][DECO_BASE]; if (!Object.keys(state.css['']).length) delete state.css['']; } }
+  sel = null; renderLive(); commit(); buildPanel(); toast('Layer deleted.', 1800);
+}
+const layerNodes = () => [...doc.querySelectorAll('*')].filter((n) => layerClass(n) && !n.hasAttribute('data-ed-gone'));
+function addSection() {
+  const C = sel ? containerFor(sel) : null, inItem = C && sel !== C;
+  const picker = (where) => { const i = h('input', { type: 'file', accept: 'image/*,.avif', hidden: true, 'aria-label': 'Choose an image to add' }); i.addEventListener('change', () => { const f = i.files[0]; i.value = ''; if (f) addImageLayer(where, f); }); return i; };
+  const fIn = picker('in'), fDeco = picker('deco');
+  const pos = h('select', { 'aria-label': 'Where inside the box', disabled: !C },
+    h('option', { value: 'after', text: inItem ? `After ${label(sel)}` : 'After the selected item', disabled: !inItem }),
+    h('option', { value: 'start', text: 'At the start of the box' }), h('option', { value: 'end', text: 'At the end of the box' }));
+  pos.value = addPos === 'after' && !inItem ? 'end' : addPos; pos.addEventListener('change', () => { addPos = pos.value; });
+  const btn = (text, fn, off, tip) => h('button', { type: 'button', text, disabled: !!off, title: tip || '', onclick: fn });
+  const kids = [
+    h('div', { class: 'sub', text: 'Inside a box' }),
+    C ? h('p', { class: 'muted', style: 'margin:0 0 6px' }, 'Into ', h('code', { text: label(C) }), '. Pick another box with the breadcrumbs above.') : h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'Select a div, section or other box on the page: the new item goes inside it.' }),
+    h('label', { class: 'fsel', style: 'grid-template-columns:54px minmax(0,1fr)' }, h('span', { class: 'lab', text: 'Where' }), pos),
+    h('div', { class: 'btnrow' }, btn('＋ Text', () => addLayer({ where: 'in', kind: 'text' }), !C), btn('＋ Heading', () => addLayer({ where: 'in', kind: 'heading' }), !C), btn('＋ Image…', () => fIn.click(), !C)),
+    h('div', { class: 'sub', text: 'Decoration' }),
+    h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'Floating, behind the page by default, ignored by screen readers and not clickable on the live page.' }),
+    h('div', { class: 'btnrow' }, btn('＋ Decorative text', () => addLayer({ where: 'deco', kind: 'text' })), btn('＋ Decorative image…', () => fDeco.click())),
+    fIn, fDeco];
+  return sec('Add layers', true, ...kids);
+}
+function layersSection() {
+  const nodes = layerNodes(); if (!nodes.length) return null;
+  const ul = h('ul', { class: 'changes' });
+  for (const n of nodes) {
+    const c = layerClass(n), deco = /^ed-deco-/.test(c), isNew = !!layerOf(n);
+    const what = n.localName === 'img' ? shortSrc(n.getAttribute('src') || '') : (n.textContent || '').trim().slice(0, 30) || n.localName;
+    ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: deco ? 'decor' : 'in page' }), isNew ? h('span', { class: 'scope', text: 'new' }) : null,
+      h('code', { style: 'cursor:pointer;text-decoration:underline dotted', title: 'Select this layer', text: (n.localName === 'img' ? '▣ ' : 'T ') + what, onclick: () => select(n, true) })),
+      h('button', { title: 'Delete this layer', 'aria-label': 'Delete this layer', text: '×', onclick: () => deleteLayer(n) })));
+  }
+  return sec('Layers', true, ul);
+}
+// The inspector for a selected layer.
+function layerSection(el) {
+  const c = layerClass(el), L = layerOf(el), deco = /^ed-deco-/.test(c), isImg = el.localName === 'img', kids = [];
+  kids.push(h('p', { class: 'muted', style: 'margin:0 0 6px', text: (deco ? 'Decorative layer: ignored by screen readers, and not clickable on the live page.' : 'A layer added with the editor.') + (L ? ' It is added to the page when you push.' : ' It is already in the page.') }));
+  if (L) {
+    const glass = h('input', { type: 'checkbox', checked: L.classes.includes('glass'), 'aria-label': 'Frosted plate behind it' });
+    glass.addEventListener('change', () => { L.classes = glass.checked ? ['glass', ...L.classes.filter((x) => x !== 'glass')] : L.classes.filter((x) => x !== 'glass'); renderLive(); commit(); });
+    kids.push(h('label', { class: 'tick' }, glass, 'Frosted plate behind it'));
+    if (isImg) {
+      const file = h('input', { type: 'file', accept: 'image/*,.avif', hidden: true, 'aria-label': 'Choose another image' });
+      file.addEventListener('change', async () => { const f = file.files[0]; file.value = ''; if (!f) return;
+        try { const prep = await prepareImage(f, { optimise: imgOpts.optimise, maxSide: imgOpts.maxSide || (deco ? 1200 : 1600) }); assets.set(prep.path, prep); Object.assign(L, { path: prep.path, w: prep.w, h: prep.h }); renderLive(); commit(); toast('Image swapped.', 1600); } catch (err) { toast(err.message || String(err), 4000, 'err'); } });
+      kids.push(h('div', { class: 'btnrow' }, h('button', { type: 'button', text: 'Choose another image…', onclick: () => file.click() }), file));
+      if (!deco) {
+        const alt = h('input', { type: 'text', value: L.alt, spellcheck: 'true', placeholder: 'Describe the picture for screen readers', 'aria-label': 'Alt text', style: 'width:100%;background:#15171a;border:1px solid var(--line);border-radius:5px;padding:5px 7px;margin-top:8px' });
+        alt.addEventListener('input', () => { L.alt = alt.value; renderLive(); }); alt.addEventListener('change', () => commit());
+        kids.push(alt, h('p', { class: 'muted', style: 'margin:4px 0 0', text: 'Leave empty only if the picture is purely decorative; then it is skipped by screen readers.' }));
+      }
+    }
+  }
+  if (deco) {
+    const z = h('select', { 'aria-label': 'Layer order' }, h('option', { value: '-1', text: 'Behind the page content' }), h('option', { value: '20', text: 'In front of the page content' }));
+    const zNow = () => (parseInt(win.getComputedStyle(el).zIndex, 10) >= 0 ? '20' : '-1');
+    z.value = zNow(); z.addEventListener('change', () => { setTweak(state.css, '', '.' + c, 'z-index', z.value); renderLive(); commit(); });
+    kids.push(h('label', { class: 'fsel', style: 'grid-template-columns:54px minmax(0,1fr)' }, h('span', { class: 'lab', text: 'Order' }), z));
+    kids.push(g2(numField({ label: '↻', aria: 'Rotation in degrees', prop: 'rotate', unit: '°', step: 1, read: (e, cs) => parseFloat(cs.rotate) || 0, write: (v) => setProp('rotate', `${r3(v)}deg`) })));
+  }
+  kids.push(h('div', { class: 'btnrow' }, h('button', { type: 'button', text: 'Delete layer', title: 'Delete (Del)', style: 'color:#ff8b8b', onclick: () => deleteLayer(el) })));
+  return sec('Layer', true, ...kids);
 }
 
 /* ---- Image: replace, optimise, fit ---- */
@@ -1229,9 +1427,9 @@ function tokenSyncAll() { for (const f of fields) f.sync(); }
 /* ---------- changes list ---------- */
 function summary() {
   const ops = diffCss(baseline, state.css), base = flatten(baseline), rows = [];
-  for (const [sc, sl, p, v] of ops.set) rows.push({ scope: sc, sel: sl, prop: p, value: v, was: base.get(JSON.stringify([sc, sl, p])) });
-  for (const [sc, sl, p] of ops.del) rows.push({ scope: sc, sel: sl, prop: p, removed: true, was: base.get(JSON.stringify([sc, sl, p])) });
-  return { rows, text: state.text, images: state.images, count: rows.length + state.text.length + state.images.length };
+  for (const [sc, sl, p, v] of ops.set) if (!newLayerSel(sl)) rows.push({ scope: sc, sel: sl, prop: p, value: v, was: base.get(JSON.stringify([sc, sl, p])) });
+  for (const [sc, sl, p] of ops.del) if (!newLayerSel(sl)) rows.push({ scope: sc, sel: sl, prop: p, removed: true, was: base.get(JSON.stringify([sc, sl, p])) });
+  return { rows, text: state.text, images: state.images, layers: state.layers, removed: state.removed, count: rows.length + state.text.length + state.images.length + state.layers.length + state.removed.length };
 }
 let changesHost = null;
 function changesSection() {
@@ -1245,6 +1443,10 @@ function renderChanges() {
     h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { if (r.was != null) setTweak(state.css, r.scope, r.sel, r.prop, r.was); else delTweak(state.css, r.scope, r.sel, r.prop); renderLive(); commit(); syncFields(); } })));
   for (const t of s.text) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: 'Text' }), h('code', { text: `${t.sel}: “${stripTags(t.after)}”` })),
     h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { state.text = state.text.filter((x) => x !== t); renderLive(); commit(); } })));
+  for (const l of s.layers) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: l.where === 'deco' ? 'Decor' : 'Layer' }), h('code', { text: 'add ' + describeLayer(l) })),
+    h('button', { title: 'Delete this layer', 'aria-label': 'Delete this layer', text: '×', onclick: () => { const n = doc.querySelector(`[data-ed-layer="${l.id}"]`); if (n) deleteLayer(n); } })));
+  for (const r of s.removed) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: 'Layer' }), h('code', { text: `delete .${r.cls}` })),
+    h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { state.removed = state.removed.filter((x) => x !== r); renderLive(); commit(); buildPanelSoon(); } })));
   for (const im of s.images) ul.append(h('li', {}, h('div', {}, h('span', { class: 'scope', text: 'Image' }), h('code', { text: `${im.sel}: → ${im.path}` })),
     h('button', { title: 'Undo this change', 'aria-label': 'Undo this change', text: '×', onclick: () => { state.images = state.images.filter((x) => x !== im); renderLive(); commit(); buildPanelSoon(); } })));
   changesHost.replaceChildren(ul);
@@ -1266,6 +1468,124 @@ function ghHelp(err) {
   return err.message || String(err);
 }
 const repoPath = () => `/repos/${encodeURIComponent(settings.owner)}/${encodeURIComponent(settings.repo)}`;
+/* ---------- putting layers into the page's source ----------
+   A small HTML indexer finds where every element starts and ends, so a new element can be written in exactly the right
+   place without touching anything else. It is deliberately simple, so every insertion is double-checked: the result is
+   re-read by the browser's own parser and must contain exactly one more element, with the new one inside the expected parent.
+   If anything doesn't line up the layer is NOT added and is listed in the pull request instead. */
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+const RAWTEXT = new Set(['script', 'style', 'textarea', 'title', 'noscript']);
+function indexHtml(src) {
+  const root = { tag: '#root', attrs: '', children: [], start: 0, openEnd: 0, closeStart: src.length, end: src.length, parent: null };
+  const stack = [root]; let i = 0;
+  while (i < src.length) {
+    const lt = src.indexOf('<', i); if (lt < 0) break;
+    if (src.startsWith('<!--', lt)) { const e = src.indexOf('-->', lt + 4); i = e < 0 ? src.length : e + 3; continue; }
+    const c = src[lt + 1];
+    if (c === '!' || c === '?') { const e = src.indexOf('>', lt); i = e < 0 ? src.length : e + 1; continue; }
+    if (c === '/') {
+      const e = src.indexOf('>', lt); if (e < 0) break;
+      const name = src.slice(lt + 2, e).trim().toLowerCase();
+      for (let k = stack.length - 1; k > 0; k--) if (stack[k].tag === name) { stack[k].closeStart = lt; stack[k].end = e + 1; stack.length = k; break; }
+      i = e + 1; continue;
+    }
+    const m = /^<([a-zA-Z][^\s/>]*)/.exec(src.slice(lt, lt + 80)); if (!m) { i = lt + 1; continue; }
+    let j = lt + m[0].length, q = '';
+    for (; j < src.length; j++) { const ch = src[j]; if (q) { if (ch === q) q = ''; } else if (ch === '"' || ch === "'") q = ch; else if (ch === '>') break; }
+    if (j >= src.length) break;
+    const tag = m[1].toLowerCase(), attrs = src.slice(lt + m[0].length, j), top = stack[stack.length - 1];
+    const node = { tag, attrs, children: [], start: lt, openEnd: j + 1, closeStart: j + 1, end: j + 1, parent: top };
+    top.children.push(node); i = j + 1;
+    if (VOID.has(tag) || /\/\s*$/.test(attrs)) continue;
+    if (RAWTEXT.has(tag)) { const re = new RegExp('</' + tag + '\\s*>', 'ig'); re.lastIndex = j + 1; const mm = re.exec(src); if (mm) { node.closeStart = mm.index; node.end = mm.index + mm[0].length; i = node.end; } else i = src.length; continue; }
+    stack.push(node);
+  }
+  return root;
+}
+const attrOf = (node, name) => { const m = new RegExp('(?:^|\\s)' + name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s"\'>]+))', 'i').exec(node.attrs); return m ? (m[1] ?? m[2] ?? m[3]) : null; };
+const classesOf = (node) => (attrOf(node, 'class') || '').split(/\s+/).filter(Boolean);
+const srcSig = (node) => ({ tag: node.tag, id: attrOf(node, 'id') || '', classes: classesOf(node).filter((c) => !VOLATILE.has(c) && !c.startsWith('__ed')).sort() });
+const sameSig = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function findNode(node, test) { for (const c of node.children) { if (test(c)) return c; const r = findNode(c, test); if (r) return r; } return null; }
+const findBody = (root) => findNode(root, (n) => n.tag === 'body');
+const findByClass = (root, cls) => findNode(root, (n) => classesOf(n).includes(cls));
+const srcAt = (body, path) => { let n = body; for (const i of path) n = n && n.children[i]; return n || null; };
+const lineIndent = (src, pos) => /^[ \t]*/.exec(src.slice(src.lastIndexOf('\n', pos - 1) + 1))[0];
+const escAttr = (v) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+function layerHtml(L, pagePath) {
+  const deco = L.where === 'deco', cls = ` class="${L.classes.join(' ')}"`;
+  if (L.kind === 'image') return `<img${cls} src="${relPath(pagePath, L.path)}" alt="${deco ? '' : escAttr(L.alt || '')}"${deco ? ' aria-hidden="true"' : ' loading="lazy"'}${L.w && L.h ? ` width="${L.w}" height="${L.h}"` : ''}>`;
+  return `<${L.tag}${cls}${deco ? ' aria-hidden="true"' : ''}>${L.text}</${L.tag}>`;
+}
+const parseDoc = (h2) => new DOMParser().parseFromString(h2, 'text/html');
+// The indexer is only trusted if it sees exactly the same elements, in the same order, as the browser does. (Markup with unclosed
+// <p>/<li> tags and the like is read differently by the two, and then nothing is inserted automatically.)
+function assertSameStructure(src, idx) {
+  const tok = []; (function walk(n, d) { for (const c of n.children) { tok.push([c.tag, d]); walk(c, d + 1); } })(idx, 0);
+  const depth = (e) => { let d = 0; for (let n = e.parentElement; n; n = n.parentElement) d++; return d; };
+  const dom = [...parseDoc(src).documentElement.querySelectorAll('*')].map((e) => [e.localName, depth(e)]);
+  const t = tok[0] && tok[0][0] === 'html' ? tok.slice(1) : tok.map(([n, d]) => [n, d + 1]);
+  if (t.length !== dom.length || t.some((x, i) => x[0] !== dom[i][0] || x[1] !== dom[i][1])) throw new Error('the page’s markup has unclosed or implied tags, which can’t be edited safely');
+}
+const domSig = (e) => ({ tag: e.localName, id: e.id || '', classes: [...e.classList].filter((c) => !VOLATILE.has(c) && !c.startsWith('__ed')).sort() });
+function verifyInsert(before, after, L, nb = {}) {
+  const A = parseDoc(before), B = parseDoc(after), hit = B.querySelectorAll('.' + L.cls);
+  if (hit.length !== 1) throw new Error('the new element could not be found after inserting it');
+  if (B.querySelectorAll('*').length !== A.querySelectorAll('*').length + 1) throw new Error('the browser would read the result differently, so it was not applied');
+  const par = hit[0].parentElement;
+  if (L.where === 'deco') { if (par !== B.body) throw new Error('the browser would not put it directly in <body>'); }
+  else if (!par || !sameSig(domSig(par), L.psig)) throw new Error('the browser would put it in a different box');
+  const prev = hit[0].previousElementSibling, next = hit[0].nextElementSibling;
+  if (nb.prev === null ? prev : nb.prev && (!prev || !sameSig(domSig(prev), nb.prev))) throw new Error('the browser would put it next to the wrong item');
+  if (nb.next === null ? next : nb.next && (!next || !sameSig(domSig(next), nb.next))) throw new Error('the browser would put it next to the wrong item');
+  return after;
+}
+function placeInFlow(src, L, pagePath) {
+  const idx = indexHtml(src); assertSameStructure(src, idx);
+  const body = findBody(idx); if (!body) throw new Error('no <body> found in the page');
+  const parent = srcAt(body, L.parent);
+  if (!parent || !sameSig(srcSig(parent), L.psig)) throw new Error('the box it goes into is not where it was when you opened the editor (the page changed)');
+  const kids = parent.children, a = L.anchor; let at, indent, nb;
+  if (a.after) {
+    const sib = a.after.layer ? findByClass(idx, (state.layers.find((x) => x.id === a.after.layer) || {}).cls) : srcAt(body, a.after.path);
+    if (!sib || sib.parent !== parent || (a.after.sig && !sameSig(srcSig(sib), a.after.sig))) throw new Error('the item it should follow is not where it was');
+    const i = kids.indexOf(sib); at = sib.end; indent = lineIndent(src, sib.start); nb = { prev: srcSig(sib), next: kids[i + 1] ? srcSig(kids[i + 1]) : null };
+  } else if (a.start) { at = parent.openEnd; indent = kids.length ? lineIndent(src, kids[0].start) : lineIndent(src, parent.start) + '  '; nb = { prev: null, next: kids.length ? srcSig(kids[0]) : null }; }
+  else if (kids.length) { const last = kids[kids.length - 1]; at = last.end; indent = lineIndent(src, last.start); nb = { prev: srcSig(last), next: null }; }
+  else { at = parent.openEnd; indent = lineIndent(src, parent.start) + '  '; nb = { prev: null, next: null }; }
+  const html = layerHtml(L, pagePath);
+  const out = !kids.length && /^\s*$/.test(src.slice(parent.openEnd, parent.closeStart))
+    ? src.slice(0, parent.openEnd) + '\n' + indent + html + '\n' + lineIndent(src, parent.start) + src.slice(parent.closeStart)
+    : src.slice(0, at) + '\n' + indent + html + src.slice(at);
+  return verifyInsert(src, out, L, nb);
+}
+function placeDecor(src, L, pagePath) {
+  const html = layerHtml(L, pagePath), m = DECOR_RE.exec(src); let out;
+  if (m) { const e = src.indexOf(DECOR_END, m.index); out = src.slice(0, e) + html + '\n' + src.slice(e); }
+  else { const i = src.lastIndexOf('</body>'); if (i < 0) throw new Error('no </body> found in the page'); out = src.slice(0, i) + '\n' + DECOR_START + '\n' + html + '\n' + DECOR_END + '\n' + src.slice(i); }
+  return verifyInsert(src, out, L);
+}
+// Delete a layer that an earlier push put in the page (found by its unique class).
+function removeLayerFromSource(src, cls) {
+  const idx = indexHtml(src), node = findByClass(idx, cls); if (!node) throw new Error('not found');
+  assertSameStructure(src, idx);
+  const A = parseDoc(src), target = A.querySelector('.' + cls); if (!target) throw new Error('the browser does not see it where the file says');
+  const gone = 1 + target.querySelectorAll('*').length;
+  let a = node.start, b = node.end;
+  const ls = src.lastIndexOf('\n', a - 1) + 1; let e = b; while (src[e] === ' ' || src[e] === '\t') e++;
+  if (/^[ \t]*$/.test(src.slice(ls, a)) && (src[e] === '\n' || e >= src.length)) { a = ls; b = e < src.length ? e + 1 : e; }
+  let out = src.slice(0, a) + src.slice(b);
+  const m = DECOR_RE.exec(out);   // an emptied decoration block goes too
+  if (m && !/</.test(m[1])) { let x = m.index; if (out[x - 1] === '\n' && out[x - 2] === '\n') x--; const y = m.index + m[0].length; out = out.slice(0, x) + out.slice(out[y] === '\n' ? y + 1 : y); }
+  const B = parseDoc(out);
+  if (B.querySelector('.' + cls) || B.querySelectorAll('*').length !== A.querySelectorAll('*').length - gone) throw new Error('removing it would change something else, so it was not applied');
+  return out;
+}
+const dropCss = (css, cls) => { for (const sc of Object.keys(css)) { for (const k of Object.keys(css[sc])) if (hasCls(k, cls)) delete css[sc][k]; if (!Object.keys(css[sc]).length) delete css[sc]; } };
+const copyCss = (from, to, cls) => { for (const [sc, sels] of Object.entries(from)) for (const [k, props] of Object.entries(sels)) if (hasCls(k, cls)) for (const [pr, v] of Object.entries(props)) setTweak(to, sc, k, pr, v); };
+const psigLabel = (g) => g.tag + (g.id ? '#' + g.id : '') + g.classes.slice(0, 3).map((c) => '.' + c).join('');
+const describeLayer = (l) => (l.kind === 'image' ? `image ${l.path}` : `“${stripTags(l.text)}”`) + (l.where === 'deco' ? ' (floating decoration)' : ` inside ${psigLabel(l.psig)}`);
+
 /* A replaced picture's src="…" is swapped for the new file's path. The old address must appear exactly once as a src
    attribute (it also appears in og:image / JSON-LD for the portrait, which is deliberately left alone). */
 const relPath = (from, to) => '../'.repeat(from.split('/').length - 1) + to;
@@ -1285,11 +1605,20 @@ function applyImageEdits(src, edits, pagePath) {
   return { src: out, applied, failed };
 }
 function buildNewSource(remoteSrc) {
-  const merged = applyOps(parseBlock(remoteSrc), diffCss(baseline, state.css));
-  let out = replaceBlock(remoteSrc, blockText(merged));
-  const t = applyTextEdits(out, state.text);
-  const im = applyImageEdits(t.src, state.images, settings.path);
-  return { src: im.src, merged, applied: t.applied, failed: t.failed, imgApplied: im.applied, imgFailed: im.failed };
+  const remoteCss = parseBlock(remoteSrc), merged = applyOps(remoteCss, diffCss(baseline, state.css));
+  const t = applyTextEdits(remoteSrc, state.text), im = applyImageEdits(t.src, state.images, settings.path);
+  let out = im.src; const layersPlaced = [], layersFailed = [], removedDone = [], removedFailed = [];
+  for (const r of state.removed) {
+    try { out = removeLayerFromSource(out, r.cls); removedDone.push(r); }
+    catch (err) { if (err.message === 'not found') removedDone.push(r); else { removedFailed.push({ ...r, why: err.message }); copyCss(remoteCss, merged, r.cls); } }
+  }
+  for (const L of state.layers) {
+    try { out = L.where === 'deco' ? placeDecor(out, L, settings.path) : placeInFlow(out, L, settings.path); layersPlaced.push(L); }
+    catch (err) { layersFailed.push({ L, why: err.message || String(err) }); dropCss(merged, L.cls); }
+  }
+  if (!/class="[^"]*\bed-deco\b/.test(stripBlock(out)) && merged['']) { delete merged[''][DECO_BASE]; if (!Object.keys(merged['']).length) delete merged['']; }
+  out = replaceBlock(out, blockText(merged));
+  return { src: out, merged, applied: t.applied, failed: t.failed, imgApplied: im.applied, imgFailed: im.failed, layersPlaced, layersFailed, removedDone, removedFailed };
 }
 function prBody(s, built) {
   const lines = ['Visual tweaks made with the page editor (`/editor/`).', ''];
@@ -1298,6 +1627,18 @@ function prBody(s, built) {
   if (built.applied.length) { lines.push('**Text**'); for (const t of built.applied) lines.push(`- \`${t.sel}\`: “${stripTags(t.after)}”`); lines.push(''); }
   if (built.failed.length) { lines.push('**Text edits that could not be placed automatically** (edit by hand):'); for (const t of built.failed) lines.push(`- \`${t.sel}\`: “${stripTags(t.before)}” → “${stripTags(t.after)}”`); lines.push(''); }
   if (built.imgApplied.length) { lines.push('**Images** (uploaded in this pull request)'); for (const e of built.imgApplied) lines.push(`- \`${e.sel}\`: \`${shortSrc(e.was)}\` → \`${e.path}\` (${fmtBytes(e.bytes)}${e.w ? `, ${e.w}×${e.h}` : ''})`); lines.push(''); }
+  if (built.layersPlaced.length || built.removedDone.length) {
+    lines.push('**Layers**');
+    for (const l of built.layersPlaced) lines.push(`- Added ${l.where === 'deco' ? 'decorative ' : ''}${describeLayer(l)} as \`.${l.cls}\`${l.where === 'deco' ? ' (`aria-hidden`, not clickable)' : ''}`);
+    for (const r of built.removedDone) lines.push(`- Deleted layer \`.${r.cls}\``);
+    lines.push('');
+  }
+  if (built.layersFailed.length || built.removedFailed.length) {
+    lines.push('**Layers that could not be added or removed automatically** (do by hand):');
+    for (const f of built.layersFailed) lines.push(`- ${describeLayer(f.L)}: ${f.why}`);
+    for (const f of built.removedFailed) lines.push(`- delete \`.${f.cls}\`: ${f.why}`);
+    lines.push('');
+  }
   if (built.imgFailed.length) { lines.push('**Images that could not be placed automatically** (not uploaded; the original address was not found exactly once as a `src`):'); for (const e of built.imgFailed) lines.push(`- \`${e.sel}\`: \`${shortSrc(e.was)}\``); lines.push(''); }
   lines.push('The style changes are in one managed block at the end of the page’s `<style>`, between the “editor tweaks” marker comments. They use `!important` so they always win; fold them into the main CSS whenever convenient.');
   return lines.join('\n');
@@ -1318,8 +1659,8 @@ async function pushChanges(title, statusEl, built0) {
     const remote = b64decode(file.content);
     const built = buildNewSource(remote);
     if (built.src === remote) {
-      const what = [built.failed.length && (built.failed.length === 1 ? 'your text edit' : 'your text edits'), built.imgFailed.length && (built.imgFailed.length === 1 ? 'your picture' : 'your pictures')].filter(Boolean).join(' or ');
-      const find = built.failed.length ? "the original text" + (built.imgFailed.length ? ' or picture address' : '') : 'the picture’s old address';
+      const what = [built.failed.length && (built.failed.length === 1 ? 'your text edit' : 'your text edits'), built.imgFailed.length && (built.imgFailed.length === 1 ? 'your picture' : 'your pictures'), (built.layersFailed.length + built.removedFailed.length) && 'your layers'].filter(Boolean).join(' or ');
+      const find = built.failed.length ? 'the original text' + (built.imgFailed.length ? ' or picture address' : '') : built.imgFailed.length ? 'the picture’s old address' : 'where they go';
       set(what
         ? `Couldn't place ${what}: ${find} isn't found exactly once in ${settings.path} on ${settings.base} (the page may have changed since you opened the editor). Nothing was pushed. Reload the editor and try again.`
         : 'Nothing to change: the file on ' + settings.base + ' already matches.', 'warn');
@@ -1327,6 +1668,7 @@ async function pushChanges(title, statusEl, built0) {
     }
     const uploads = new Map();   // repo path -> asset (two pictures may share one file)
     for (const e of built.imgApplied) { const a = assets.get(e.path); if (a) uploads.set(e.path, a); }
+    for (const l of built.layersPlaced) if (l.kind === 'image') { const a = assets.get(l.path); if (a) uploads.set(l.path, a); }
     set('Reading the base commit…');
     const baseCommit = await gh('GET', `${repoPath()}/git/commits/${baseSha}`);
     const entries = []; let n = 0;
@@ -1347,7 +1689,7 @@ async function pushChanges(title, statusEl, built0) {
     await gh('POST', `${repoPath()}/git/refs`, { ref: 'refs/heads/' + branch, sha: commitObj.sha });
     set('Opening the pull request…');
     const pr = await gh('POST', `${repoPath()}/pulls`, { title, head: branch, base: settings.base, body: prBody(s, built) });
-    return { url: pr.html_url, number: pr.number, branch, failed: built.failed, imgFailed: built.imgFailed, uploaded: [...uploads.keys()] };
+    return { url: pr.html_url, number: pr.number, branch, failed: built.failed, imgFailed: built.imgFailed, layersFailed: built.layersFailed, uploaded: [...uploads.keys()] };
   } catch (err) { set(ghHelp(err), 'err'); return null; }
 }
 
@@ -1375,12 +1717,14 @@ function openReview() {
   body.replaceChildren(...[
     h('label', { class: 'row', style: 'grid-template-columns:90px 1fr' }, 'PR title', title),
     h('p', { class: 'note', text: `A new branch will be created from ${settings.owner}/${settings.repo}@${settings.base}, with a pull request for ${settings.path}.` }),
-    summary().rows.length ? [h('div', { class: 'sub', text: 'Style changes (written into one managed block)' }), h('pre', { text: blockText(built.merged) })] : null,
+    (() => { const d = diffCss(baseline, state.css); return d.set.length || d.del.length ? [h('div', { class: 'sub', text: 'Style changes (written into one managed block)' }), h('pre', { text: blockText(built.merged) })] : null; })(),
     s.text.length ? [h('div', { class: 'sub', text: 'Text changes' }), h('ul', {}, state.text.map((t) => h('li', {}, `${t.sel}: “${stripTags(t.before)}” → “${stripTags(t.after)}”`)))] : null,
     built.failed.length ? h('p', { class: 'warn', text: `${built.failed.length} text edit(s) can't be placed automatically (the original text isn't found exactly once in the file). They'll be listed in the PR description for you to apply by hand.` }) : null,
     s.images.length ? [h('div', { class: 'sub', text: `Images (${built.imgApplied.length} will be uploaded to ${IMG_DIR}/)` }),
       h('ul', { class: 'thumbs' }, built.imgApplied.map((e) => h('li', {}, assets.get(e.path) ? h('img', { src: assets.get(e.path).url, alt: '' }) : h('span'),
         h('div', {}, h('div', {}, h('code', { text: e.path })), h('div', { class: 'muted', text: `${shortSrc(e.was)} → ${fmtBytes(e.bytes)}${e.w ? `, ${e.w}×${e.h}` : ''}` })))))] : null,
+    (s.layers.length || s.removed.length) ? [h('div', { class: 'sub', text: 'Layers' }), h('ul', {}, [...built.layersPlaced.map((l) => h('li', {}, `Add ${describeLayer(l)}${l.kind === 'image' ? ` (uploads ${l.path})` : ''}`)), ...built.removedDone.map((r) => h('li', {}, `Delete layer .${r.cls}`))])] : null,
+    (built.layersFailed.length || built.removedFailed.length) ? h('p', { class: 'warn', text: `${built.layersFailed.length + built.removedFailed.length} layer change(s) can't be made automatically (${[...built.layersFailed.map((f) => f.why), ...built.removedFailed.map((f) => f.why)][0]}). They won't be applied; they're listed in the PR description.` }) : null,
     built.imgFailed.length ? h('p', { class: 'warn', text: `${built.imgFailed.length} picture(s) can't be placed automatically (the old address isn't found exactly once as a src in the file). They won't be uploaded; they're listed in the PR description.` }) : null,
   ].flat().filter(Boolean));
   const go = h('button', { class: 'primary', type: 'button', text: 'Create pull request' });
@@ -1411,7 +1755,7 @@ window.addEventListener('resize', () => { layoutFrame(); updateOverlay(); });
 layoutFrame(); loadPage();
 
 // handy for debugging and for the automated tests
-window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, applyImageEdits, buildNewSource, ensurePush, pushTo, pageLen, replaceImage, prepareImage, assets, inkAlpha, inkFor, tokScope, get guarded() { return guarded; }, get doc() { return doc; }, get sel() { return sel; }, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
+window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, applyImageEdits, indexHtml, placeInFlow, placeDecor, removeLayerFromSource, addLayer, addImageLayer, deleteLayer, layerOf, layerClass, pathOf, liveAt, containerFor, buildNewSource, ensurePush, pushTo, pageLen, replaceImage, prepareImage, assets, inkAlpha, inkFor, tokScope, get guarded() { return guarded; }, get doc() { return doc; }, get sel() { return sel; }, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
 })();
 </script>
 </body>
