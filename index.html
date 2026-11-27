@@ -72,7 +72,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Josefin+Sans:wght@100..700&display=swap" rel="stylesheet">
 
-  <script>document.documentElement.classList.add('js');</script>
+  <!-- Runs before first paint: marks the page as JS-enabled and resolves the motion
+       setting (saved choice, else the OS "reduce motion" preference) into
+       <html data-motion="full|reduced">. All motion CSS/JS keys off that attribute. -->
+  <script>
+    (function () {
+      var d = document.documentElement, m = null;
+      d.classList.add('js');
+      try { m = localStorage.getItem('ct907-motion'); } catch (e) {}
+      if (m !== 'full' && m !== 'reduced') {
+        m = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'full';
+      }
+      d.setAttribute('data-motion', m);
+    })();
+  </script>
 
   <style>
     :root {
@@ -83,6 +96,7 @@
       --accent: #ff6546;
       --green: #1f6b2d;            /* was #2c8a3d; darkened so the label stays >= 4.5:1 on the tinted hover/press plates */
       --grid-line: #adcedd;
+      --rule: #117b9a;             /* section dividers */
 
       /* Graph-paper grid. One cell is 2.25rem, so it grows and shrinks with the
          text (the root font-size below is fluid). */
@@ -96,6 +110,7 @@
       --glass: rgb(242 238 234 / .05);       /* #F2EEEA @ 5%  */
       --glass-hover: rgb(255 129 3 / .2);    /* #FF8103 @ 20% */
       --glass-press: rgb(0 180 255 / .2);    /* #00B4FF @ 20% */
+      --glass-quiet: rgb(0 0 0 / .05);       /* #000000 @ 5%: hover tint for non-clickable plates */
 
       --arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M0 7h22M16 1l6 6-6 6' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
       --pad: clamp(1.25rem, 8vw, 5.25rem);
@@ -119,7 +134,12 @@
          the browser's text-size setting and page zoom working. */
       font-size: clamp(.875rem, .775rem + .25vw, 1.5rem);
     }
+    /* Motion setting: <html data-motion="full|reduced"> is set by the script in <head>
+       (saved choice, else the OS preference) and flipped by the toggle at the top right.
+       Without JS the OS preference is honoured by the media queries instead. */
     @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+    :root[data-motion="full"] { scroll-behavior: smooth; }
+    :root[data-motion="reduced"] { scroll-behavior: auto; }
     body {
       margin: 0;
       background-color: var(--bg);
@@ -133,7 +153,7 @@
     }
     a { color: inherit; -webkit-tap-highlight-color: transparent; }
     /* Solid ink ring: the orange accent is only ~2.5:1 on this background. */
-    a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+    a:focus-visible, button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
     img { display: block; max-width: 100%; height: auto; }
     .wrap { max-width: 68rem; margin: 0 auto; padding: 0 var(--pad); }
     section { scroll-margin-top: 1rem; }
@@ -166,9 +186,8 @@
       text-transform: uppercase;
       margin: 1.4rem 0 0;
     }
-    @media (prefers-reduced-motion: no-preference) {
-      h1 { animation: weight 6s infinite; }
-    }
+    :root:not([data-motion="reduced"]) h1 { animation: weight 6s infinite; }
+    @media (prefers-reduced-motion: reduce) { :root:not(.js) h1 { animation: none; } }
     @keyframes weight {
       0%   { font-weight: 100; }
       50%  { font-weight: 700; }
@@ -211,8 +230,9 @@
       opacity: 1; transform: none; transition: opacity .22s ease-out, transform .22s ease-out;
     }
     @media (hover: none) { .aside { opacity: 1; transform: none; } }
+    :root[data-motion="reduced"] .aside { transform: none; transition: opacity .15s; }
     @media (prefers-reduced-motion: reduce) {
-      .aside { transform: none; transition: opacity .15s; }
+      :root:not(.js) .aside { transform: none; transition: opacity .15s; }
     }
 
     .portrait {
@@ -231,18 +251,30 @@
       .hero { padding-bottom: 2rem; }
       .arrows { margin-top: 2rem; }
     }
+    @media (max-width: 30rem) { .hero { padding-top: 3.6rem; } }   /* room for the toggle */
+
+    /* ---------- reduce-motion toggle (top right of the page) ----------
+       First thing in the tab order, so someone who needs it can reach it before anything moves. */
+    .motion-toggle {
+      --gx: .9em; --gy: .55em; --gr: 999px;
+      position: absolute; top: .9rem; right: max(.9rem, calc(var(--pad) * .5)); z-index: 3;
+      display: inline-flex; align-items: center; gap: .6em;
+      border: 0; margin: 0; font: 500 .8rem/1 var(--text); color: var(--ink); cursor: pointer;
+    }
+    :root:not(.js) .motion-toggle { display: none; }          /* does nothing without JS */
+    .motion-toggle .sw { position: relative; flex: none; width: 1.9em; height: 1.05em; border: 1.5px solid var(--ink); border-radius: 999px; }
+    .motion-toggle .sw::after {
+      content: ""; position: absolute; top: 50%; left: .14em; width: .65em; height: .65em;
+      border-radius: 50%; background: var(--ink); transform: translateY(-50%);
+      transition: left .2s ease, background-color .2s ease;
+    }
+    .motion-toggle[aria-pressed="true"] .sw { background: var(--ink); }
+    .motion-toggle[aria-pressed="true"] .sw::after { left: calc(100% - .79em); background: var(--bg); }
+    :root[data-motion="reduced"] .motion-toggle .sw::after { transition: none; }
 
     /* ---------- dividers, icons, headings ---------- */
-    /* Dots are ~2px, pitch ~10.3px. --dot-shift is set from scrollY by the script
-       below; the dots slide LEFT as you scroll down. Tune --dot-ratio in the JS
-       (1 = dots move as far as the page scrolls). */
-    .dots {
-      border: 0; margin: 0; height: 3px;
-      background-image: radial-gradient(circle at center, var(--ink) 0 1px, transparent 1.25px);
-      background-size: 10.27px 3px;
-      background-repeat: repeat-x;
-      background-position-x: calc(var(--dot-shift, 0) * -1px);
-    }
+    /* Sharp 2px rule between sections. */
+    .rule { border: 0; margin: 0; height: 2px; background: var(--rule); }
     .block { padding-block: 2.6rem 3.4rem; }
     .badge {
       display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem;
@@ -281,7 +313,8 @@
       border: 1px solid #6a6764; overflow: hidden; width: auto; max-width: 44rem;
       transition: transform .25s, box-shadow .25s, background-color .18s;
     }
-    .release:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,.14); }
+    .release:hover { box-shadow: 0 8px 18px rgba(0,0,0,.14); }
+    :root:not([data-motion="reduced"]) .release:hover { transform: translateY(-3px); }
     .release img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 1; }
     .release .body { padding: 1rem 1.2rem; display: flex; flex-direction: column; justify-content: space-between; min-height: 11.7rem; }
     .release h3 { font: 600 1.4rem/1.2 var(--display); letter-spacing: .1em; margin: 0; }
@@ -304,7 +337,8 @@
       display: block; width: auto;
       transition: transform .25s, box-shadow .25s, background-color .18s;
     }
-    .tiles a:hover, .tiles a:focus-visible { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,.2); }
+    .tiles a:hover, .tiles a:focus-visible { box-shadow: 0 8px 16px rgba(0,0,0,.2); }
+    :root:not([data-motion="reduced"]) .tiles a:is(:hover, :focus-visible) { transform: translateY(-4px); }
     .tiles img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: .4rem; }
     .earlier { --gx: 1rem; --gy: .55rem; --gr: .9rem; font-size: .9rem; color: var(--muted); margin: .9rem 0 0; max-width: 40rem; }
     .pill {
@@ -327,31 +361,34 @@
       --gx: .35rem; --gy: .35rem; --gr: .85rem; margin: 0 -.9rem 0 0; flex: none;
       transition: transform .25s, -webkit-backdrop-filter .3s ease, backdrop-filter .3s ease;
     }
-    .strip figure:hover { transform: translateY(-6px) scale(1.03); z-index: 5; position: relative; }
+    .strip figure:hover { z-index: 5; position: relative; }
+    :root:not([data-motion="reduced"]) .strip figure:hover { transform: translateY(-6px) scale(1.03); }
     .strip img { height: 100%; width: 100%; object-fit: cover; border-radius: .5rem; filter: drop-shadow(1px 5px 1px rgba(0, 14, 37, .58)); }
     .strip .rot { transform: rotate(10deg); }
-    .strip .rot:hover { transform: rotate(10deg) translateY(-6px) scale(1.03); }
+    :root:not([data-motion="reduced"]) .strip .rot:hover { transform: rotate(10deg) translateY(-6px) scale(1.03); }
 
     footer { text-align: center; padding-block: 1.6rem 3rem; }
     footer .name { --gx: .9em; --gy: .2em; --gr: .6em; font: 400 1.1rem/1.3 var(--display); letter-spacing: .02em; margin: 0 auto; }
     footer .year { --gx: .9em; --gy: .15em; --gr: .8em; font-size: .8rem; margin: .4rem auto 0; color: var(--muted); }
     footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; margin-top: .9rem; font-size: .85rem; }
     footer nav a { --gx: 1em; --gy: .45em; --gr: 999px; text-underline-offset: .2em; }
-    .strip-line { border: 0; border-top: 1px dotted #555; margin: 0 auto; max-width: 56rem; }
+    .strip-line { border: 0; height: 2px; background: var(--rule); margin: 0 auto; max-width: 56rem; }
 
     /* ---------- hover / press / keyboard focus ----------
-       The plate itself changes colour. Hover is only applied where a real hover exists
-       (not on touch, where it would stick after a tap). */
+       Clickable plates (links, buttons, the album card) tint orange on hover and blue on press.
+       Non-clickable plates tint black @ 5% and deepen their blur, so the grid seems to vanish
+       behind them. Hover only applies where a real hover exists (not on touch, where it would
+       stick after a tap).
+       With the cursor effects running (html.fx) the tint is drawn by the liquid layer instead
+       (see the script), so these plain CSS tints are the fallback: reduced motion, touch,
+       contrast modes, or no JS. Keyboard focus always uses the plate itself. */
     @media (hover: hover) {
-      a.glass:hover, .release:hover { --fill: var(--glass-hover); }
+      :root:not(.fx) :is(a, button).glass:hover, :root:not(.fx) .release:hover { --fill: var(--glass-hover); }
+      :root:not(.fx) .glass:not(a, button, .release, .aside):hover { --fill: var(--glass-quiet); }
+      .glass:not(a, button, .release, .aside):hover { --blur: var(--blur-hover); }
     }
-    a.glass:focus-visible { --fill: var(--glass-hover); }
-    a.glass:active, .release:active { --fill: var(--glass-press); }
-    /* Plates that aren't clickable don't take the orange/blue tint (that would suggest they're
-       links). Instead the blur deepens on hover, so the grid seems to vanish behind them. */
-    @media (hover: hover) {
-      .glass:not(a, .release, .aside):hover { --blur: var(--blur-hover); }
-    }
+    :is(a, button).glass:focus-visible { --fill: var(--glass-hover); }
+    :root:not(.fx) :is(a, button).glass:active, :root:not(.fx) .release:active { --fill: var(--glass-press); }
     /* Whole-card link: ring the card instead of just the title. */
     @supports selector(:has(*)) {
       .release:has(a:focus-visible) { --fill: var(--glass-hover); outline: 2px solid var(--ink); outline-offset: 3px; }
@@ -361,21 +398,34 @@
     /* ---------- reveal on scroll (content stays visible without JS) ----------
        Each glass item fades in on its own. Fading a whole section with opacity would stop
        backdrop-filter from seeing the grid behind it until the fade finished. */
-    @media (prefers-reduced-motion: no-preference) {
-      .js .reveal:not(.in) :is(.glass, .badge) { opacity: 0; }
-      .js .reveal.in :is(.glass, .badge) { animation: rise .7s ease backwards; }
-      @keyframes rise { from { opacity: 0; translate: 0 16px; } }
-      .js .portrait { opacity: 0; animation: portrait-in .9s .2s ease forwards; }
-      @keyframes portrait-in {
-        from { opacity: 0; transform: rotate(-12deg) scale(.96); }
-        to   { opacity: 1; transform: rotate(10deg); }
-      }
+    :root.js:not([data-motion="reduced"]) .reveal:not(.in) :is(.glass, .badge) { opacity: 0; }
+    :root.js:not([data-motion="reduced"]) .reveal.in :is(.glass, .badge) { animation: rise .7s ease backwards; }
+    :root.js:not([data-motion="reduced"]) .portrait { opacity: 0; animation: portrait-in .9s .2s ease forwards; }
+    @keyframes rise { from { opacity: 0; translate: 0 16px; } }
+    @keyframes portrait-in {
+      from { opacity: 0; transform: rotate(-12deg) scale(.96); }
+      to   { opacity: 1; transform: rotate(10deg); }
     }
+
+    /* ---------- cursor effects (built and driven by the script; only with full motion) ----------
+       Both layers sit BEHIND the page content (z-index -1), so text is never blurred or tinted
+       under the pointer. .fx-lens is the frosted puck that follows the cursor. .fx-goo draws the
+       hover tint: the cursor circle and a rounded rect shaped like the hovered plate are blurred
+       and thresholded together (an SVG "goo" filter), so they join like liquid. */
+    #fx { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+    .fx-lens {
+      position: absolute; left: 0; top: 0; border-radius: 50%;
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur));
+      opacity: 0; transition: opacity .25s ease;
+    }
+    .fx-lens.on { opacity: 1; }
+    .fx-goo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 
     /* ---------- accessibility fallbacks ---------- */
     /* Increased contrast / reduced transparency: solid plates, no blur, calmer grid. */
     @media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
-      :root { --glass: rgb(242 238 234 / .92); --glass-hover: #f5d8bc; --glass-press: #c2e2ee; }
+      :root { --glass: rgb(242 238 234 / .92); --glass-hover: #f5d8bc; --glass-press: #c2e2ee; --glass-quiet: #e6e2de; }
       .glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
     @media (prefers-contrast: more) { :root { --grid-line: #d3e4ec; } }
@@ -388,6 +438,10 @@
   </style>
 </head>
 <body>
+
+<button type="button" id="motion-toggle" class="glass motion-toggle" aria-pressed="false">
+  <span class="sw" aria-hidden="true"></span>Reduce motion
+</button>
 
 <header class="wrap hero">
   <p class="hello glass">hello there, <span class="wave" aria-hidden="true">👋</span></p>
@@ -406,7 +460,7 @@
   </div>
 </header>
 
-<hr class="dots">
+<hr class="rule">
 
 <main>
   <section id="ux-portfolio" class="block wrap reveal" aria-labelledby="ux-h">
@@ -428,7 +482,7 @@
     </div>
   </section>
 
-  <hr class="dots">
+  <hr class="rule">
 
   <section id="music-projects" class="block wrap reveal" aria-labelledby="music-h">
     <span class="badge round" aria-hidden="true">♪</span>
@@ -470,7 +524,7 @@
     </a>
   </section>
 
-  <hr class="dots">
+  <hr class="rule">
 
   <section id="in-between" class="block between wrap reveal" aria-labelledby="between-h">
     <span class="badge hex" aria-hidden="true"></span><br>
@@ -511,16 +565,222 @@
     els.forEach(function (e) { io.observe(e); });
   })();
 
-  /* Dotted dividers drift sideways with scroll. */
+  /* ---------- motion setting + cursor effects ----------
+     1. The "Reduce motion" toggle flips <html data-motion>, remembers the choice, and follows
+        the OS preference until the visitor has chosen.
+     2. With full motion on a mouse-type device, a frosted lens follows the cursor and hovering a
+        plate pours a tint out of the cursor that fills the plate like liquid (metaball).
+        Clickable plates: orange (hover) / blue (press). Everything else: black @ 5%.
+        Reduced motion, touch, contrast modes: the plain CSS tints are used instead. */
   (function () {
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var ratio = 1;            // dot movement per pixel scrolled (tune to taste)
-    var root = document.documentElement, ticking = false;
-    function update() { root.style.setProperty('--dot-shift', (window.scrollY * ratio).toFixed(1)); ticking = false; }
-    window.addEventListener('scroll', function () {
-      if (!ticking) { ticking = true; requestAnimationFrame(update); }
-    }, { passive: true });
-    update();
+    var root = document.documentElement;
+    var KEY = 'ct907-motion';
+    var btn = document.getElementById('motion-toggle');
+    var stored = null;
+    try { stored = localStorage.getItem(KEY); } catch (e) {}
+
+    function mq(q) { return window.matchMedia ? window.matchMedia(q) : { matches: false }; }
+    function listen(m, fn) { if (m.addEventListener) m.addEventListener('change', fn); else if (m.addListener) m.addListener(fn); }
+    var osReduce = mq('(prefers-reduced-motion: reduce)');
+    var fine = mq('(hover: hover) and (pointer: fine)');
+    var calm = mq('(prefers-contrast: more), (prefers-reduced-transparency: reduce), (forced-colors: active)');
+    function reduced() { return root.getAttribute('data-motion') === 'reduced'; }
+
+    /* ----- tiny spring + helpers ----- */
+    function spring(v) { return { x: v, v: 0, t: v }; }
+    function step(s, h, k, c) { s.v += (k * (s.t - s.x) - c * s.v) * h; s.x += s.v * h; }
+    function rest(s, e) { return Math.abs(s.t - s.x) < e && Math.abs(s.v) < e; }
+    function n2(v) { return Math.round(v * 100) / 100; }
+    function put(node, key, val) { var c = node._c || (node._c = {}); if (c[key] === val) return; c[key] = val; node.setAttribute(key, val); }
+
+    /* ----- liquid cursor ----- */
+    var ORANGE = { r: 255, g: 129, b: 3, a: 0.2 };    // #FF8103 @ 20%  hover, clickable
+    var BLUE   = { r: 0, g: 180, b: 255, a: 0.2 };    // #00B4FF @ 20%  press, clickable
+    var QUIET  = { r: 0, g: 0, b: 0, a: 0.05 };       // #000000 @ 5%   hover, not clickable
+    var layer, lens, svg, region, blurNode, flood, rect, dot;
+    var active = false, raf = 0, lastT = 0, pickAt = 0, bound = false;
+    var px = 0, py = 0, seen = false, pressed = false, needPick = false, el = null, R = 20, PAD = 36;
+    var cx = spring(0), cy = spring(0);                                   // the cursor puck
+    var bx = spring(0), by = spring(0), bw = spring(0), bh = spring(0), br = spring(0), ba = spring(0);   // the tint shape
+    var col = { r: 255, g: 129, b: 3, a: 0 }, colT = { r: 255, g: 129, b: 3, a: 0 };
+
+    function build() {
+      layer = document.createElement('div');
+      layer.id = 'fx';
+      layer.setAttribute('aria-hidden', 'true');
+      layer.innerHTML =
+        '<div class="fx-lens"></div>' +
+        '<svg class="fx-goo" focusable="false"><defs>' +
+          '<filter id="fx-filter" filterUnits="userSpaceOnUse" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">' +
+            '<feGaussianBlur id="fx-blur" in="SourceGraphic" stdDeviation="8" result="b"/>' +
+            // alpha threshold: this is what makes nearby shapes fuse into one liquid blob
+            '<feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -14.5" result="m"/>' +
+            '<feFlood id="fx-flood" flood-color="#ff8103" flood-opacity="0" result="f"/>' +
+            '<feComposite in="f" in2="m" operator="in"/>' +
+          '</filter></defs>' +
+          '<g filter="url(#fx-filter)"><rect id="fx-rect" fill="#000"/><circle id="fx-dot" fill="#000"/></g>' +
+        '</svg>';
+      document.body.appendChild(layer);
+      lens = layer.querySelector('.fx-lens');
+      svg = layer.querySelector('svg');
+      region = document.getElementById('fx-filter');
+      blurNode = document.getElementById('fx-blur');
+      flood = document.getElementById('fx-flood');
+      rect = document.getElementById('fx-rect');
+      dot = document.getElementById('fx-dot');
+    }
+
+    function size() {
+      R = n2(parseFloat(getComputedStyle(root).fontSize) * 1.25);   // puck radius scales with the text
+      PAD = R * 1.8;
+      put(blurNode, 'stdDeviation', n2(R * 0.4));
+      lens.style.width = lens.style.height = (R * 2) + 'px';
+    }
+
+    function snap() {   // first sighting of the pointer: start there rather than flying in
+      cx.x = cx.t = bx.x = bx.t = px; cy.x = cy.t = by.x = by.t = py;
+      bw.x = bw.t = bh.x = bh.t = R * 2; br.x = br.t = R; ba.x = ba.t = 0;
+      cx.v = cy.v = bx.v = by.v = bw.v = bh.v = br.v = ba.v = 0;
+      col.a = 0;
+    }
+
+    function pick() {   // which plate is under the pointer?
+      needPick = false;
+      var t = seen ? document.elementFromPoint(px, py) : null;
+      var g = t && t.closest ? t.closest('.glass') : null;
+      if (g && getComputedStyle(g).opacity === '0') g = null;    // not revealed yet
+      el = g;
+    }
+
+    function measure(g) {   // the plate's shape in viewport px, including any rotation/scale
+      var r = g.getBoundingClientRect(), cs = getComputedStyle(g), a = 0, w = r.width, h = r.height;
+      if (cs.transform !== 'none') {
+        try {
+          var m = new DOMMatrixReadOnly(cs.transform);
+          a = Math.atan2(m.b, m.a);
+          if (Math.abs(a) > 0.0001) { var sc = Math.hypot(m.a, m.b); w = g.offsetWidth * sc; h = g.offsetHeight * sc; }
+        } catch (e) { a = 0; }
+      }
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: w, h: h, a: a,
+               r: parseFloat(cs.borderTopLeftRadius) || 0, click: g.matches('a, button, .release') };
+    }
+
+    function draw() {
+      var w = Math.max(bw.x, 0), h = Math.max(bh.x, 0), r = Math.max(0, Math.min(br.x, w / 2, h / 2));
+      var x = bx.x, y = by.x;
+      put(rect, 'x', n2(x - w / 2)); put(rect, 'y', n2(y - h / 2));
+      put(rect, 'width', n2(w)); put(rect, 'height', n2(h)); put(rect, 'rx', n2(r));
+      put(rect, 'transform', 'rotate(' + n2(ba.x * 57.29578) + ' ' + n2(x) + ' ' + n2(y) + ')');
+      put(dot, 'cx', n2(cx.x)); put(dot, 'cy', n2(cy.x)); put(dot, 'r', R);
+      // only filter the area that matters (the shapes plus room for the blur)
+      var c = Math.abs(Math.cos(ba.x)), s = Math.abs(Math.sin(ba.x));
+      var hw = (w * c + h * s) / 2, hh = (w * s + h * c) / 2;
+      var x0 = Math.min(x - hw, cx.x - R) - PAD, y0 = Math.min(y - hh, cy.x - R) - PAD;
+      var x1 = Math.max(x + hw, cx.x + R) + PAD, y1 = Math.max(y + hh, cy.x + R) + PAD;
+      put(region, 'x', n2(x0)); put(region, 'y', n2(y0)); put(region, 'width', n2(x1 - x0)); put(region, 'height', n2(y1 - y0));
+      put(flood, 'flood-color', 'rgb(' + Math.round(col.r) + ',' + Math.round(col.g) + ',' + Math.round(col.b) + ')');
+      put(flood, 'flood-opacity', col.a.toFixed(3));
+      lens.style.transform = 'translate3d(' + n2(cx.x - R) + 'px,' + n2(cy.x - R) + 'px,0)';
+      svg.style.visibility = col.a < 0.002 ? 'hidden' : 'visible';
+    }
+
+    function frame(now) {
+      raf = 0;
+      if (!active) return;
+      var dt = Math.min(Math.max((now - lastT) / 1000, 0.001), 1 / 30); lastT = now;
+      if (needPick || now - pickAt > 120) { pickAt = now; pick(); }
+
+      var t = el ? measure(el) : null;
+      cx.t = px; cy.t = py;
+      if (t) {   // hovering a plate: the tint shape springs out to fill it
+        var sq = (pressed && t.click) ? 0.965 : 1;          // a little squish when pressed
+        bx.t = t.x; by.t = t.y; bw.t = t.w * sq; bh.t = t.h * sq;
+        br.t = Math.min(t.r, bw.t / 2, bh.t / 2); ba.t = t.a;
+        colT = t.click ? (pressed ? BLUE : ORANGE) : QUIET;
+      } else {   // nothing hovered: it pulls back into the cursor and fades out
+        bx.t = cx.x; by.t = cy.x; bw.t = bh.t = R * 2; br.t = R; ba.t = 0;
+        colT = { r: col.r, g: col.g, b: col.b, a: 0 };
+      }
+      if (col.a < 0.01 && colT.a > 0) { col.r = colT.r; col.g = colT.g; col.b = colT.b; }
+
+      // Springs: snappy and slightly elastic when filling a plate, softer and slower when it
+      // pulls back into the cursor, so the liquid visibly stretches before it lets go.
+      var K = t ? 200 : 110, C = t ? 19 : 14;
+      var n = Math.ceil(dt * 120), h = dt / n, i;   // fixed small sub-steps keep the springs stable
+      for (i = 0; i < n; i++) {
+        step(cx, h, 260, 26); step(cy, h, 260, 26);                    // puck: slightly lagging
+        step(bx, h, K, C); step(by, h, K, C); step(bw, h, K, C);
+        step(bh, h, K, C); step(br, h, K, C); step(ba, h, K, C);       // tint shape
+      }
+      var f = 1 - Math.exp(-dt * (t ? 14 : 6));
+      col.r += (colT.r - col.r) * f; col.g += (colT.g - col.g) * f;
+      col.b += (colT.b - col.b) * f; col.a += (colT.a - col.a) * f;
+      draw();
+
+      var still = rest(cx, 0.05) && rest(cy, 0.05) && rest(bx, 0.05) && rest(by, 0.05) && rest(bw, 0.05) &&
+                  rest(bh, 0.05) && rest(br, 0.05) && rest(ba, 0.0005) && Math.abs(col.a - colT.a) < 0.002;
+      if (!still || el) raf = requestAnimationFrame(frame);   // while over a plate, keep following it
+    }
+    function kick() { if (active && !raf) { lastT = performance.now(); raf = requestAnimationFrame(frame); } }
+
+    function onMove(e) {
+      if (!active || e.pointerType === 'touch') return;
+      px = e.clientX; py = e.clientY;
+      if (!seen) { seen = true; snap(); lens.classList.add('on'); }
+      needPick = true; kick();
+    }
+    function onDown(e) { if (active && e.button === 0 && e.pointerType !== 'touch') { pressed = true; kick(); } }
+    function onUp() { if (active && pressed) { pressed = false; kick(); } }
+    function onScroll() { if (active && seen) { needPick = true; kick(); } }
+    function onResize() { if (active) { size(); kick(); } }
+    function onLeave() { if (active) { seen = false; el = null; pressed = false; lens.classList.remove('on'); kick(); } }
+
+    function allowed() { return !reduced() && fine.matches && !calm.matches; }
+    function sync() {
+      var want = allowed();
+      if (want === active) return;
+      active = want;
+      if (want) {
+        if (!layer) build();
+        if (!bound) {
+          bound = true;
+          window.addEventListener('pointermove', onMove, { passive: true });
+          window.addEventListener('pointerdown', onDown, { passive: true });
+          window.addEventListener('pointerup', onUp, { passive: true });
+          window.addEventListener('pointercancel', onUp, { passive: true });
+          window.addEventListener('blur', onUp);
+          window.addEventListener('scroll', onScroll, { passive: true });
+          window.addEventListener('resize', onResize);
+          document.addEventListener('mouseout', function (e) { if (!e.relatedTarget) onLeave(); });
+        }
+        layer.style.display = '';
+        size();
+        root.classList.add('fx');
+      } else {
+        root.classList.remove('fx');
+        if (layer) layer.style.display = 'none';
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0; el = null; seen = false; pressed = false;
+        if (lens) lens.classList.remove('on');
+      }
+    }
+
+    /* ----- the toggle ----- */
+    function setMode(mode, remember) {
+      root.setAttribute('data-motion', mode);
+      if (btn) btn.setAttribute('aria-pressed', mode === 'reduced' ? 'true' : 'false');
+      if (remember) { stored = mode; try { localStorage.setItem(KEY, mode); } catch (e) {} }
+      sync();
+    }
+    if (btn) {
+      btn.setAttribute('aria-pressed', reduced() ? 'true' : 'false');
+      btn.addEventListener('click', function () { setMode(reduced() ? 'full' : 'reduced', true); });
+    }
+    // Until the visitor has chosen, keep following the OS setting if it changes.
+    listen(osReduce, function (e) { if (stored !== 'full' && stored !== 'reduced') setMode(e.matches ? 'reduced' : 'full', false); });
+    listen(fine, sync);
+    listen(calm, sync);
+    sync();
   })();
 </script>
 </body>
