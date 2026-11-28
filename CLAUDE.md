@@ -100,6 +100,21 @@ editor for it (see `editor/README.md`).
   flat shadow on top. Everything is off for increased contrast, forced colours and print. Browser support: Chrome 120+,
   Safari 16.4+, Firefox 128+ for the textured ghosts.
 
+## Baked riso photos (`tools/riso-bake.py`)
+
+- Photos get the riso look **baked into the file**, not applied live: an SVG-filter version (the displacement-noise CodePen) cost ~5x
+  the frame budget when measured, and masking photos with the grain texture at runtime was also costly. Baking costs nothing at runtime.
+- `python3 tools/riso-bake.py photo.jpg --preset soft|overprint|duo --display-width 300` (Python + numpy + Pillow; a dev tool, the site
+  still has no build step). It separates the photo into the heading inks (cyan, magenta, yellow), breaks them up with grain, prints
+  yellow up-left and magenta down-right like the heading plates, and multiplies them onto `--paper`. `duo` uses only the wallpaper's
+  blue and pink. Photos use a lighter cyan (`#2aa5df`) than the headings' `#1a84c4`, which goes muddy over a whole picture.
+- **Don't use `paper-texture.webp` as the ink threshold.** It has a regular fine mesh under its speckle: invisible as an 8% overlay,
+  but it prints as a halftone screen. The tool uses synthetic speckle (shared across the three plates, like a real print) instead.
+- Grain compresses badly: baked photos come out roughly 1-3x the size of the originals. Check sizes (LCP, see the texture notes
+  above) and use `--quality` / `--grain` if a file is too heavy. Keep the original as the source; commit only the baked WebP.
+- Not applied to the site yet: the homepage's photos are hosted on Readymag's CDN, so using one means committing the baked file under
+  `assets/images/` and swapping its `src` (the editor's **Replace image...** does both in one pull request).
+
 ## Page editor: structural edits (`editor/index.html`)
 
 - **Selection.** `sel` is the active element, `selMore` the rest of a multi-selection; `setProp` / `resetProps` / `isTweaked`
