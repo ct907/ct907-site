@@ -1,0 +1,240 @@
+{
+ "project": {
+  "title": "Chris Tan",
+  "num_id": 4100299,
+  "last_changed": "2026-11-27T04:15:07.953Z",
+  "desktopWidth": 1024,
+  "ci_css": "[data-id=\"6634f806fe0df1002f7b1761\"] p span {\nanimation: font-weight 6s infinite;\n}\n@keyframes font-weight {\n  0% {font-variation-settings: \"wght\" 100; }\n50% {font-variation-settings: \"wght\" 700; }\n100% {font-variation-settings: \"wght\" 100; }\n}\n\n[data-id=\"66496c717030240044c0614f\"] p span {\nanimation: font-weight 6s infinite;\n}\n@keyframes font-weight {\n  0% {font-variation-settings: \"wght\" 100; }\n50% {font-variation-settings: \"wght\" 700; }\n100% {font-variation-settings: \"wght\" 100; }\n}\n\n[data-id=\"66b9f7ee3bd0965a5cb0fcb2\"] p span {\nanimation: font-weight 6s infinite;\n}\n@keyframes font-weight {\n  0% {font-variation-settings: \"wght\" 100; }\n50% {font-variation-settings: \"wght\" 700; }\n100% {font-variation-settings: \"wght\" 100; }\n}\n\n[data-id=\"66382c636a406600131e41ec\"] {\n  background: linear-gradient(270deg, #B7BCC1 0%, #FF6546 100%);\n}\n\n\n[data-id=\"663a3829a05cd700627b3805\"] {\n  background: linear-gradient(270deg, #B7BCC1 0%, #FF6546 100%);\n}\n\n[data-id=\"664402ac5c783f0052deb898\"] {\n  background: linear-gradient(270deg, #B7BCC1 0%, #FF6546 100%);\n}\n\n[data-id=\"66496c717030240044c0614f\"] {\n  background: linear-gradient(270deg, #B8B7C1 0%, #FF6546 100%);\n}\n\n[data-id=\"68c53fa1bcff02f4d56a69cb\"] {\n    pointer-events: none;\n  }\n\n[data-id=\"68c548df2d516466ae8bc0fd\"] {\n    pointer-events: none;\n  }\n\n[data-id=\"68c549e00a7f8256bcbd4905\"] {\n    pointer-events: none;\n  }\n\n[data-id=\"687cee8daf9cfcc8c3d53f2a\"] {\n@media (prefers-color-scheme: dark) {\n  [data-id=\"687cee8daf9cfcc8c3d53f2a\"] {\n    background-color: #372415 !important;\n    filter: none !important;\n  }\n  \n  \n  [data-id=\"687cf66b75efa9b465fb433e\"] {\n@media (prefers-color-scheme: dark) {\n  [data-id=\"687cf66b75efa9b465fb433e\"] {\n    background-color: #032206 !important;\n    filter: none !important;\n  }"
+ },
+ "pages": [
+  {
+   "uri": "welcome",
+   "title": "Chris Tan",
+   "num_id": 22151550,
+   "height": 2339,
+   "seo": {
+    "title": "Chris Tan | UX Designer & Singer-Songwriter",
+    "description": "Chris Tan is a Singapore-based UX designer with experience in AI interaction design and government digital services \u2014 and a singer-songwriter on the side. Debut album Slow Food out now on Spotify.",
+    "keywords": "Chris Tan, UX designer, singer-songwriter, Singapore, AI interaction design, Slow Food, indie pop, ct907, portfolio"
+   },
+   "custom_shares": null,
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-38557060-487c-4b0b-ad08-d7e744bf9f53.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-82440823-e867-48c2-8083-dbcd5b1c82d1_readyscr.jpg"
+  },
+  {
+   "uri": "slow-food-album",
+   "title": "Slow Food Album",
+   "num_id": 28379393,
+   "height": 4874,
+   "seo": {
+    "title": "Slow Food | Chris Tan",
+    "description": "Food for the ears. Slow Food is the second album by singer-songwriter Chris Tan \u2014 a 4-course meal of 12 songs, from Salty to Sweet. Stream now on Spotify and all major platforms.",
+    "keywords": "Chris Tan, Slow Food, singer-songwriter, Singapore, Malaysia, indie pop, album, slow cooking, food music, Spotify"
+   },
+   "custom_shares": {
+    "title": "Slow Food",
+    "description": "Album by Chris Tan",
+    "image": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/Image-f0f62952-8f96-4492-9ea4-55eaf12744b7.jpg",
+    "tweet": "Slow Food album by Chris Tan"
+   },
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-0ddd5f25-0fd2-400f-ac7a-1ee4f763f271.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-794daf23-db7e-40ac-9918-929f03640a7a_readyscr.jpg"
+  },
+  {
+   "uri": "slow-food-recipe-1",
+   "title": "Slow Food - Course 1",
+   "num_id": 27395238,
+   "height": 9723,
+   "seo": {
+    "title": "Course 1",
+    "description": "Slow Food album by Chris Tan",
+    "keywords": ""
+   },
+   "custom_shares": {
+    "title": "Slow Food - Course 1",
+    "description": "Album tracks",
+    "image": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-494b7736-7a13-4393-ae9d-09bebfd0e4a9_1024.jpg",
+    "tweet": "Slow Food - Course 1"
+   },
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-b4150d54-0b09-4938-97a7-15d1adcd39b1.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-0b02c3c4-bbf5-43e6-8797-1de679b9a627_readyscr.jpg"
+  },
+  {
+   "uri": "slow-food-recipe-2",
+   "title": "Slow Food - Course 2",
+   "num_id": 27367517,
+   "height": 7631,
+   "seo": {
+    "title": "Course 2",
+    "description": "Slow Food album by Chris Tan",
+    "keywords": ""
+   },
+   "custom_shares": {
+    "title": "Slow Food - Course 2",
+    "description": "Album Tracks 4-6",
+    "image": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-b9802894-0f86-4954-bd88-7f5009e10a2e_1024.jpg",
+    "tweet": "Slow Food - Course 2"
+   },
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-5fa1c00c-49be-4fc8-9ee4-2631137fb880.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-81f5ba02-1fce-4c07-bc0d-2ea5126a7a06_readyscr.jpg"
+  },
+  {
+   "uri": "slow-food-recipe-3",
+   "title": "Slow Food - Course 3",
+   "num_id": 27425811,
+   "height": 8542,
+   "seo": {
+    "title": "Course 2",
+    "description": "Slow Food album by Chris Tan",
+    "keywords": ""
+   },
+   "custom_shares": {
+    "title": "Slow Food - Course 2",
+    "description": "Album Tracks 4-6",
+    "image": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-718b6873-63a2-4be8-a33d-636c97e20aeb_1024.jpg",
+    "tweet": "Slow Food - Course 2"
+   },
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-c783a362-c46e-4915-be50-cb10353cb4ef.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-56a62017-3ea2-4091-b7bb-9f8baf2224c8_readyscr.jpg"
+  },
+  {
+   "uri": "slow-food-recipe-4",
+   "title": "Slow Food - Course 3",
+   "num_id": 27553394,
+   "height": 8470,
+   "seo": {
+    "title": "Course 2",
+    "description": "Slow Food album by Chris Tan",
+    "keywords": ""
+   },
+   "custom_shares": {
+    "title": "Slow Food - Course 2",
+    "description": "Album Tracks 4-6",
+    "image": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-99898051-be77-4add-aebc-0189c7a4cca0_1024.jpg",
+    "tweet": "Slow Food - Course 2"
+   },
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-3ecb4169-21df-4494-a075-71ff3f20250b.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-3641cb74-f56c-4ada-a7a0-1d5ae2ed6f6b_readyscr.jpg"
+  },
+  {
+   "uri": "portfolio",
+   "title": "Chris Tan's UX Portfolio",
+   "num_id": 23047709,
+   "height": 1380,
+   "seo": null,
+   "custom_shares": null,
+   "isPrivate": true,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-4fc83d59-7920-40a1-aa60-fb610e2b2ebf.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-3d59e74a-a85e-454b-ad17-045ad947f993_readyscr.jpg"
+  },
+  {
+   "uri": "research-gateway-design",
+   "title": "Statboard Research Gateway",
+   "num_id": 22159558,
+   "height": 7220,
+   "seo": null,
+   "custom_shares": null,
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-b80a2e36-3b1b-4b0a-a8b5-03444a536df9.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-5642168a-38a0-49a3-9d8a-062e06457760_readyscr.jpg"
+  },
+  {
+   "uri": "aria-driverless-car-app",
+   "title": "ARIA Rideshare App",
+   "num_id": 22185621,
+   "height": 2840,
+   "seo": null,
+   "custom_shares": null,
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-83a9009d-ad9e-4987-a23e-74e7f7574d3d.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-a812937a-35ee-47cd-8436-a714c0bd1467_readyscr.jpg"
+  },
+  {
+   "uri": "nhb-games",
+   "title": "NHB Gamification Webapp",
+   "num_id": 22299512,
+   "height": 5052,
+   "seo": null,
+   "custom_shares": null,
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-3def1cd2-c0b1-4186-8a78-5302e0c20d61.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-869d042b-9e6b-4ca3-8fa8-f3c7bde01d9b_readyscr.jpg"
+  },
+  {
+   "uri": "ai-interaction-design",
+   "title": "AI Driver Interaction Design",
+   "num_id": 22260953,
+   "height": 3885,
+   "seo": null,
+   "custom_shares": null,
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-516f1e19-2038-4044-a86d-a95373862642.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-6e01c04d-7dba-4757-823e-b837b28a74e2_readyscr.jpg"
+  },
+  {
+   "uri": "ai-driver-interaction-surface",
+   "title": "Ai Driver Interaction Surfaces",
+   "num_id": 22152065,
+   "height": 3025,
+   "seo": null,
+   "custom_shares": null,
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-a25a590e-3c12-4f2f-a922-efb65a0732a9.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-973cb4b1-a2f6-4695-a758-91e1c608f5f4_readyscr.jpg"
+  },
+  {
+   "uri": "private-capital-management-website",
+   "title": "Investment Firm Website",
+   "num_id": 23057147,
+   "height": 2709,
+   "seo": null,
+   "custom_shares": null,
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-39597b7d-dd27-49c0-b0fa-654dedbabf82.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-7a96dd35-685b-4a1f-b915-e510f7502c9b_readyscr.jpg"
+  },
+  {
+   "uri": "ai-driver-visual-language",
+   "title": "AI Driver Visual Language",
+   "num_id": 22174730,
+   "height": 2261,
+   "seo": null,
+   "custom_shares": null,
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-d91ff648-95f7-4728-bd85-507712ad9b95.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-2f0d83c4-e6c9-4a11-8783-d8d094642e88_readyscr.jpg"
+  },
+  {
+   "uri": "ai-visual-identity",
+   "title": "AI Visual Identity",
+   "num_id": 22184352,
+   "height": 3438,
+   "seo": null,
+   "custom_shares": null,
+   "isPrivate": false,
+   "hidden": false,
+   "htmlUrl": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/HtmlSnippet-f8fdd968-ce25-45fe-904d-1b3b1a224b1e.html",
+   "screenshot": "https://c-p.rmcdn.net/63b5401ad11b3f0729779879/4100299/Screenshot-ad626faf-5026-42f8-a73c-e7e190580411_readyscr.jpg"
+  }
+ ]
+}
