@@ -502,22 +502,40 @@
     var root = document.documentElement;
     if (!('maskImage' in root.style || 'webkitMaskImage' in root.style)) return;
     var ro = window.ResizeObserver ? new ResizeObserver(function (list) { list.forEach(function (e) { paint(e.target); }); }) : null;
-    function paint(g) {
+    /* A plate whose size drifts a little (the title's weight cycle makes its text a few pixels wider and narrower, many times a
+       second) must NOT get a new mask image each time: a new data: image URL is decoded again, and Firefox shows the element
+       unmasked or blank until it has loaded, which flashes. So a mask is kept while the plate stays within 6% of the size it was
+       drawn for (it is stretched by mask-size: 100% 100%, which moves the 4px fade by about a tenth of a pixel), and a plate that
+       has stopped changing and isn't in an endless animation gets one exact repaint after 250ms. Anything that asks for a repaint on purpose
+       (paintAll: load, fonts) is always exact. Same code as index.html. */
+    function endless(g) {   // is something animating this plate for ever (the title's weight cycle)? a one-off animation, like the reveal, isn't
+      var a = g.getAnimations ? g.getAnimations() : [];
+      for (var i = 0; i < a.length; i++) { var t = a[i].effect && a[i].effect.getTiming && a[i].effect.getTiming(); if (t && t.iterations === Infinity) return true; }
+      return false;
+    }
+    function paint(g, exact) {
       var cs = getComputedStyle(g), E = parseFloat(cs.getPropertyValue('--edge')) || 0;
       var blur = cs.backdropFilter || cs.webkitBackdropFilter || 'none';
       var border = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderRightWidth) + parseFloat(cs.borderBottomWidth) + parseFloat(cs.borderLeftWidth);
       var w = g.offsetWidth, h = g.offsetHeight;
       if (E <= 0 || blur === 'none' || border > 0 || w < 2 * E + 2 || h < 2 * E + 2) { if (g.style.getPropertyValue('--edge-mask')) g.style.removeProperty('--edge-mask'); return; }
+      var drawn = g.__edge;
+      if (!exact && drawn && g.style.getPropertyValue('--edge-mask') && Math.abs(w - drawn.w) <= .06 * drawn.w && Math.abs(h - drawn.h) <= .06 * drawn.h) {
+        clearTimeout(g.__edgeT);
+        if (!endless(g)) g.__edgeT = setTimeout(function () { paint(g, true); }, 250);
+        return;
+      }
       var R = Math.min(parseFloat(cs.borderTopLeftRadius) || 0, w / 2, h / 2), inset = E / 2;
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' +
         '<filter id="f" filterUnits="userSpaceOnUse" x="0" y="0" width="' + w + '" height="' + h + '"><feGaussianBlur stdDeviation="' + (E / 4) + '"/></filter>' +
         '<rect x="' + inset + '" y="' + inset + '" width="' + (w - E) + '" height="' + (h - E) + '" rx="' + Math.max(R - inset, 0) + '" fill="#000" filter="url(#f)"/></svg>';
       var url = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+      g.__edge = { w: w, h: h };
       if (g.style.getPropertyValue('--edge-mask') !== url) g.style.setProperty('--edge-mask', url);
     }
     function paintAll() {
       var list = document.querySelectorAll('.glass');
-      for (var i = 0; i < list.length; i++) { paint(list[i]); if (ro) ro.observe(list[i]); }
+      for (var i = 0; i < list.length; i++) { paint(list[i], true); if (ro) ro.observe(list[i]); }
     }
     paintAll();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintAll);
