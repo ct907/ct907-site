@@ -102,6 +102,22 @@ editor for it (see `editor/README.md`).
 - Source edits happen in this order in `buildNewSource`: text, pictures, new layers and copies, removal of pushed layers,
   deletions, then the managed style block. Path lookups in the source skip layers already placed in that push (`srcAt` with `ign`).
 
+## Page editor: pages, pictures and labels (`editor/index.html`)
+
+- **Which page.** The top-bar **Page** drop-down switches the page being edited (`settings.path`). `fetchPage` reads a page without
+  touching the session, `startPage` begins a clean one, `switchPage` does the check-then-confirm-then-start. The list comes from
+  GitHub's file tree (`discoverPages`, one unauthenticated request) with each page probed on the live site. A page that is a
+  `<meta http-equiv="refresh">` stub (every folder except `assets/` and `editor/` today) is refused and shown under *Can't be
+  edited*, since the preview would leave the site. Switching with unsaved changes asks first and clears the saved draft. The
+  home page's own token sliders (grid, grain, glass, riso) only show on a page that defines those tokens.
+- **Pictures.** `picturesSection` lists every `<img>` that isn't an editor layer, each with its own Replace; a frame holding exactly
+  one picture shows that picture's Image controls (`imageSection(img, true)`). Thumbnails are drawn onto a `<canvas>` because the
+  editor's Content-Security-Policy only allows `blob:` images.
+- **Labels are written in full, and headers are big (standing rule for the panel).** No abbreviations in a visible label: *Move
+  horizontally*, *Letter spacing*, *Frosted glass blur*, not X / LS / Bl. New controls follow it (the design-token rows get names from
+  `TOKEN_NAMES`, with the CSS variable in the tooltip). Section headers are 15px, nested ones 13.5px; number fields put the label above
+  the input, and select/colour/slider rows have a 104px label column that wraps. The panel is 390px wide.
+
 ## Frosted glass and the title animation
 
 - **Blur has two tokens.** `--blur` (4px) is for *clickable* plates (links, buttons, the album card) and `--blur-static` (24px) for

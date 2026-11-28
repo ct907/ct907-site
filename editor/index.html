@@ -19,7 +19,7 @@
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
-    display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: 48px minmax(0, 1fr);
+    display: grid; grid-template-columns: minmax(0, 1fr) 390px; grid-template-rows: 48px minmax(0, 1fr);
     grid-template-areas: "bar bar" "stage panel";
   }
   button, input, select { font: inherit; color: inherit; }
@@ -43,6 +43,11 @@
   #bar label { color: var(--muted); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
   #bar input[type=number], #bar select { background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
   #bar input[type=number] { width: 64px; }
+  #pageSel { max-width: 210px; }
+  #bar button { white-space: nowrap; }
+  #bar .pill { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 1340px) { #range { display: none; } #pageSel { max-width: 160px; } }   /* the panel header already says which width range tweaks apply to */
+  @media (max-width: 1180px) { .brand { display: none; } #bar { gap: 6px; padding: 0 8px; } .seg button { padding: 5px 6px; } #bar input[type=number] { width: 56px; } }
   .pill { background: #15171a; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--muted); white-space: nowrap; }
   .pill b { color: var(--text); font-weight: 600; }
   .spacer { flex: 1; }
@@ -58,37 +63,41 @@
   /* ---- inspector ---- */
   #panel { grid-area: panel; overflow: auto; background: var(--panel); border-left: 1px solid var(--line); }
   #panel details { border-bottom: 1px solid var(--line); }
-  #panel summary { padding: 9px 12px; cursor: pointer; font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: .06em; list-style: none; }
-  #panel summary::before { content: "▸"; display: inline-block; width: 14px; transition: transform .15s; }
+  #panel summary { padding: 12px 14px; cursor: pointer; font-weight: 650; color: var(--text); font-size: 15px; line-height: 1.3; letter-spacing: .005em; list-style: none; background: rgba(255,255,255,.025); display: flex; align-items: center; }
+  #panel summary:hover { background: rgba(255,255,255,.055); }
+  #panel summary::before { content: "▸"; display: inline-block; width: 18px; color: var(--muted); transition: transform .15s; }
   #panel details[open] > summary::before { transform: rotate(90deg); }
-  #panel .body { padding: 2px 12px 12px; }
-  .hint { color: var(--muted); padding: 0 12px; }
-  .sel-head { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  #panel .body { padding: 8px 14px 14px; }
+  .hint { color: var(--muted); padding: 0 14px; font-size: 13px; }
+  .sel-head { padding: 12px 14px; border-bottom: 1px solid var(--line); }
   .sel-head code { display: block; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #9ec5ff; word-break: break-all; margin: 4px 0 6px; }
   .crumbs { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
   .crumbs button { padding: 1px 6px; font-size: 11px; background: transparent; color: var(--muted); }
   .crumbs button.cur { color: var(--text); border-color: var(--accent); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
-  .f { display: grid; grid-template-columns: 22px minmax(0, 1fr) 16px 14px; align-items: center; gap: 4px; }
-  .f .lab { color: var(--muted); cursor: ew-resize; user-select: none; font-size: 11px; text-align: center; }
+  .f { display: grid; grid-template-columns: minmax(0, 1fr) 24px 14px; grid-template-areas: "lab lab lab" "inp unit x"; align-items: center; gap: 3px 4px; }
+  .f .lab { grid-area: lab; color: var(--muted); cursor: ew-resize; user-select: none; font-size: 13px; line-height: 1.25; }
+  .f input { grid-area: inp; }
+  .f .u { grid-area: unit; }
+  .f .x { grid-area: x; }
   .f input { width: 100%; background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; min-width: 0; }
-  .f .u { color: var(--muted); font-size: 10px; }
+  .f .u { color: var(--muted); font-size: 11px; }
   .f .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); line-height: 1; font-size: 14px; }
   .f.on .x { visibility: visible; }
   .f.on input { border-color: #3d6fb7; }
-  .fc { display: grid; grid-template-columns: 56px 30px minmax(0, 1fr) 58px 14px; align-items: center; gap: 6px; margin-top: 6px; }
-  .fc .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .fc .lab { color: var(--muted); font-size: 12px; }
+  .fc { display: grid; grid-template-columns: 104px 30px minmax(0, 1fr) 58px 14px; align-items: center; gap: 6px; margin-top: 8px; }
+  .fc .lab { color: var(--muted); font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; }
   .fc input[type=color] { width: 30px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
   .fc input[type=text], .fc input[type=number] { width: 100%; background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; min-width: 0; }
   .fc .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; }
   .fc.on .x { visibility: visible; }
-  .sub { margin: 10px 0 4px; color: var(--muted); font-size: 11px; }
-  .fr { display: grid; grid-template-columns: 54px minmax(0, 1fr) 52px 16px 14px; align-items: center; gap: 6px; margin-top: 8px; }
-  .fr .lab { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #panel .body > .sub:first-child { margin-top: 2px; }
+  .sub { margin: 14px 0 4px; color: #c9cfd6; font-size: 13px; font-weight: 600; }
+  .fr { display: grid; grid-template-columns: 104px minmax(0, 1fr) 52px 18px 14px; align-items: center; gap: 6px; margin-top: 10px; }
+  .fr .lab { color: var(--muted); font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; }
   .fr input[type=range] { width: 100%; min-width: 0; accent-color: var(--accent); }
   .fr input[type=number] { width: 100%; background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; min-width: 0; }
-  .fr .u { color: var(--muted); font-size: 10px; }
+  .fr .u { color: var(--muted); font-size: 11px; }
   .fr .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); line-height: 1; font-size: 14px; }
   .fr.on .x { visibility: visible; }
   .fr.on input[type=number] { border-color: #3d6fb7; }
@@ -100,8 +109,8 @@
   .imginfo { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
   .imginfo .ph { width: 56px; height: 56px; border-radius: 6px; border: 1px solid var(--line); background: #15171a; object-fit: cover; display: block; }
   .imginfo code { font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; color: #9ec5ff; }
-  .fsel { display: grid; grid-template-columns: 54px minmax(0, 1fr) 14px; gap: 6px; align-items: center; margin-top: 6px; }
-  .fsel .lab { color: var(--muted); font-size: 12px; }
+  .fsel { display: grid; grid-template-columns: 104px minmax(0, 1fr) 14px; gap: 6px; align-items: center; margin-top: 8px; }
+  .fsel .lab { color: var(--muted); font-size: 13px; line-height: 1.25; }
   .fsel select { background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; min-width: 0; width: 100%; }
   .fsel .x { visibility: hidden; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; }
   .fsel.on .x { visibility: visible; }
@@ -111,7 +120,8 @@
   #panel .tgb[aria-pressed="true"] { background: var(--accent-2); border-color: var(--accent); color: #fff; }
   #panel .btnrow .tg + .tg { margin-left: 6px; }
   #panel .nest { margin-top: 10px; border-top: 1px dashed var(--line); border-bottom: 0; }
-  #panel .nest > summary { padding: 8px 0 2px; font-size: 11px; text-transform: none; letter-spacing: 0; }
+  #panel .nest > summary { padding: 8px 0 4px; font-size: 13.5px; font-weight: 600; background: none; color: #d6dbe1; }
+  #panel .nest > summary:hover { background: none; color: #fff; }
   #panel .nest > .nbody { padding: 2px 0 0; }
   .customfont input { flex: 1; min-width: 0; background: #15171a; border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
   .cssadd { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 6px; }
@@ -119,6 +129,13 @@
   .cssrow { display: grid; grid-template-columns: minmax(0, 38%) minmax(0, 1fr) 16px; gap: 6px; align-items: center; margin-top: 6px; }
   .cssrow code { font: 11px/1.3 ui-monospace, Menlo, Consolas, monospace; color: #9ec5ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cssrow .x { padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; }
+  .pics { list-style: none; margin: 0; padding: 0; }
+  .pics li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+  .pics .pth { width: 56px; height: 56px; border-radius: 6px; border: 1px solid var(--line); background: #15171a; display: block; }
+  .pics .pmeta { min-width: 0; font-size: 12px; }
+  .pics .ptitle { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pics .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pics .btnrow { margin-top: 6px; }
   .thumbs { list-style: none; margin: 0; padding: 0; }
   .thumbs li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--line); }
   .thumbs img { width: 48px; height: 48px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); }
@@ -154,6 +171,7 @@
 <body>
 <header id="bar">
   <div class="brand">Page editor</div>
+  <label>Page <select id="pageSel" aria-label="Page being edited" title="Switch to another page of the site"></select></label>
   <div class="seg" id="widths" role="group" aria-label="Preview width"></div>
   <label>Width <input id="w" type="number" min="280" max="3000" step="10" aria-label="Preview width in pixels"> px</label>
   <span class="pill" id="range" title="Tweaks you make are saved for this width range only"></span>
@@ -192,6 +210,21 @@
       <b>Repository access</b>: only this repository. <b>Permissions</b>: <i>Contents: Read and write</i> and <i>Pull requests: Read and write</i>. Set a short expiry.</p>
   </div>
   <div class="dfoot"><button value="cancel" type="button" id="sCancel">Cancel</button><button value="ok" class="primary" id="sSave">Save</button></div>
+</form></dialog>
+
+<dialog id="dlgConfirm" style="width:min(460px,94vw)"><form method="dialog">
+  <h2 id="cTitle"></h2>
+  <div class="dbody"><p id="cText" style="margin:0"></p></div>
+  <div class="dfoot"><button type="button" id="cNo">Stay here</button><button type="button" class="primary" id="cOk"></button></div>
+</form></dialog>
+
+<dialog id="dlgPage" style="width:min(520px,94vw)"><form method="dialog" id="fPage">
+  <h2>Edit another page</h2>
+  <div class="dbody">
+    <label class="row">Page file <input type="text" id="pPath" placeholder="portfolio/index.html" autocomplete="off" spellcheck="false"></label>
+    <p class="note">The path of an HTML file in this site, like <code>portfolio/index.html</code>. A page that only redirects somewhere else can’t be edited.</p>
+  </div>
+  <div class="dfoot"><button type="button" id="pCancel">Cancel</button><button class="primary" id="pOpen" value="ok">Open</button></div>
 </form></dialog>
 
 <dialog id="dlgReview"><form method="dialog" id="fReview">
@@ -237,14 +270,14 @@ const GUARD = '(prefers-contrast: no-preference)';
 const INKS = { '--ink-c': [0x59, 0xe1, 0xff], '--ink-m': [0xe1, 0xc1, 0xdd] };
 // The riso shift on heading text: yellow and magenta ghosts, off-register in opposite directions (see the page's --riso-* tokens).
 const RISO = [
-  { name: '--riso-yellow-shift', label: 'Yellow', aria: 'Riso yellow shift in pixels (up-left)', title: 'How far the yellow plate is off-register, up and to the left (0 to 2px)', min: 0, max: 2, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
-  { name: '--riso-magenta-shift', label: 'Magenta', aria: 'Riso magenta shift in pixels (down-right)', title: 'How far the magenta plate is off-register, down and to the right (0 to 4px)', min: 0, max: 4, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
-  { name: '--riso-text', label: 'Opacity', aria: 'Riso shift opacity in percent', title: 'Opacity of both plates (the page ships at 20%); 0 switches the effect off', min: 0, max: 100, step: 1, unit: '%', get: (v) => Math.round(100 * (parseFloat(v) || 0)), put: (v) => String(r3(v / 100)) },
+  { name: '--riso-yellow-shift', label: 'Yellow plate shift', aria: 'Riso yellow shift in pixels (up-left)', title: 'How far the yellow plate is off-register, up and to the left (0 to 2px)', min: 0, max: 2, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
+  { name: '--riso-magenta-shift', label: 'Magenta plate shift', aria: 'Riso magenta shift in pixels (down-right)', title: 'How far the magenta plate is off-register, down and to the right (0 to 4px)', min: 0, max: 4, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
+  { name: '--riso-text', label: 'Plate opacity', aria: 'Riso shift opacity in percent', title: 'Opacity of both plates (the page ships at 20%); 0 switches the effect off', min: 0, max: 100, step: 1, unit: '%', get: (v) => Math.round(100 * (parseFloat(v) || 0)), put: (v) => String(r3(v / 100)) },
 ];
 // How hard the frosted plates blur what is behind them: the page's two tokens (see --blur and --blur-static).
 const BLURS = [
-  { name: '--blur', label: 'Clickable', aria: 'Frosted blur of clickable plates in pixels', title: 'Links, buttons and the album card (the page ships at 4px)' },
-  { name: '--blur-static', label: 'Unclickable', aria: 'Frosted blur of unclickable plates in pixels', title: 'Headings, paragraphs, labels and every other frosted plate that is not a link (the page ships at 24px)' },
+  { name: '--blur', label: 'Clickable plates', aria: 'Frosted blur of clickable plates in pixels', title: 'Links, buttons and the album card (the page ships at 4px)' },
+  { name: '--blur-static', label: 'Unclickable plates', aria: 'Frosted blur of unclickable plates in pixels', title: 'Headings, paragraphs, labels and every other frosted plate that is not a link (the page ships at 24px)' },
 ];
 const MAX_PUSH = 20000;                       // px: a typo like 99999999 shouldn't make a page that long
 const IMG_DIR = 'assets/images';
@@ -690,23 +723,111 @@ function layoutFrame() {
 function setWidth(w) { frameW = Math.max(280, Math.min(3000, Math.round(w) || 1440)); layoutFrame(); setTimeout(updateOverlay, 30); }
 
 /* ---------- load the page ---------- */
-async function loadPage() {
-  q('#empty').style.display = 'grid'; q('#empty').textContent = 'Loading…';
-  const url = new URL('../' + settings.path.replace(/^\/+/, ''), location.href);
-  try {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    source0 = await res.text();
-  } catch (err) {
-    q('#empty').textContent = `Couldn't load ${settings.path} (${err.message}). Open this editor from the live site (…/editor/), not from a file on disk.`; return;
+// A page path the editor will accept: an .html file inside the site (no "..", no query), with a trailing slash meaning its index.html.
+function normPage(raw) {
+  let p = String(raw || '').trim().replace(/^\/+/, '');
+  if (!p) return '';
+  if (p.endsWith('/')) p += 'index.html';
+  return /^[\w.\-]+(\/[\w.\-]+)*\.html?$/i.test(p) && !p.split('/').some((x) => x === '..' || x === '.') ? p : '';
+}
+// The address a page like <meta http-equiv="refresh" content="0; url=…"> sends visitors to ('' if it doesn't redirect).
+function redirectOf(text) {
+  for (const m of text.matchAll(/<meta\b[^>]*>/gi)) {
+    if (!/http-equiv\s*=\s*["']?refresh/i.test(m[0])) continue;
+    const c = /content\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(m[0]), v = c ? (c[1] ?? c[2] ?? c[3] ?? '') : '', u = /url\s*=\s*['"]?([^'";\s]+)/i.exec(v);
+    if (u) return u[1];
   }
+  return '';
+}
+// Fetch a page of this site without touching the editor: { ok, text } or { ok: false, kind, message, to? }.
+async function fetchPage(path) {
+  const url = new URL('../' + path, location.href);
+  let res;
+  try { res = await fetch(url, { cache: 'no-store' }); }
+  catch (err) { return { ok: false, kind: 'error', message: `Couldn't load ${path} (${err.message}). Open this editor from the live site (…/editor/), not from a file on disk.` }; }
+  if (res.status === 404) return { ok: false, kind: 'missing', message: `${path} isn’t on the site (404). If you only just added it, wait for the site to finish publishing.` };
+  if (!res.ok) return { ok: false, kind: 'error', message: `Couldn't load ${path} (HTTP ${res.status}).` };
+  const text = await res.text();
+  if (!/<html[\s>]|<!doctype html/i.test(text)) return { ok: false, kind: 'error', message: `${path} doesn’t look like an HTML page.` };
+  const to = redirectOf(text);
+  if (to) return { ok: false, kind: 'redirect', to, message: `${path} only sends visitors on to ${to}, so there is nothing to edit here.` };
+  return { ok: true, text };
+}
+// Show a fetched page in the preview and start a clean editing session on it.
+function startPage(text) {
+  q('#empty').style.display = 'grid'; q('#empty').textContent = 'Loading…';
+  source0 = text;
   baseline = parseBlock(source0);
   state = { css: clone(baseline), text: [], images: [], layers: [], removed: [], deleted: [], renames: [], fonts: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1;
   for (const a of assets.values()) URL.revokeObjectURL(a.url);
   assets.clear(); push = null;
   sel = null; selMore = []; hover = null; editing = null;
-  frame.src = url.href;
+  pageInfo.set(settings.path, { state: 'ok' }); renderPageSelect();
+  frame.src = new URL('../' + settings.path, location.href).href;
 }
+async function loadPage() {
+  q('#empty').style.display = 'grid'; q('#empty').textContent = 'Loading…';
+  const got = await fetchPage(settings.path);
+  if (!got.ok) { q('#empty').textContent = got.message; renderPageSelect(); return false; }
+  startPage(got.text); return true;
+}
+
+/* ---------- the page switcher ---------- */
+const pageInfo = new Map();   // path -> { state: 'ok' | 'redirect' | 'missing' | 'error', to? }
+let pageList = [], discoverRun = 0;
+async function probePage(path) {
+  if (!pageInfo.has(path)) { const got = await fetchPage(path); pageInfo.set(path, got.ok ? { state: 'ok' } : { state: got.kind, to: got.to }); }
+  return pageInfo.get(path);
+}
+// The site's HTML pages: the repository's file list from GitHub (works without a token for a public repo), each one checked on the live site.
+async function discoverPages() {
+  const run = ++discoverRun; let paths = [];
+  const get = (auth) => fetch(`https://api.github.com${repoPath()}/git/trees/${encPath(settings.base)}?recursive=1`, { headers: Object.assign({ Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, auth ? { Authorization: 'Bearer ' + token } : {}) });
+  try {
+    let res = await get(!!token); if (!res.ok && token) res = await get(false);
+    if (res.ok) { const j = await res.json(); paths = (j.tree || []).filter((e) => e.type === 'blob' && /\.html?$/i.test(e.path) && !/^(editor|assets)\//.test(e.path) && !/(^|\/)[._]/.test(e.path)).map((e) => e.path).filter((x) => normPage(x)); }
+  } catch { /* offline or rate limited: the list is just the page being edited and the home page */ }
+  for (const must of [settings.path, 'index.html']) if (!paths.includes(must)) paths.push(must);
+  paths.sort((a, b) => (a === 'index.html' ? -1 : b === 'index.html' ? 1 : a.localeCompare(b)));
+  await Promise.all(paths.map(probePage));
+  if (run !== discoverRun) return;
+  pageList = paths.map((path) => Object.assign({ path }, pageInfo.get(path))); renderPageSelect();
+}
+function renderPageSelect() {
+  const sel = q('#pageSel'), cur = settings.path;
+  const why = { redirect: ' · redirects elsewhere', missing: ' · not on the site yet', error: ' · can’t be loaded' };
+  const items = (pageList.some((p) => p.path === cur) ? pageList : [{ path: cur, state: 'ok' }, ...pageList]).map((p) => (p.path === cur ? Object.assign({}, p, { state: 'ok' }) : p));
+  const opt = (p) => h('option', { value: p.path, text: p.path + (why[p.state] || ''), disabled: !!why[p.state] }), stuck = items.filter((p) => why[p.state]);
+  sel.replaceChildren(...items.filter((p) => !why[p.state]).map(opt), ...(stuck.length ? [h('optgroup', { label: `Can’t be edited (${stuck.length})` }, ...stuck.map(opt))] : []), h('option', { value: '__other', text: 'Another page…' }));
+  sel.value = cur; document.title = 'Page editor · ' + cur;
+}
+function confirmDialog(title, text, okText) {
+  return new Promise((resolve) => {
+    const d = q('#dlgConfirm'); q('#cTitle').textContent = title; q('#cText').textContent = text; q('#cOk').textContent = okText;
+    q('#cOk').onclick = () => { resolve(true); d.close(); }; q('#cNo').onclick = () => d.close(); d.onclose = () => resolve(false);
+    d.showModal();
+  });
+}
+async function switchPage(raw) {
+  const path = normPage(raw);
+  if (!path) { toast('Type the path of an HTML page in this site, like portfolio/index.html.', 4200, 'warn'); return false; }
+  if (path === settings.path) return true;
+  const got = await fetchPage(path);
+  if (!got.ok) { pageInfo.set(path, { state: got.kind, to: got.to }); toast(got.message, 6500, 'err'); renderPageSelect(); return false; }
+  const n = summary().count;
+  if (n && !(await confirmDialog(`Switch to ${path}?`, `You have ${n} unsaved change${n > 1 ? 's' : ''} on ${settings.path}. Switching drops ${n > 1 ? 'them' : 'it'}: push ${n > 1 ? 'them' : 'it'} first (Review & push) to keep ${n > 1 ? 'them' : 'it'}.`, 'Discard and switch'))) { renderPageSelect(); return false; }
+  lsDel(LS.draft); pendingDraft = null;
+  settings = Object.assign({}, settings, { path }); lsSet(LS.settings, JSON.stringify(settings));
+  startPage(got.text); toast(`Now editing ${path}.`, 1800);
+  return true;
+}
+function openOtherPage() { const d = q('#dlgPage'); q('#pPath').value = ''; d.showModal(); q('#pPath').focus(); }
+q('#pageSel').addEventListener('change', async (e) => {
+  if (e.target.value === '__other') { renderPageSelect(); openOtherPage(); return; }
+  if (!(await switchPage(e.target.value))) renderPageSelect();
+});
+q('#pCancel').addEventListener('click', () => q('#dlgPage').close());
+q('#fPage').addEventListener('submit', (e) => { if (e.submitter && e.submitter.value !== 'ok') return; const v = q('#pPath').value; setTimeout(() => switchPage(v), 0); });
 function onFrameLoad() {
   if (!frame.contentWindow || frame.src === 'about:blank' || !frame.src) return;
   win = frame.contentWindow; doc = win.document; root = doc.documentElement;
@@ -1331,9 +1452,9 @@ function shadowBlock(kind) {
   const compose = (o) => `${o.inset ? 'inset ' : ''}${r3(o.x)}px ${r3(o.y)}px ${r3(o.blur)}px ${box ? r3(o.spread) + 'px ' : ''}${colorSpec(o.color.hex, o.color.a)}`;
   const edit = (patch) => { const c = parse(); setProp(prop, compose({ ...(c.none ? base() : c), ...patch })); };
   const nf = (label, aria, key, step = 1) => numField({ label, aria, props: [prop], unit: 'px', step, read: () => parse()[key], write: (v) => edit({ [key]: v }) });
-  const kids = [g2(nf('X', `${kind === 'text' ? 'Text' : 'Box'} shadow X offset in pixels`, 'x'), nf('Y', `${kind === 'text' ? 'Text' : 'Box'} shadow Y offset in pixels`, 'y')),
-    g2(nf('Bl', `${kind === 'text' ? 'Text' : 'Box'} shadow blur in pixels`, 'blur'), box ? nf('Sp', 'Box shadow spread in pixels', 'spread') : null),
-    colorField('Colour', null, { get: () => parse().color, set: (hex, a) => edit({ color: { hex, a } }), on: () => isTweaked([prop]), reset: () => resetProps([prop]) })];
+  const kids = [g2(nf('Horizontal offset', `${kind === 'text' ? 'Text' : 'Box'} shadow X offset in pixels`, 'x'), nf('Vertical offset', `${kind === 'text' ? 'Text' : 'Box'} shadow Y offset in pixels`, 'y')),
+    g2(nf('Blur', `${kind === 'text' ? 'Text' : 'Box'} shadow blur in pixels`, 'blur'), box ? nf('Spread', 'Box shadow spread in pixels', 'spread') : null),
+    colorField('Shadow colour', null, { get: () => parse().color, set: (hex, a) => edit({ color: { hex, a } }), on: () => isTweaked([prop]), reset: () => resetProps([prop]) })];
   if (box) {
     const inset = h('input', { type: 'checkbox', 'aria-label': 'Inner shadow' });
     inset.addEventListener('change', () => { edit({ inset: inset.checked }); commit(); syncFields(); });
@@ -1353,9 +1474,9 @@ function risoSection() {
   const off = (which) => { const t = ghost(which).translate, p = t && t !== 'none' ? t.split(/\s+/).map(parseFloat) : [0, 0]; return { x: p[0] || 0, y: (p[1] || 0) - (parseFloat(sel.style.getPropertyValue('--riso-dy')) || 0) }; };   // minus the alignment nudge the page adds
   const alpha = (which) => Math.round(100 * parseColor(ghost(which).color).a);
   const mk = (name, which, pre) => [
-    g2(numField({ label: 'X', aria: `Heading ${name.toLowerCase()} ghost X offset in pixels`, props: [`--riso-${pre}-x`], unit: 'px', step: 0.5, read: () => off(which).x, write: (v) => setProp(`--riso-${pre}-x`, r3(v) + 'px') }),
-       numField({ label: 'Y', aria: `Heading ${name.toLowerCase()} ghost Y offset in pixels`, props: [`--riso-${pre}-y`], unit: 'px', step: 0.5, read: () => off(which).y, write: (v) => setProp(`--riso-${pre}-y`, r3(v) + 'px') })),
-    g2(numField({ label: '%', aria: `Heading ${name.toLowerCase()} ghost opacity in percent`, props: [`--riso-${pre}-a`], unit: '%', step: 5, read: () => alpha(which), write: (v) => setProp(`--riso-${pre}-a`, String(r3(Math.max(0, Math.min(100, v)) / 100))) }))];
+    g2(numField({ label: 'Horizontal offset', aria: `Heading ${name.toLowerCase()} ghost X offset in pixels`, props: [`--riso-${pre}-x`], unit: 'px', step: 0.5, read: () => off(which).x, write: (v) => setProp(`--riso-${pre}-x`, r3(v) + 'px') }),
+       numField({ label: 'Vertical offset', aria: `Heading ${name.toLowerCase()} ghost Y offset in pixels`, props: [`--riso-${pre}-y`], unit: 'px', step: 0.5, read: () => off(which).y, write: (v) => setProp(`--riso-${pre}-y`, r3(v) + 'px') })),
+    g2(numField({ label: 'Opacity', aria: `Heading ${name.toLowerCase()} ghost opacity in percent`, props: [`--riso-${pre}-a`], unit: '%', step: 5, read: () => alpha(which), write: (v) => setProp(`--riso-${pre}-a`, String(r3(Math.max(0, Math.min(100, v)) / 100))) }))];
   return sec('Riso plates (this heading)', false,
     h('p', { class: 'muted', style: 'margin:0 0 4px', text: 'The off-register yellow and magenta copies of this heading, with the paper grain. Opacity 0 hides a plate. The sliders under Page & background set them for every heading.' }),
     h('div', { class: 'sub', text: 'Yellow' }), ...mk('Yellow', '::before', 'yellow'),
@@ -1386,7 +1507,7 @@ function typeSection() {
     }
     out.push({ label: 'More', items: [['__custom', 'Other Google font…']] }); return out;
   };
-  const family = selectField({ label: 'Font', aria: 'Font family (Google Fonts)', props: ['font-family'], options: groups,
+  const family = selectField({ label: 'Font family', aria: 'Font family (Google Fonts)', props: ['font-family'], options: groups,
     read: () => { const r = tw()['font-family']; return r === 'var(--display)' || r === 'var(--text)' ? r : 'f:' + fontKey(famNow()); },
     unknown: (v) => (v.startsWith('f:') ? v.slice(2) + ' (not a Google font)' : v),
     write: (v) => {
@@ -1394,7 +1515,7 @@ function typeSection() {
       if (v === 'var(--display)' || v === 'var(--text)') { setProp('font-family', v); return; }
       const name = nameFor(v); ensureFont(name); setProp('font-family', famCss(name));
     } });
-  const weight = selectField({ label: 'Wt', aria: 'Font weight', props: ['font-weight'],
+  const weight = selectField({ label: 'Weight', aria: 'Font weight', props: ['font-weight'],
     options: () => weightChoices(famNow()).map((w) => [String(w), `${w} ${WEIGHT_NAMES[w]}`]),
     read: () => String(Math.round((parseFloat(cs().fontWeight) || 400) / 100) * 100), write: (v) => setProp('font-weight', v) });
   const heavy = () => (parseFloat(cs().fontWeight) || 400) >= 600, italic = () => /italic|oblique/.test(cs().fontStyle);
@@ -1402,22 +1523,22 @@ function typeSection() {
   const toggleLine = (ln) => { const cur = new Set(lines().filter((x) => x === 'underline' || x === 'line-through')); cur.has(ln) ? cur.delete(ln) : cur.add(ln); setProp('text-decoration-line', cur.size ? [...cur].join(' ') : 'none'); };
   const norm = (a) => (a === 'start' ? 'left' : a === 'end' ? 'right' : a);
   const fmt1 = h('div', { class: 'tg', role: 'group', 'aria-label': 'Text style' },
-    toggleBtn({ text: 'B', aria: 'Bold', title: 'Bold: the selected words while you are editing text, otherwise the whole element', style: 'font-weight:700', pressed: () => (editingNow() ? doc.queryCommandState('bold') : heavy()), click: () => (editingNow() ? doc.execCommand('bold') : setProp('font-weight', heavy() ? '400' : '700')) }),
-    toggleBtn({ text: 'I', aria: 'Italic', title: 'Italic: the selected words while you are editing text, otherwise the whole element', style: 'font-style:italic', pressed: () => (editingNow() ? doc.queryCommandState('italic') : italic()), click: () => (editingNow() ? doc.execCommand('italic') : setProp('font-style', italic() ? 'normal' : 'italic')) }),
-    toggleBtn({ text: 'U', aria: 'Underline', title: 'Underline the whole element', style: 'text-decoration:underline', pressed: () => lines().includes('underline'), click: () => toggleLine('underline') }),
-    toggleBtn({ text: 'S', aria: 'Strikethrough', title: 'Strike through the whole element', style: 'text-decoration:line-through', pressed: () => lines().includes('line-through'), click: () => toggleLine('line-through') }));
+    toggleBtn({ text: 'Bold', aria: 'Bold', title: 'Bold: the selected words while you are editing text, otherwise the whole element', style: 'font-weight:700', pressed: () => (editingNow() ? doc.queryCommandState('bold') : heavy()), click: () => (editingNow() ? doc.execCommand('bold') : setProp('font-weight', heavy() ? '400' : '700')) }),
+    toggleBtn({ text: 'Italic', aria: 'Italic', title: 'Italic: the selected words while you are editing text, otherwise the whole element', style: 'font-style:italic', pressed: () => (editingNow() ? doc.queryCommandState('italic') : italic()), click: () => (editingNow() ? doc.execCommand('italic') : setProp('font-style', italic() ? 'normal' : 'italic')) }),
+    toggleBtn({ text: 'Underline', aria: 'Underline', title: 'Underline the whole element', style: 'text-decoration:underline', pressed: () => lines().includes('underline'), click: () => toggleLine('underline') }),
+    toggleBtn({ text: 'Strikethrough', aria: 'Strikethrough', title: 'Strike through the whole element', style: 'text-decoration:line-through', pressed: () => lines().includes('line-through'), click: () => toggleLine('line-through') }));
   const al = (v, d, label) => toggleBtn({ html: ALIGN_SVG(d), aria: label, pressed: () => norm(cs().textAlign) === v, click: () => setProp('text-align', v) });
   const fmt2 = h('div', { class: 'tg', role: 'group', 'aria-label': 'Alignment' },
     al('left', 'M1 1.5h12M1 4.5h8M1 7.5h12M1 10.5h6', 'Align left'), al('center', 'M1 1.5h12M3 4.5h8M1 7.5h12M4 10.5h6', 'Align centre'),
     al('right', 'M1 1.5h12M5 4.5h8M1 7.5h12M7 10.5h6', 'Align right'), al('justify', 'M1 1.5h12M1 4.5h12M1 7.5h12M1 10.5h12', 'Justify'));
-  const hint = h('p', { class: 'muted', style: 'margin:4px 0 0', text: 'While you edit text, B and I format the selected words.' });
+  const hint = h('p', { class: 'muted', style: 'margin:4px 0 0', text: 'While you edit text, Bold and Italic format the selected words.' });
   return sec('Type', true,
     family, custom, weight, h('div', { class: 'btnrow', style: 'align-items:center' }, fmt1, fmt2), hint,
-    selectField({ label: 'Case', aria: 'Text case', props: ['text-transform'], options: () => [['none', 'As typed'], ['uppercase', 'UPPERCASE'], ['lowercase', 'lowercase'], ['capitalize', 'Capitalize']], read: () => cs().textTransform, write: (v) => setProp('text-transform', v) }),
-    g2(numField({ label: 'Aa', aria: 'Font size in pixels', prop: 'font-size', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.fontSize), write: (v) => setProp('font-size', remv(v)) }),
-       numField({ label: 'LH', aria: 'Line height (ratio)', prop: 'line-height', unit: '×', step: 0.05, read: (e, c) => (c.lineHeight === 'normal' ? 1.2 : parseFloat(c.lineHeight) / parseFloat(c.fontSize)), write: (v) => setProp('line-height', String(r3(v))) }),
-       numField({ label: 'LS', aria: 'Letter spacing in em', prop: 'letter-spacing', unit: 'em', step: 0.01, read: (e, c) => (c.letterSpacing === 'normal' ? 0 : parseFloat(c.letterSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('letter-spacing', r3(v) + 'em') }),
-       numField({ label: 'WS', aria: 'Word spacing in em', prop: 'word-spacing', unit: 'em', step: 0.05, read: (e, c) => (c.wordSpacing === 'normal' ? 0 : parseFloat(c.wordSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('word-spacing', r3(v) + 'em') })),
+    selectField({ label: 'Text case', aria: 'Text case', props: ['text-transform'], options: () => [['none', 'As typed'], ['uppercase', 'UPPERCASE'], ['lowercase', 'lowercase'], ['capitalize', 'Capitalize']], read: () => cs().textTransform, write: (v) => setProp('text-transform', v) }),
+    g2(numField({ label: 'Font size', aria: 'Font size in pixels', prop: 'font-size', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.fontSize), write: (v) => setProp('font-size', remv(v)) }),
+       numField({ label: 'Line height', aria: 'Line height (ratio)', prop: 'line-height', unit: '×', step: 0.05, read: (e, c) => (c.lineHeight === 'normal' ? 1.2 : parseFloat(c.lineHeight) / parseFloat(c.fontSize)), write: (v) => setProp('line-height', String(r3(v))) }),
+       numField({ label: 'Letter spacing', aria: 'Letter spacing in em', prop: 'letter-spacing', unit: 'em', step: 0.01, read: (e, c) => (c.letterSpacing === 'normal' ? 0 : parseFloat(c.letterSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('letter-spacing', r3(v) + 'em') }),
+       numField({ label: 'Word spacing', aria: 'Word spacing in em', prop: 'word-spacing', unit: 'em', step: 0.05, read: (e, c) => (c.wordSpacing === 'normal' ? 0 : parseFloat(c.wordSpacing) / parseFloat(c.fontSize)), write: (v) => setProp('word-spacing', r3(v) + 'em') })),
     nested('Text shadow', sel.hasAttribute('data-riso') ? h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'This heading’s yellow and magenta plates (with the paper grain) are in the Riso plates section. A text shadow here is an extra, flat shadow.' }) : null, shadowBlock('text')));
 }
 
@@ -1428,13 +1549,13 @@ function borderSection() {
   const isNone = () => /^(none|hidden)$/.test(cs().borderTopStyle);
   // A border needs a style and a width to show at all: setting a colour or a thickness makes the border visible.
   const visible = () => { const was = isNone(), w0 = widest(); if (was) setProp('border-style', 'solid'); if (was || w0 === 0) for (const s of SIDES) setProp(`border-${s}-width`, '1px'); };
-  const side = (s) => numField({ label: s[0].toUpperCase(), aria: `Border ${s} thickness in pixels`, props: [`border-${s}-width`], unit: 'px', step: 0.5, read: () => bw(s), write: (v) => { if (v > 0 && isNone()) setProp('border-style', 'solid'); setProp(`border-${s}-width`, r3(v) + 'px'); } });
-  const corner = (c) => numField({ label: c.split('-').map((x) => x[0].toUpperCase()).join(''), aria: `${c.replace('-', ' ')} corner radius in pixels`, props: [`border-${c}-radius`], unit: 'px', step: 1, read: () => parseFloat(cs().getPropertyValue(`border-${c}-radius`)) || 0, write: (v) => setProp(`border-${c}-radius`, r3(v) + 'px') });
+  const side = (s) => numField({ label: s[0].toUpperCase() + s.slice(1), aria: `Border ${s} thickness in pixels`, props: [`border-${s}-width`], unit: 'px', step: 0.5, read: () => bw(s), write: (v) => { if (v > 0 && isNone()) setProp('border-style', 'solid'); setProp(`border-${s}-width`, r3(v) + 'px'); } });
+  const corner = (c) => numField({ label: c[0].toUpperCase() + c.slice(1).replace('-', ' '), aria: `${c.replace('-', ' ')} corner radius in pixels`, props: [`border-${c}-radius`], unit: 'px', step: 1, read: () => parseFloat(cs().getPropertyValue(`border-${c}-radius`)) || 0, write: (v) => setProp(`border-${c}-radius`, r3(v) + 'px') });
   return sec('Border', false,
-    numField({ label: 'W', aria: 'Border thickness in pixels (all sides)', props: SIDES.map((s) => `border-${s}-width`), unit: 'px', step: 0.5, read: widest, write: (v) => { if (v > 0 && isNone()) setProp('border-style', 'solid'); for (const s of SIDES) setProp(`border-${s}-width`, r3(v) + 'px'); } }),
-    selectField({ label: 'Line', aria: 'Border style', props: ['border-style'], options: () => ['none', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset'].map((v) => [v, v]), read: () => cs().borderTopStyle,
+    numField({ label: 'Thickness (all sides)', aria: 'Border thickness in pixels (all sides)', props: SIDES.map((s) => `border-${s}-width`), unit: 'px', step: 0.5, read: widest, write: (v) => { if (v > 0 && isNone()) setProp('border-style', 'solid'); for (const s of SIDES) setProp(`border-${s}-width`, r3(v) + 'px'); } }),
+    selectField({ label: 'Border style', aria: 'Border style', props: ['border-style'], options: () => ['none', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset'].map((v) => [v, v]), read: () => cs().borderTopStyle,
       write: (v) => { const was = isNone(); setProp('border-style', v); if (v !== 'none' && was) for (const s of SIDES) setProp(`border-${s}-width`, '1px'); } }),
-    colorField('Colour', 'border-color', { read: 'border-top-color', write: ['border-color'], ensure: visible }),
+    colorField('Border colour', 'border-color', { read: 'border-top-color', write: ['border-color'], ensure: visible }),
     nested('Each side', g2(...SIDES.map(side))), nested('Corner radius', g2(...CORNERS.map(corner))));
 }
 
@@ -1458,12 +1579,12 @@ function fxSection(open = false) {
   return sec('Shadow, filters & transform', open,
     nested('Box shadow', shadowBlock('box')),
     h('div', { class: 'sub', text: 'Filters (× resets them all)' }),
-    g2(ff('blur', 'Bl', 'Filter blur in pixels', 'px', 0.5), ff('brightness', 'Br', 'Filter brightness in percent', '%', 5), ff('contrast', 'Co', 'Filter contrast in percent', '%', 5),
-       ff('saturate', 'Sa', 'Filter saturation in percent', '%', 5), ff('grayscale', 'Gs', 'Filter grayscale in percent', '%', 5), ff('hue-rotate', 'Hu', 'Filter hue rotation in degrees', '°', 5)),
-    selectField({ label: 'Blend', aria: 'Blend mode', props: ['mix-blend-mode'], options: () => ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'].map((v) => [v, v]), read: () => cs().mixBlendMode, write: (v) => setProp('mix-blend-mode', v) }),
+    g2(ff('blur', 'Blur', 'Filter blur in pixels', 'px', 0.5), ff('brightness', 'Brightness', 'Filter brightness in percent', '%', 5), ff('contrast', 'Contrast', 'Filter contrast in percent', '%', 5),
+       ff('saturate', 'Saturation', 'Filter saturation in percent', '%', 5), ff('grayscale', 'Greyscale', 'Filter grayscale in percent', '%', 5), ff('hue-rotate', 'Hue rotation', 'Filter hue rotation in degrees', '°', 5)),
+    selectField({ label: 'Blend mode', aria: 'Blend mode', props: ['mix-blend-mode'], options: () => ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'].map((v) => [v, v]), read: () => cs().mixBlendMode, write: (v) => setProp('mix-blend-mode', v) }),
     h('div', { class: 'sub', text: 'Transform' }),
-    g2(numField({ label: '↻', aria: 'Rotation in degrees', prop: 'rotate', unit: '°', step: 1, read: (e, c) => parseFloat(c.rotate) || 0, write: (v) => setProp('rotate', r3(v) + 'deg') }),
-       numField({ label: '⤢', aria: 'Scale in percent', prop: 'scale', unit: '%', step: 5, read: (e, c) => (c.scale === 'none' ? 100 : Math.round((parseFloat(c.scale) || 1) * 100)), write: (v) => setProp('scale', r3(v / 100)) })));
+    g2(numField({ label: 'Rotation', aria: 'Rotation in degrees', prop: 'rotate', unit: '°', step: 1, read: (e, c) => parseFloat(c.rotate) || 0, write: (v) => setProp('rotate', r3(v) + 'deg') }),
+       numField({ label: 'Scale', aria: 'Scale in percent', prop: 'scale', unit: '%', step: 5, read: (e, c) => (c.scale === 'none' ? 100 : Math.round((parseFloat(c.scale) || 1) * 100)), write: (v) => setProp('scale', r3(v / 100)) })));
 }
 
 /* ---- Layout ---- */
@@ -1471,15 +1592,15 @@ function layoutSection() {
   const cs = () => win.getComputedStyle(sel), d = cs().display, flexy = /flex/.test(d), gridy = /grid/.test(d);
   const sf = (label, aria, prop, vals, extra = {}) => selectField({ label, aria, props: [prop], options: () => vals.map((v) => [v, v]), read: () => cs().getPropertyValue(prop), write: (v) => { setProp(prop, v); if (extra.rebuild) buildPanelSoon(); } });
   return sec('Layout', false,
-    sf('Show', 'Display', 'display', ['block', 'inline', 'inline-block', 'flex', 'inline-flex', 'grid', 'none'], { rebuild: true }),
+    sf('Display', 'Display', 'display', ['block', 'inline', 'inline-block', 'flex', 'inline-flex', 'grid', 'none'], { rebuild: true }),
     h('p', { class: 'muted', style: 'margin:2px 0 6px', text: 'A hidden element (display: none) can’t be clicked: undo, or pick it from the breadcrumbs.' }),
-    sf('Pos', 'Position', 'position', ['static', 'relative', 'absolute', 'fixed', 'sticky']),
-    g2(numField({ label: 'Z', aria: 'Stacking order (z-index)', prop: 'z-index', unit: '', step: 1, read: (e, c) => (c.zIndex === 'auto' ? 0 : parseFloat(c.zIndex)), write: (v) => setProp('z-index', String(Math.round(v))) })),
-    sf('Ovf', 'Overflow', 'overflow', ['visible', 'hidden', 'auto', 'scroll', 'clip']),
-    flexy ? sf('Dir', 'Flex direction', 'flex-direction', ['row', 'column', 'row-reverse', 'column-reverse']) : null,
-    flexy ? sf('Wrap', 'Flex wrap', 'flex-wrap', ['nowrap', 'wrap', 'wrap-reverse']) : null,
-    flexy || gridy ? sf('Just', 'Justify content', 'justify-content', ['normal', 'flex-start', 'center', 'flex-end', 'space-between', 'space-around', 'space-evenly']) : null,
-    flexy || gridy ? sf('Align', 'Align items', 'align-items', ['normal', 'stretch', 'flex-start', 'center', 'flex-end', 'baseline']) : null);
+    sf('Position', 'Position', 'position', ['static', 'relative', 'absolute', 'fixed', 'sticky']),
+    g2(numField({ label: 'Stacking order', aria: 'Stacking order (z-index)', prop: 'z-index', unit: '', step: 1, read: (e, c) => (c.zIndex === 'auto' ? 0 : parseFloat(c.zIndex)), write: (v) => setProp('z-index', String(Math.round(v))) })),
+    sf('Overflow', 'Overflow', 'overflow', ['visible', 'hidden', 'auto', 'scroll', 'clip']),
+    flexy ? sf('Flex direction', 'Flex direction', 'flex-direction', ['row', 'column', 'row-reverse', 'column-reverse']) : null,
+    flexy ? sf('Flex wrap', 'Flex wrap', 'flex-wrap', ['nowrap', 'wrap', 'wrap-reverse']) : null,
+    flexy || gridy ? sf('Justify content', 'Justify content', 'justify-content', ['normal', 'flex-start', 'center', 'flex-end', 'space-between', 'space-around', 'space-evenly']) : null,
+    flexy || gridy ? sf('Align items', 'Align items', 'align-items', ['normal', 'stretch', 'flex-start', 'center', 'flex-end', 'baseline']) : null);
 }
 
 /* ---- Any CSS property ---- */
@@ -1521,7 +1642,7 @@ function buildPanel() {
   const sections = [];
   if (!doc) return;
   if (!sel) {
-    panel.append(h('p', { class: 'hint', style: 'padding-top:12px' }, 'Click anything on the page to select it. Drag to move, use the handles to resize, arrow keys to nudge (Shift = 10px), double-click text to retype, drop an image file onto a picture to replace it. Shift+click or Ctrl/Cmd+click adds to the selection (then whatever you change applies to all of it); Alt+click picks the innermost element. Duplicate and Delete are the buttons at the top of the panel for a selected element.'), addSection(), layersSection(), pageSection(true), tokensSection(), changesSection());
+    panel.append(...[h('p', { class: 'hint', style: 'padding-top:12px' }, 'Click anything on the page to select it. Drag to move, use the handles to resize, arrow keys to nudge (Shift = 10px), double-click text to retype, replace any picture from Pictures on this page below (or drop an image file onto it). Shift+click or Ctrl/Cmd+click adds to the selection (then whatever you change applies to all of it); Alt+click picks the innermost element. Duplicate and Delete are the buttons at the top of the panel for a selected element.'), addSection(), picturesSection(true), layersSection(), pageSection(true), tokensSection(), changesSection()].filter(Boolean));
     syncFields(); afterChange(); return;
   }
   const r = rangeFor(frameW), cs = win.getComputedStyle(sel), all = targets(), many = all.length > 1;
@@ -1545,28 +1666,28 @@ function buildPanel() {
   const showGap = /flex|grid/.test(cs.display);
   panel.append(
     sec('Position & size', true,
-      g2(numField({ label: 'X', aria: 'Move horizontally in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).x, write: (v) => { for (const t of targets()) setTranslatePx(v, getTranslate(t).y, t); } }),
-         numField({ label: 'Y', aria: 'Move vertically in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).y, write: (v) => { for (const t of targets()) setTranslatePx(getTranslate(t).x, v, t); } }),
-         numField({ label: 'W', aria: 'Width in pixels', prop: 'width', unit: 'px', read: (e, c) => parseFloat(c.width) || e.getBoundingClientRect().width, write: (v) => { for (const t of targets()) { ensureMovable(t); setSize('width', v, rootPx(), t); } } }),
-         numField({ label: 'H', aria: 'Height in pixels', prop: 'height', unit: 'px', read: (e, c) => parseFloat(c.height) || e.getBoundingClientRect().height, write: (v) => { for (const t of targets()) { ensureMovable(t); setSize('height', v, rootPx(), t); } } })),
+      g2(numField({ label: 'Move horizontally', aria: 'Move horizontally in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).x, write: (v) => { for (const t of targets()) setTranslatePx(v, getTranslate(t).y, t); } }),
+         numField({ label: 'Move vertically', aria: 'Move vertically in pixels', prop: 'translate', unit: 'px', read: () => getTranslate(sel).y, write: (v) => { for (const t of targets()) setTranslatePx(getTranslate(t).x, v, t); } }),
+         numField({ label: 'Width', aria: 'Width in pixels', prop: 'width', unit: 'px', read: (e, c) => parseFloat(c.width) || e.getBoundingClientRect().width, write: (v) => { for (const t of targets()) { ensureMovable(t); setSize('width', v, rootPx(), t); } } }),
+         numField({ label: 'Height', aria: 'Height in pixels', prop: 'height', unit: 'px', read: (e, c) => parseFloat(c.height) || e.getBoundingClientRect().height, write: (v) => { for (const t of targets()) { ensureMovable(t); setSize('height', v, rootPx(), t); } } })),
       h('p', { class: 'muted', style: 'margin:6px 0 0', text: 'Moves are saved as rem offsets, so they scale with the text.' })),
     ...(many ? [] : [pushSection()]),
     sec('Spacing', true,
       h('div', { class: 'sub', text: 'Padding' }),
-      g2(numField(P('T', 'padding-top')), numField(P('R', 'padding-right')), numField(P('B', 'padding-bottom')), numField(P('L', 'padding-left'))),
+      g2(numField(P('Top', 'padding-top')), numField(P('Right', 'padding-right')), numField(P('Bottom', 'padding-bottom')), numField(P('Left', 'padding-left'))),
       h('div', { class: 'sub', text: 'Margin' }),
-      g2(numField(P('T', 'margin-top')), numField(P('R', 'margin-right')), numField(P('B', 'margin-bottom')), numField(P('L', 'margin-left'))),
-      showGap ? [h('div', { class: 'sub', text: 'Gap' }), g2(numField(P('G', 'gap', { read: (e, c) => parseFloat(c.rowGap) || 0 })))] : null),
+      g2(numField(P('Top', 'margin-top')), numField(P('Right', 'margin-right')), numField(P('Bottom', 'margin-bottom')), numField(P('Left', 'margin-left'))),
+      showGap ? [h('div', { class: 'sub', text: 'Gap' }), g2(numField(P('Gap', 'gap', { read: (e, c) => parseFloat(c.rowGap) || 0 })))] : null),
     typeSection(),
     sec('Colour & effects', true,
-      colorField('Text', 'color'), colorField('Fill', 'background-color'),
+      colorField('Text colour', 'color'), colorField('Fill colour', 'background-color'),
       h('div', { class: 'sub', text: 'Effects' }),
-      g2(numField({ label: 'Op', aria: 'Opacity', prop: 'opacity', unit: '0–1', step: 0.05, read: (e, c) => parseFloat(c.opacity), write: (v) => setProp('opacity', String(Math.max(0, Math.min(1, r3(v))))) }),
-         numField({ label: 'R', aria: 'Corner radius in pixels', prop: 'border-radius', unit: 'px', read: (e, c) => parseFloat(c.borderTopLeftRadius) || 0, write: (v) => setProp('border-radius', remv(v)) }),
-         numField({ label: 'Bl', aria: 'Frosted-glass blur in pixels (frosted plates only)', prop: '--blur', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.getPropertyValue('--blur')) || 0, write: (v) => setProp('--blur', r3(v) + 'px') }))),
+      g2(numField({ label: 'Opacity', aria: 'Opacity', prop: 'opacity', unit: '0–1', step: 0.05, read: (e, c) => parseFloat(c.opacity), write: (v) => setProp('opacity', String(Math.max(0, Math.min(1, r3(v))))) }),
+         numField({ label: 'Corner radius', aria: 'Corner radius in pixels', prop: 'border-radius', unit: 'px', read: (e, c) => parseFloat(c.borderTopLeftRadius) || 0, write: (v) => setProp('border-radius', remv(v)) }),
+         numField({ label: 'Frosted glass blur', aria: 'Frosted-glass blur in pixels (frosted plates only)', prop: '--blur', unit: 'px', step: 0.5, read: (e, c) => parseFloat(c.getPropertyValue('--blur')) || 0, write: (v) => setProp('--blur', r3(v) + 'px') }))),
     ...(!many && sel.hasAttribute('data-riso') ? [risoSection()] : []),
     borderSection(), fxSection(!!layerClass(sel)), layoutSection(), cssSection(),   // rotation lives here, and is a main control for a decorative layer
-    ...[layersSection(), pageSection(false), tokensSection(), changesSection()].filter(Boolean));
+    ...[picturesSection(false), layersSection(), pageSection(false), tokensSection(), changesSection()].filter(Boolean));
   syncFields(); afterChange();
 }
 function imageBlock() {
@@ -1574,12 +1695,14 @@ function imageBlock() {
   if (sel.localName === 'img') return layerOf(sel) ? null : imageSection(sel);
   const imgs = sel.querySelectorAll('img');
   if (imgs.length !== 1) return null;
-  return sec('Image', true, h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'This contains one picture.' }), h('button', { type: 'button', text: 'Select the picture', onclick: () => select(imgs[0], true) }));
+  const one = imgs[0];
+  if (layerClass(one) || one.closest('[data-ed-layer]')) return sec('Image', true, h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'This contains one picture.' }), h('button', { type: 'button', text: 'Select the picture', onclick: () => select(one, true) }));
+  return imageSection(one, true);   // a frame with one picture in it: replace that picture without selecting it first
 }
 /* ---- Move this element and everything below it ---- */
 function pushSection() {
   const s = ensurePush(), n = s ? s.units.length : 0;
-  const field = numField({ label: '↕', aria: 'Push this element and everything below it, in pixels', unit: 'px', step: 1,
+  const field = numField({ label: 'Push distance', aria: 'Push this element and everything below it, in pixels', unit: 'px', step: 1,
     read: () => (push && push.anchor === sel ? push.applied : 0),
     on: () => !!push && push.anchor === sel && push.applied !== 0,
     write: (v) => pushTo(v), reset: () => pushTo(0) });
@@ -1623,24 +1746,31 @@ function pageSection(open) {
   const setInk = (ns, pct) => { for (const n of ns) setTok(n, inkFor(n, pct / 100)); };
   const inkPct = (ns) => Math.round(100 * ns.reduce((t, n) => t + inkAlpha(n, tokenValue(n)), 0) / ns.length);
   const ink = (label, aria, ns, title) => rangeField({ label, aria, title, min: 0, max: 100, step: 1, unit: '%', read: () => inkPct(ns), write: (v) => setInk(ns, v), on: () => isSet(ns), reset: () => clear(ns) });
+  // The tokens below belong to the home page's design: show a group only when the page being edited defines it.
+  const has = (ns) => ns.some((n) => tokenValue(n) !== '');
+  const hasGrid = has(['--ink-c', '--ink-m', '--grain']), hasBlur = has(BLURS.map((x) => x.name)), hasRiso = has(RISO.map((x) => x.name));
   return sec('Page & background', open,
+    !hasGrid && !hasBlur && !hasRiso ? h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'This page doesn’t use the home page’s grid, grain, glass or riso settings. Select an element to change it, or set the length of the page below.' }) : null,
+    ...(hasGrid ? [
     h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'Opacity of the printed grid and the paper grain. These apply at every width; they are skipped for visitors who ask for increased contrast.' }),
-    ink('Grid', 'Grid line opacity in percent (100 is the full-strength reference print)', names, '100% is the reference print; the page ships at 50%'),
-    ink('Cyan', 'Cyan plate opacity in percent', ['--ink-c'], 'The cyan ink plate on its own'),
-    ink('Magenta', 'Magenta plate opacity in percent', ['--ink-m'], 'The magenta ink plate on its own'),
-    rangeField({ label: 'Grain', aria: 'Paper grain opacity in percent', min: 0, max: 100, step: 1, unit: '%',
+    ink('Grid opacity', 'Grid line opacity in percent (100 is the full-strength reference print)', names, '100% is the reference print; the page ships at 50%'),
+    ink('Cyan plate opacity', 'Cyan plate opacity in percent', ['--ink-c'], 'The cyan ink plate on its own'),
+    ink('Magenta plate opacity', 'Magenta plate opacity in percent', ['--ink-m'], 'The magenta ink plate on its own'),
+    rangeField({ label: 'Paper grain opacity', aria: 'Paper grain opacity in percent', min: 0, max: 100, step: 1, unit: '%',
       read: () => Math.round(100 * (parseFloat(tokenValue('--grain')) || 0)),
       write: (v) => setTok('--grain', String(r3(v / 100))),
-      on: () => isSet(['--grain']), reset: () => { delTweak(state.css, tokScope('--grain'), ':root', '--grain'); renderLive(); } }),
+      on: () => isSet(['--grain']), reset: () => { delTweak(state.css, tokScope('--grain'), ':root', '--grain'); renderLive(); } })] : []),
+    ...(hasBlur ? [
     h('div', { class: 'sub', text: 'Frosted glass blur' }),
     ...BLURS.map((bl) => rangeField({ label: bl.label, aria: bl.aria, title: bl.title, min: 0, max: 48, step: 1, unit: 'px',
-      read: () => parseFloat(tokenValue(bl.name)) || 0, write: (v) => setTok(bl.name, r3(v) + 'px'), on: () => isSet([bl.name]), reset: () => clear([bl.name]) })),
+      read: () => parseFloat(tokenValue(bl.name)) || 0, write: (v) => setTok(bl.name, r3(v) + 'px'), on: () => isSet([bl.name]), reset: () => clear([bl.name]) }))] : []),
+    ...(hasRiso ? [
     h('div', { class: 'sub', text: 'Header riso shift' }),
     h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'A yellow and a magenta copy of heading text (h1–h3 and the big sub-headline), printed slightly off-register in opposite directions and carrying the paper grain. Every width; skipped for increased contrast and print. Select a heading for its own plates.' }),
     ...RISO.map((r) => rangeField({ label: r.label, aria: r.aria, title: r.title, min: r.min, max: r.max, step: r.step, unit: r.unit,
-      read: () => r.get(tokenValue(r.name)), write: (v) => setTok(r.name, r.put(v)), on: () => isSet([r.name]), reset: () => clear([r.name]) })),
+      read: () => r.get(tokenValue(r.name)), write: (v) => setTok(r.name, r.put(v)), on: () => isSet([r.name]), reset: () => clear([r.name]) }))] : []),
     h('div', { class: 'sub', text: `Page length (${rangeFor(frameW).label})` }),
-    g2(numField({ label: 'Len', aria: 'Page length in pixels', unit: 'px', global: true, step: 10,
+    g2(numField({ label: 'Page length', aria: 'Page length in pixels', unit: 'px', global: true, step: 10,
       read: () => pageLen(), on: () => state.css[scopeKey()]?.body?.height != null,
       write: (v) => { setTweak(state.css, scopeKey(), 'body', 'height', remv(Math.max(200, Math.min(100000, v)))); renderLive(); },
       reset: () => { delTweak(state.css, scopeKey(), 'body', 'height'); renderLive(); } })));
@@ -1885,7 +2015,7 @@ function addSection() {
   const kids = [
     h('div', { class: 'sub', text: 'Inside a box' }),
     C ? h('p', { class: 'muted', style: 'margin:0 0 6px' }, 'Into ', h('code', { text: label(C) }), '. Pick another box with the breadcrumbs above.') : h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'Select a div, section or other box on the page: the new item goes inside it.' }),
-    h('label', { class: 'fsel', style: 'grid-template-columns:54px minmax(0,1fr)' }, h('span', { class: 'lab', text: 'Where' }), pos),
+    h('label', { class: 'fsel', style: 'grid-template-columns:104px minmax(0,1fr)' }, h('span', { class: 'lab', text: 'Where' }), pos),
     h('div', { class: 'btnrow' }, btn('＋ Text', () => addLayer({ where: 'in', kind: 'text' }), !C), btn('＋ Heading', () => addLayer({ where: 'in', kind: 'heading' }), !C), btn('＋ Image…', () => fIn.click(), !C)),
     h('div', { class: 'sub', text: 'Decoration' }),
     h('p', { class: 'muted', style: 'margin:0 0 6px', text: 'Floating, behind the page by default, ignored by screen readers and not clickable on the live page.' }),
@@ -1930,7 +2060,7 @@ function layerSection(el) {
     const z = h('select', { 'aria-label': 'Layer order' }, h('option', { value: '-1', text: 'Behind the page content' }), h('option', { value: '20', text: 'In front of the page content' }));
     const zNow = () => (parseInt(win.getComputedStyle(el).zIndex, 10) >= 0 ? '20' : '-1');
     z.value = zNow(); z.addEventListener('change', () => { setTweak(state.css, '', '.' + c, 'z-index', z.value); renderLive(); commit(); });
-    kids.push(h('label', { class: 'fsel', style: 'grid-template-columns:54px minmax(0,1fr)' }, h('span', { class: 'lab', text: 'Order' }), z));
+    kids.push(h('label', { class: 'fsel', style: 'grid-template-columns:104px minmax(0,1fr)' }, h('span', { class: 'lab', text: 'Layer order' }), z));
   }
   kids.push(h('div', { class: 'btnrow' }, h('button', { type: 'button', text: 'Delete layer', title: 'Delete (Del)', style: 'color:#ff8b8b', onclick: () => deleteLayer(el) })));
   return sec('Layer', true, ...kids);
@@ -1941,7 +2071,7 @@ function shortSrc(src) {
   try { const u = new URL(src, doc.baseURI), f = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || u.hostname); return f.length > 46 ? f.slice(0, 22) + '…' + f.slice(-20) : f; }
   catch { return String(src).slice(0, 46); }
 }
-function imageSection(img) {
+function imageSection(img, via = false) {
   const s = selectorFor(img), entry = state.images.find((x) => x.sel === s), a = entry && assets.get(entry.path);
   const file = h('input', { type: 'file', accept: 'image/*,.avif', hidden: true, 'aria-label': 'Choose a replacement image' });
   file.addEventListener('change', () => { const f = file.files[0]; file.value = ''; if (f) replaceImage(img, f); });
@@ -1959,18 +2089,50 @@ function imageSection(img) {
   // fit & focal point: how the picture fills its frame
   const fit = h('select', { 'aria-label': 'How the picture fills its frame' }, ...['cover', 'contain', 'fill', 'none', 'scale-down'].map((v) => h('option', { value: v, text: v })));
   const fitReset = h('button', { class: 'x', type: 'button', title: 'Reset fit and focal point', 'aria-label': 'Reset fit', text: '×' });
-  const fitRow = h('div', { class: 'fsel' }, h('span', { class: 'lab', text: 'Fit' }), fit, fitReset);
+  const fitRow = h('div', { class: 'fsel' }, h('span', { class: 'lab', text: 'Image fit' }), fit, fitReset);
   fit.addEventListener('change', () => { setProp('object-fit', fit.value, scopeKey(), img); commit(); syncFields(); });
   fitReset.addEventListener('click', () => { resetProps(['object-fit', 'object-position'], img); commit(); syncFields(); });
   fields.push({ sync() { if (document.activeElement !== fit) fit.value = win.getComputedStyle(img).objectFit; fitRow.classList.toggle('on', isTweaked(['object-fit', 'object-position'], img)); } });
   const pos = () => win.getComputedStyle(img).objectPosition.split(/\s+/).map((v) => (v.endsWith('%') ? parseFloat(v) : 50));
   const posField = (label, aria, i) => numField({ label, aria, unit: '%', step: 5, props: ['object-position'], target: () => img,
     read: () => pos()[i], write: (v) => { const p = pos(); p[i] = r3(v); setProp('object-position', `${p[0]}% ${p[1]}%`, scopeKey(), img); } });
-  return sec('Image', true, info, h('div', { class: 'btnrow' }, pick, revert), file,
+  return sec('Image', true,
+    via ? h('p', { class: 'muted', style: 'margin:0 0 8px' }, 'The picture inside this element. ', h('button', { type: 'button', text: 'Select the picture', onclick: () => select(img, true) })) : null,
+    info, h('div', { class: 'btnrow' }, pick, revert), file,
     h('label', { class: 'tick' }, opt, 'Optimise for the web (resize + WebP)'),
     h('label', { class: 'tick', style: 'margin-top:4px' }, 'Longest side', ms, h('span', { class: 'muted', text: 'px (blank = automatic)' })),
-    fitRow, g2(posField('X', 'Focal point, horizontal in percent', 0), posField('Y', 'Focal point, vertical in percent', 1)),
+    fitRow, g2(posField('Focal point, horizontal', 'Focal point, horizontal in percent', 0), posField('Focal point, vertical', 'Focal point, vertical in percent', 1)),
     h('p', { class: 'muted', style: 'margin:8px 0 0', text: 'The new file is uploaded to ' + IMG_DIR + '/ when you push. You can also drop an image file onto any picture.' }));
+}
+
+/* ---- Pictures on this page: every <img>, each with its own Replace button (no need to find and click it first) ---- */
+const pagePictures = () => [...doc.querySelectorAll('img')].filter((im) => !im.closest('#__ed') && !im.hasAttribute('data-ed-gone') && !im.closest('[data-ed-del]') && !layerClass(im) && !im.closest('[data-ed-layer]'));
+function drawThumb(cv, src) {   // a small preview of a picture from the page (drawn, not loaded: the editor's own policy only allows blob: images)
+  const paint = () => { try { const w = src.naturalWidth, h2 = src.naturalHeight; if (!w || !h2) return; const c = cv.getContext('2d'), k = Math.max(cv.width / w, cv.height / h2); c.clearRect(0, 0, cv.width, cv.height); c.drawImage(src, (cv.width - w * k) / 2, (cv.height - h2 * k) / 2, w * k, h2 * k); cv.dataset.ready = '1'; } catch {} };
+  if (src.complete && src.naturalWidth) paint(); else src.addEventListener('load', paint, { once: true });
+}
+function picturesSection(open) {
+  const imgs = pagePictures(); if (!imgs.length) return null;
+  const ul = h('ul', { class: 'pics' });
+  imgs.forEach((im, i) => {
+    const s = selectorFor(im), entry = state.images.find((x) => x.sel === s), r = im.getBoundingClientRect();
+    const alt = (im.getAttribute('alt') || '').trim(), name = entry ? entry.name : shortSrc(imgOrig.get(im) ?? im.getAttribute('src') ?? '');
+    const thumb = h('canvas', { class: 'pth', width: 96, height: 96, 'aria-hidden': 'true' }); drawThumb(thumb, im);
+    const file = h('input', { type: 'file', accept: 'image/*,.avif', hidden: true, 'aria-label': `Choose a replacement for picture ${i + 1}` });
+    file.addEventListener('change', () => { const f = file.files[0]; file.value = ''; if (f) replaceImage(im, f); });
+    const inCopy = !!cloneRootOf(im);
+    ul.append(h('li', { 'data-pic': String(i) }, thumb,
+      h('div', { class: 'pmeta' },
+        h('div', { class: 'ptitle', text: alt || 'No description (alt text)', title: alt }),
+        h('div', { class: 'muted' }, entry ? h('b', { style: 'color:var(--ok)', text: 'Replaced' }) : null, entry ? ' · ' : '', name),
+        h('div', { class: 'muted', text: `Shown at ${Math.round(r.width)}×${Math.round(r.height)}${im.naturalWidth ? ` · file ${im.naturalWidth}×${im.naturalHeight}` : ''}` }),
+        h('div', { class: 'btnrow' },
+          h('button', { type: 'button', text: 'Show', title: 'Select this picture on the page', 'aria-label': `Show picture ${i + 1} on the page`, onclick: () => select(im, true) }),
+          h('button', { type: 'button', class: 'primary', text: entry ? 'Replace again…' : 'Replace…', 'aria-label': `Replace picture ${i + 1}`, disabled: inCopy, onclick: () => file.click() }),
+          entry ? h('button', { type: 'button', text: 'Revert', title: 'Go back to the original picture', onclick: () => { state.images = state.images.filter((x) => x.sel !== s); renderLive(); commit(); buildPanel(); } }) : null),
+        file)));
+  });
+  return sec(`Pictures on this page (${imgs.length})`, open, ul, h('p', { class: 'muted', style: 'margin:8px 0 0', text: 'Pick a new file for any picture: it is resized for the web and uploaded to ' + IMG_DIR + '/ when you push. You can also drop a file onto a picture in the preview.' }));
 }
 
 const slug = (n) => n.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'image';
@@ -2018,7 +2180,7 @@ async function replaceImage(img, file) {
   assets.set(prep.path, prep);   // earlier replacements stay in `assets` so that undo can bring them back
   state.images = state.images.filter((x) => x.sel !== s);
   state.images.push({ sel: s, was: imgOrig.get(img), path: prep.path, name: prep.name, bytes: prep.bytes, w: prep.w, h: prep.h, type: prep.type });
-  renderLive(); commit(); if (sel === img) buildPanel();
+  renderLive(); commit(); buildPanelSoon();
   toast(`Picture replaced (${fmtBytes(prep.bytes)}${prep.w ? `, ${prep.w}×${prep.h}` : ''}). It is uploaded when you push.`, 3600);
 }
 function onDrop(e) {
@@ -2040,6 +2202,12 @@ function crumbs() {
   if (kids.length) { box.append(h('span', { class: 'muted', text: '↳' })); for (const k of kids) box.append(h('button', { text: k.localName + (stableClasses(k)[0] ? '.' + stableClasses(k)[0] : ''), onclick: () => select(k, true) })); }
   return box;
 }
+// Readable names for the page's design tokens (the CSS variable name stays in the tooltip). Unknown tokens get their name spelled out.
+const TOKEN_NAMES = { bg: 'Page background', ink: 'Text ink', paper: 'Paper colour', 'ink-c': 'Cyan ink', 'ink-m': 'Magenta ink', grain: 'Paper grain opacity', 'grain-size': 'Paper grain tile size',
+  'riso-yellow': 'Riso yellow', 'riso-magenta': 'Riso magenta', 'riso-yellow-shift': 'Riso yellow shift', 'riso-magenta-shift': 'Riso magenta shift', 'riso-text': 'Riso plate opacity',
+  cell: 'Grid cell size', lv: 'Grid line width (vertical and magenta)', lc: 'Grid line width (cyan)', blur: 'Blur of clickable plates', 'blur-static': 'Blur of unclickable plates', edge: 'Soft edge width',
+  glass: 'Glass fill', 'glass-hover': 'Glass hover colour', 'glass-press': 'Glass pressed colour', pad: 'Page side padding', display: 'Heading font', text: 'Body font', arrow: 'Arrow image' };
+const tokenLabel = (n) => { const k = n.replace(/^--/, ''); return TOKEN_NAMES[k] || (k.replace(/[-_]+/g, ' ').replace(/^./, (c) => c.toUpperCase())); };
 function tokensSection() {
   const body = h('div', { class: 'body' }); const d = h('details', {}, h('summary', { text: 'Design tokens (all widths)' }), body); d.open = false;
   if (!doc) return d;
@@ -2054,12 +2222,12 @@ function tokensSection() {
   const cs = win.getComputedStyle(root); const colors = [], other = [];
   for (const n of names) { const v = cs.getPropertyValue(n).trim(); if (!v || /url\(/.test(v)) continue; (/^(#[0-9a-f]{3,8}|rgba?\(|hsla?\()/i.test(v) ? colors : other).push([n, v]); }
   body.append(h('p', { class: 'muted', style: 'margin:0 0 4px', text: 'Site-wide values from the stylesheet. Changes apply at every width.' }));
-  for (const [n, v] of colors) body.append(colorField(n.replace(/^--/, ''), null, { token: { name: n, get value() { return win.getComputedStyle(root).getPropertyValue(n).trim() || v; } } }));
+  for (const [n, v] of colors) body.append(colorField(tokenLabel(n), null, { token: { name: n, get value() { return win.getComputedStyle(root).getPropertyValue(n).trim() || v; } } }));
   if (other.length) body.append(h('div', { class: 'sub', text: 'Other' }));
   for (const [n, v] of other) {
-    const inp = h('input', { type: 'text', spellcheck: 'false', value: v, 'aria-label': n });
+    const inp = h('input', { type: 'text', spellcheck: 'false', value: v, 'aria-label': `${tokenLabel(n)} (${n})` });
     const reset = h('button', { class: 'x', type: 'button', text: '×', 'aria-label': 'Reset', title: 'Reset this tweak' });
-    const row = h('div', { class: 'fc', style: 'grid-template-columns:90px minmax(0,1fr) 14px' }, h('span', { class: 'lab', text: n.replace(/^--/, ''), title: n }), inp, reset);
+    const row = h('div', { class: 'fc', style: 'grid-template-columns:104px minmax(0,1fr) 14px' }, h('span', { class: 'lab', text: tokenLabel(n), title: n }), inp, reset);
     const f = { sync() { if (document.activeElement !== inp) inp.value = win.getComputedStyle(root).getPropertyValue(n).trim(); row.classList.toggle('on', state.css[tokScope(n)]?.[':root']?.[n] != null); } };
     inp.addEventListener('change', () => {
       const v = inp.value.trim(); if (!v) return;
@@ -2452,11 +2620,12 @@ function openSettings() {
 q('#sCancel').addEventListener('click', () => q('#dlgSettings').close());
 q('#fSettings').addEventListener('submit', (e) => {
   if (e.submitter && e.submitter.value !== 'ok') return;
-  const prevPath = settings.path;
-  settings = { owner: q('#sOwner').value.trim() || 'ct907', repo: q('#sRepo').value.trim() || 'ct907-site', base: q('#sBase').value.trim() || 'main', path: q('#sPath').value.trim().replace(/^\/+/, '') || 'index.html', remember: q('#sRemember').checked };
+  const prevPath = settings.path, want = q('#sPath').value.trim().replace(/^\/+/, '') || 'index.html';
+  settings = { owner: q('#sOwner').value.trim() || 'ct907', repo: q('#sRepo').value.trim() || 'ct907-site', base: q('#sBase').value.trim() || 'main', path: prevPath, remember: q('#sRemember').checked };
   token = q('#sToken').value.trim(); lsSet(LS.settings, JSON.stringify(settings));
   if (settings.remember && token) lsSet(LS.token, token); else lsDel(LS.token);
-  if (settings.path !== prevPath) loadPage(); else toast('Settings saved.', 1600);
+  pageInfo.clear(); pageInfo.set(prevPath, { state: 'ok' }); discoverPages();
+  if (want !== prevPath) switchPage(want); else toast('Settings saved.', 1600);
 });
 function openReview() {
   const s = summary(); if (!s.count) return;
@@ -2507,10 +2676,10 @@ frame.addEventListener('load', onFrameLoad);
 // A file dropped anywhere else would make the browser leave the editor and open the file: don't let it.
 window.addEventListener('dragover', (e) => e.preventDefault()); window.addEventListener('drop', (e) => e.preventDefault());
 window.addEventListener('resize', () => { layoutFrame(); updateOverlay(); });
-layoutFrame(); loadPage();
+layoutFrame(); renderPageSelect(); loadPage().then(discoverPages);
 
 // handy for debugging and for the automated tests
-window.__editor = { get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, applyImageEdits, applyFonts, applyCustom, safeCssValue, qInfo, gfQ, GFONTS, loadCustomFont, ensureFont, get pageFonts() { return pageFonts; }, indexHtml, placeInFlow, placeDecor, removeLayerFromSource, addLayer, addImageLayer, deleteLayer, layerOf, layerClass, pathOf, liveAt, containerFor, buildNewSource, ensurePush, pushTo, pageLen, replaceImage, prepareImage, assets, inkAlpha, inkFor, tokScope, get guarded() { return guarded; }, get doc() { return doc; }, get sel() { return sel; }, get selMore() { return selMore; }, targets, selectMany, clearSel, toggleSel, deleteSelection, duplicateSelection, restoreDeleted, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
+window.__editor = { switchPage, discoverPages, fetchPage, normPage, redirectOf, get pageList() { return pageList; }, get state() { return state; }, get baseline() { return baseline; }, selectorFor, select: (e, reveal) => select(e, reveal), setWidth, scopeKey, undo, redo, summary, blockText, cssText, parseBlock, parseRules, replaceBlock, stripBlock, diffCss, applyOps, applyTextEdits, applyImageEdits, applyFonts, applyCustom, safeCssValue, qInfo, gfQ, GFONTS, loadCustomFont, ensureFont, get pageFonts() { return pageFonts; }, indexHtml, placeInFlow, placeDecor, removeLayerFromSource, addLayer, addImageLayer, deleteLayer, layerOf, layerClass, pathOf, liveAt, containerFor, buildNewSource, ensurePush, pushTo, pageLen, replaceImage, prepareImage, assets, inkAlpha, inkFor, tokScope, get guarded() { return guarded; }, get doc() { return doc; }, get sel() { return sel; }, get selMore() { return selMore; }, targets, selectMany, clearSel, toggleSel, deleteSelection, duplicateSelection, restoreDeleted, get history() { return history; }, setToken: (t) => { token = t; }, settings: () => settings };
 })();
 </script>
 </body>
