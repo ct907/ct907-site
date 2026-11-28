@@ -22,6 +22,7 @@ and it is never written into the page.
 
 | Do this | To |
 |---|---|
+| **Page** drop-down in the top bar | Switch to another page of the site (see *Switching pages*) |
 | Click an element | Select it (the label shows its name; the right-hand panel shows its settings) |
 | Drag the element | Move it |
 | Drag a handle | Resize it |
@@ -33,17 +34,23 @@ and it is never written into the page.
 | Alt + ↑ ↓ ← → | Select parent / first child / previous / next sibling (or use the breadcrumb buttons) |
 | Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z | Undo, redo |
 | Drag the orange **⇅ push this & below** grip (or use **Move this & everything below** in the panel) | Move the element and everything under it together |
+<<<<<<< HEAD
+| **Page & background** in the panel (press Esc to deselect) | Grid, cyan, magenta and paper-grain opacity; frosted-glass blur; the riso shift on headings; page length |
+| **Pictures on this page** in the panel (every picture on the page, each with **Replace…**), **Replace image…** on a selected picture, or drop an image file onto a picture | Swap a picture for your own file |
+=======
 | **Page & background** in the panel (press Esc to deselect) | Grid, cyan, magenta and paper-grain opacity; frosted-glass blur; the riso style on headings (Classic / Overprint); page length |
 | **Replace image…** in the panel, or drop an image file onto a picture | Swap a picture for your own file |
+>>>>>>> origin/main
 | **Add layers** in the panel | Add new text, a heading or an image *inside a box*, or floating *decoration* |
 | The purple ✦ handle on a decorative layer, or the **Layers** list | Select a layer that sits behind the page content |
 | **390 / 820 / 1280 / 1440 / 1920** or the Width box | Preview at that screen width |
 | **Review & push** | See exactly what will be written (and uploaded), then open the pull request |
 
-| **B** / **I** buttons in the **Type** section | Bold / italic: the selected words while you are editing text, otherwise the whole element |
+| **Bold** / **Italic** buttons in the **Type** section | Bold / italic: the selected words while you are editing text, otherwise the whole element |
 | **Border** in the panel | Border thickness, colour, style, each side, corner radius |
 | **All CSS** in the panel | Any CSS property the controls don't cover |
 
+Every control is labelled in full (*Move horizontally*, *Letter spacing*, *Frosted glass blur* …) and each section has a large heading.
 The panel has number fields for position, size, padding, margin and spacing; the **Type**, **Border**, **Shadow, filters & transform**
 and **Layout** sections below; colour pickers for text and fill; opacity and the frosted-glass blur; an **All CSS** section; and a
 **Design tokens** section for the site-wide values (`--ink-c`, `--ink-m`, `--grain`, `--paper`, …). Drag a field's label
@@ -59,8 +66,8 @@ innermost element. Esc deselects everything.
 
 The panel shows the **active** element, the last one you picked (it is highlighted in the list at the top of the panel; click
 another name there to make that one active). Whatever you change is written to **every** selected element, as a separate
-rule for each. Arrow keys and dragging move them all by the same amount; the **X / Y / W / H** fields give each of them the
-same value (X keeps each element's own Y). While several are selected the resize handles, *Move this & everything below*,
+rule for each. Arrow keys and dragging move them all by the same amount; the **Move horizontally / Move vertically / Width / Height** fields give each of them the
+same value (*Move horizontally* keeps each element's own vertical offset). While several are selected the resize handles, *Move this & everything below*,
 *Add layers*, *Edit text* and the picture controls are hidden: they only make sense for one element.
 
 ### Deleting elements
@@ -98,16 +105,16 @@ each of them when several are selected. The copy is saved as it is at that momen
 
 The **Type** section has:
 
-- **Font**: the site's two roles (*Heading font* = `var(--display)`, *Body font* = `var(--text)`), the fonts the page already loads,
+- **Font family**: the site's two roles (*Heading font* = `var(--display)`, *Body font* = `var(--text)`), the fonts the page already loads,
   and **Google Fonts only**: 54 popular families (sans-serif, serif, monospace, script & display), plus **Other Google font…** for
   any family you type (e.g. *Bricolage Grotesque*). The editor asks Google for the most capable version first (variable weights and
   italics) and falls back to simpler requests until Google accepts one, so a font always loads with the weights it really has.
 - **Weight**: only the weights that are actually loaded for the chosen font (Signika 300–700, Lora 400–700, Playfair Display 400–900 …).
-- **B**, **I**, **U**, **S** buttons: bold, italic, underline, strikethrough. **While you are editing text, B and I format the selected words**
-  (saved as clean `<strong>` / `<em>`); otherwise B and I make the whole element bold or italic. U and S always apply to the whole element.
+- **Bold**, **Italic**, **Underline** and **Strikethrough** buttons. **While you are editing text, Bold and Italic format the selected words**
+  (saved as clean `<strong>` / `<em>`); otherwise they make the whole element bold or italic. Underline and Strikethrough always apply to the whole element.
   There are no keyboard shortcuts for these; use the buttons.
-- **Alignment** (left, centre, right, justify), **Case** (as typed, UPPERCASE, lowercase, Capitalize), **font size**, **line height**,
-  **letter spacing**, **word spacing**, and a **text shadow** (X, Y, blur, colour).
+- **Alignment** (left, centre, right, justify), **Text case** (as typed, UPPERCASE, lowercase, Capitalize), **Font size**, **Line height**,
+  **Letter spacing**, **Word spacing**, and a **Text shadow** (horizontal offset, vertical offset, blur, colour).
 
 **How a font reaches the live page.** Picking a font loads it in the preview immediately. When you push, the editor adds **one**
 managed `<link>` to the page's `<head>`, between marker comments, asking Google for exactly the families you used:
@@ -126,10 +133,10 @@ Each font you add costs visitors a download, so use a few. (Keep the Slow Food A
 
 - **Border**: thickness for all four sides (or each side on its own), style (solid, dashed, dotted, double …), colour with opacity, and the
   radius of each corner. Setting a colour or a thickness on an element with no border gives it a visible 1px solid one.
-- **Shadow, filters & transform**: a box shadow (X, Y, blur, spread, colour, inner), filters (blur, brightness, contrast, saturation,
-  grayscale, hue), blend mode, rotation and scale. A filter the page already uses (such as a drop-shadow on a picture) is kept when you add another.
-  Rotated or scaled elements hide their resize handles (they would point the wrong way); use the W / H fields.
-- **Layout**: display (including *none* to hide it), position, z-index, overflow, and for flex/grid boxes direction, wrap, justify and align.
+- **Shadow, filters & transform**: a box shadow (horizontal offset, vertical offset, blur, spread, colour, inner), filters (blur, brightness, contrast, saturation,
+  greyscale, hue rotation), blend mode, rotation and scale. A filter the page already uses (such as a drop-shadow on a picture) is kept when you add another.
+  Rotated or scaled elements hide their resize handles (they would point the wrong way); use the Width / Height fields.
+- **Layout**: display (including *none* to hide it), position, stacking order (z-index), overflow, and for flex/grid boxes flex direction, flex wrap, justify content and align items.
 - **All CSS**: type any property and value (the box suggests property names), for anything not covered above. The browser checks the
   value before it is recorded, and a value can't contain `{ } ;` (outside quotes), `<`, or comment marks, so it can't break the stylesheet.
   Under it, every declaration recorded for the selected element at this width is listed and can be edited as text or removed.
@@ -148,7 +155,7 @@ will move (each affected block is outlined, and the panel says how many).
 - **The page length follows.** Pushing down by 120px makes the page 120px longer (the grid and grain extend with it),
   pushing up makes it shorter. This is a `body { height }` rule; the "Page length" readout shows the effect. Untick
   *Make the page longer or shorter to fit* to move content without changing the length, or set the length directly under
-  **Page & background → Len**.
+  **Page & background → Page length**.
 - You can't pull content above the top of the page; the push stops there and says so.
 - Each moved block gets a `translate` rule (so there are as many lines in the pull request as blocks that moved), and,
   like every tweak, they are saved for the width range you are previewing.
@@ -158,15 +165,20 @@ will move (each affected block is outlined, and the panel says how many).
 ### Page & background
 
 With nothing selected (or in the **Page & background** section when something is), sliders set the opacity of the
-printed grid: **Grid** (both ink plates together, where 100% is the reference print and 50% is how the page ships),
-**Cyan** and **Magenta** on their own, and the **Grain** of the paper. Sliding back to the shipped value records nothing.
+printed grid: **Grid opacity** (both ink plates together, where 100% is the reference print and 50% is how the page ships),
+**Cyan plate opacity** and **Magenta plate opacity** on their own, and the **Paper grain opacity**. Sliding back to the shipped value records nothing.
 
-**Frosted glass blur** has two sliders: **Clickable** (`--blur`, links, buttons and the album card; ships at 4px) and
-**Unclickable** (`--blur-static`, every other frosted plate: headings, paragraphs, labels; ships at 24px). The **Bl**
+**Frosted glass blur** has two sliders: **Clickable plates** (`--blur`, links, buttons and the album card; ships at 4px) and
+**Unclickable plates** (`--blur-static`, every other frosted plate: headings, paragraphs, labels; ships at 24px). The **Frosted glass blur**
 field in a selected element's *Colour & effects* section still sets one element on its own.
 
 Under them, **Header riso** controls the off-register printing on heading text (h1, h2 and the big sub-headline): a
 yellow and a magenta copy of the text, printed in opposite directions (yellow up-left, magenta down-right), carrying the
+<<<<<<< HEAD
+same paper grain as the page. **Yellow plate shift** goes from 0 to 2px, **Magenta plate shift** from 0 to 4px, and **Plate opacity** applies to both (the
+page ships at 2px, 4px and 20%; 0% switches the effect off). They write the tokens `--riso-yellow-shift`,
+`--riso-magenta-shift` and `--riso-text`, and the two colours (`--riso-yellow`, `--riso-magenta`) are in **Design tokens**.
+=======
 same paper grain as the page.
 
 - **Style: Classic | Overprint** is a live, hot-swappable preview. *Classic* is what the page ships: black text with the two
@@ -183,12 +195,16 @@ same paper grain as the page.
 - Several headings ship with their **own** plate offsets and opacity (set per heading, below). They win over the sliders, so
   a note under the controls counts them, and **Clear their own settings** removes them all so the sliders apply to every
   heading (Ctrl/Cmd+Z brings them back). That is a lot of lines in the pull request, so use it deliberately.
+>>>>>>> origin/main
 
-To change the plates of **one heading**, select it: the **Riso plates (this heading)** section has X, Y and opacity for each
+To change the plates of **one heading**, select it: the **Riso plates (this heading)** section has *Horizontal offset*, *Vertical offset* and *Opacity* for each
 plate (opacity 0 hides a plate). They are written as `--riso-yellow-x / -y / -a` and `--riso-magenta-x / -y / -a` on that
 heading's rule. The same section has that heading's *Text ink*, *Blend*, *Plates* (over or behind the text) and *Grain*.
 The **Text shadow** control on a heading adds a separate, flat shadow; it doesn't edit the plates. (The card
 title is the one heading with flat plates instead: its Text shadow control does edit them.)
+
+The grid, grain, glass and riso groups only appear on a page that defines those tokens (the home page does), so another page
+doesn't get sliders that would do nothing.
 
 These are site-wide and are written inside `@media (prefers-contrast: no-preference)`, so visitors who ask for increased
 contrast still get the page's own calm, grain-free fallback (an `!important` rule outside that condition would override it).
@@ -241,12 +257,21 @@ layer's picture file stays in `assets/images/`.
 
 ### Replacing pictures
 
-Select a picture (or drop an image file onto it) and choose **Replace image…**. The preview shows it immediately, in the
-same frame. By default the file is **optimised for the web**: resized so its longest side is about three times the size
+There are three ways in; use whichever is easiest:
+
+- **Pictures on this page** (the panel when nothing is selected, or collapsed below the other sections when something is) lists
+  **every picture on the page**, each with a thumbnail, its alt text, the file name and how big it is shown. **Replace…** picks a
+  new file for that one; **Show** selects it in the preview; **Revert** (after a replacement) brings the original back. This is
+  the way to reach a picture that is hard to click.
+- **Select a picture**, or a frame with exactly one picture in it (a portrait box, a card), and choose **Replace image…** in the
+  Image section. A frame shows the same controls for the picture inside it, so you don't have to select the picture itself first.
+- **Drop an image file** onto a picture in the preview.
+
+The preview shows the new picture immediately, in the same frame. By default the file is **optimised for the web**: resized so its longest side is about three times the size
 it's shown at (you can set that) and re-encoded as WebP, never making a file bigger than the one you picked. Untick it
 to upload your file byte for byte. PNG, JPEG, WebP, AVIF, GIF and SVG are accepted (GIF and SVG are never re-encoded).
 
-**Fit** (cover / contain / fill…) and the **X / Y focal point** set how the picture fills its frame, which is how you
+**Image fit** (cover / contain / fill…) and the **Focal point, horizontal / vertical** fields set how the picture fills its frame, which is how you
 re-crop it. **Revert** goes back to the original.
 
 When you push, the new file is committed to **`assets/images/<name>-<hash>.<ext>`** in the same commit as everything else,
@@ -255,6 +280,23 @@ picture twice never overwrites an old file and the same file used twice is uploa
 
 The page is shown as a calm, static canvas: the cursor effects, scroll animations and hover-only text are switched
 off or made visible so you can select everything.
+
+### Switching pages
+
+The **Page** drop-down in the top bar chooses which page of the site you are editing. It lists the site's HTML pages: the
+editor reads the repository's file list from GitHub (one request to `api.github.com`; no token is needed for a public
+repository) and checks each page on the live site. Pages that only **redirect** somewhere else (this site's `portfolio/`, `slow-food-*/`
+and so on are stubs that send visitors to `hello.ct907.com`) or that aren't published yet are shown, greyed out, under *Can't be
+edited*, because there is nothing here to edit. **Another page…** takes a path such as `about/index.html` (a folder works too, as
+`about/`); the **Page file** box in Settings does the same. If GitHub can't be reached the list is just the page you're on.
+
+- **Unsaved changes are never dropped silently.** If you've recorded anything, switching asks first (*Stay here* or *Discard and
+  switch*); push them with **Review & push** before switching to keep them. A switch starts a clean session on the new page, and the
+  saved draft of the old one is cleared. The page you chose is remembered for next time.
+- Everything is per page: the tweaks, the picture swaps and the pull request all target the page you are on, and a picture
+  uploaded from a page in a sub-folder gets a path relative to that page (`../assets/images/…`).
+- A page needs a `<style>` element for the editor to write its tweaks into. The sliders for the home page's own design tokens
+  (grid, grain, glass, riso) are hidden on pages that don't define them.
 
 ### Tweaks are saved per screen width
 
