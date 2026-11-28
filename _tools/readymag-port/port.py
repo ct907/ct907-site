@@ -21,6 +21,10 @@ SRC = os.path.join(ROOT, "_tools", "readymag-port", "source")
 CACHE = os.path.join(ROOT, "_tools", "readymag-port", "cache")
 CANVAS = 1024
 SITE = "https://ct907.com"
+HELLO = "https://hello.ct907.com"
+# Ported pages are published unlisted under this prefix (noindex, not in the sitemap) while
+# hello.ct907.com stays the public version. Set PREVIEW = "" to publish them at their real paths.
+PREVIEW = "/preview"
 
 # Pages to build, with the titles and descriptions the new site uses.
 PAGES = {
@@ -228,15 +232,26 @@ def fetch_image(url, slug, local_dir=None):
     return f"/assets/images/{slug}/{name}"
 
 # ------------------------------------------------------------------- links ---
+def page_href(slug):
+    """Where a link to another Readymag page should go: its port if built, else the original."""
+    if slug in ("", "welcome"):
+        return "/"
+    if slug in PAGES:
+        return f"{PREVIEW}/{slug}/"
+    return f"{HELLO}/{slug}/"
+
 def rewrite_href(href):
     if not href:
         return href
     m = re.match(r"^/\d+/([a-z0-9-]+)/?(#.*)?$", href)
     if m:
-        return "/" if m.group(1) == "welcome" else f"/{m.group(1)}/"
+        return page_href(m.group(1))
     m = re.match(r"^https?://hello\.ct907\.com/([a-z0-9-]*)/?$", href)
     if m:
-        return "/" if m.group(1) in ("", "welcome") else f"/{m.group(1)}/"
+        return page_href(m.group(1))
+    m = re.match(r"^/([a-z0-9-]+)/$", href)
+    if m and m.group(1) in ALL_SLUGS:
+        return page_href(m.group(1))
     m = re.match(r"^/p(\d+)/?$", href)
     if m:
         return href
@@ -472,7 +487,7 @@ def render_widget(wd, slug, anchors, local_dir, drawer=False):
                 href = f"#y-{pos}"
             elif wd.link.get("href"):
                 href = rewrite_href(wd.link["href"])
-        href = href or BUTTON_TARGETS.get(label)
+        href = href or (rewrite_href(BUTTON_TARGETS[label]) if label in BUTTON_TARGETS else None)
         style = geo + (("; " + conv_decls(extra)) if extra else "")
         meta["text"] = label
         if href:
@@ -702,12 +717,13 @@ def build(slug, pages_meta, text_css_rules):
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{html.escape(title)} – Chris Tan</title>
 <meta name="description" content="{html.escape(desc, quote=True)}">
-<link rel="canonical" href="{SITE}/{slug}/">
+<link rel="canonical" href="{HELLO}/{slug}/">
+{'<meta name="robots" content="noindex, nofollow">' if PREVIEW else ''}
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Chris Tan">
 <meta property="og:title" content="{html.escape(title)} – Chris Tan">
 <meta property="og:description" content="{html.escape(desc, quote=True)}">
-<meta property="og:url" content="{SITE}/{slug}/">
+<meta property="og:url" content="{HELLO}/{slug}/">
 {f'<meta property="og:image" content="{SITE}{og}">' if og else ''}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="{css_color(bgc)}">
@@ -725,8 +741,9 @@ def build(slug, pages_meta, text_css_rules):
     page = (head + f'<body class="rm" style="--page-bg: {css_color(bgc)}">\n<a class="rm-skip" href="#main">Skip to content</a>\n'
             f'<main id="main" class="rm-page"><div class="rm-canvas" style="--H: {H}">\n'
             + drawer_html + "\n" + shapes_html + "\n" + "\n".join(body) + "\n</div></main>\n" + fixed_html + "\n</body>\n</html>\n")
-    os.makedirs(os.path.join(ROOT, slug), exist_ok=True)
-    open(os.path.join(ROOT, slug, "index.html"), "w", encoding="utf-8").write(page)
+    out_dir = os.path.join(ROOT, PREVIEW.strip("/"), slug)
+    os.makedirs(out_dir, exist_ok=True)
+    open(os.path.join(out_dir, "index.html"), "w", encoding="utf-8").write(page)
     return {"slug": slug, "widgets": len(main), "drawer": len(drawer), "dropped_offcanvas": len(offcanvas),
             "bands": len(bands), "anchors": sorted(anchors), "images": len(imgs), "placeholders": placeholders,
             "desc": desc[:70], "toggle": bool(toggle_ids), "h1": rendered[id(h1w)][1].get("text", "")[:40] if h1w else None}

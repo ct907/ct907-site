@@ -19,9 +19,18 @@ python3 _tools/readymag-port/port.py nhb-games       # one page
   the page saved from a browser instead.
 - `pages.json`: page list, heights, titles and SEO fields, plus the project's custom CSS.
 
+## Preview mode (current)
+
+hello.ct907.com stays the public version for now. The ports are published **unlisted** at
+`/preview/<slug>/`: `noindex, nofollow`, canonical pointing at the Readymag page, not in the sitemap,
+and not linked from the homepage. Links between ported pages stay inside `/preview/`; links to pages
+not yet ported go straight to hello.ct907.com. The redirect stubs at `/<slug>/` are unchanged.
+To go live, set `PREVIEW = ""` in `port.py`, rerun it (it then writes `<slug>/index.html`, replacing the
+stubs), drop the noindex, and add the pages to `sitemap.xml`.
+
 ## Outputs
 
-- `<slug>/index.html` (replaces the redirect stub), `assets/images/<slug>/`, `assets/css/rm-custom.css`.
+- `preview/<slug>/index.html` (or `<slug>/index.html` when `PREVIEW` is empty), `assets/images/<slug>/`, `assets/css/rm-custom.css`.
 - Shared, hand-written: `assets/css/rm-page.css`, `assets/css/rm-fonts.css`, `assets/js/rm-page.js`.
 
 ## How the pages work
