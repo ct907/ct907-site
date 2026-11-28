@@ -34,8 +34,13 @@ and it is never written into the page.
 | Alt + ↑ ↓ ← → | Select parent / first child / previous / next sibling (or use the breadcrumb buttons) |
 | Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z | Undo, redo |
 | Drag the orange **⇅ push this & below** grip (or use **Move this & everything below** in the panel) | Move the element and everything under it together |
+<<<<<<< HEAD
 | **Page & background** in the panel (press Esc to deselect) | Grid, cyan, magenta and paper-grain opacity; frosted-glass blur; the riso shift on headings; page length |
 | **Pictures on this page** in the panel (every picture on the page, each with **Replace…**), **Replace image…** on a selected picture, or drop an image file onto a picture | Swap a picture for your own file |
+=======
+| **Page & background** in the panel (press Esc to deselect) | Grid, cyan, magenta and paper-grain opacity; frosted-glass blur; the riso style on headings (Classic / Overprint); page length |
+| **Replace image…** in the panel, or drop an image file onto a picture | Swap a picture for your own file |
+>>>>>>> origin/main
 | **Add layers** in the panel | Add new text, a heading or an image *inside a box*, or floating *decoration* |
 | The purple ✦ handle on a decorative layer, or the **Layers** list | Select a layer that sits behind the page content |
 | **390 / 820 / 1280 / 1440 / 1920** or the Width box | Preview at that screen width |
@@ -167,15 +172,35 @@ printed grid: **Grid opacity** (both ink plates together, where 100% is the refe
 **Unclickable plates** (`--blur-static`, every other frosted plate: headings, paragraphs, labels; ships at 24px). The **Frosted glass blur**
 field in a selected element's *Colour & effects* section still sets one element on its own.
 
-Under them, **Header riso shift** controls the off-register printing on heading text (h1, h2 and the big sub-headline): a
+Under them, **Header riso** controls the off-register printing on heading text (h1, h2 and the big sub-headline): a
 yellow and a magenta copy of the text, printed in opposite directions (yellow up-left, magenta down-right), carrying the
+<<<<<<< HEAD
 same paper grain as the page. **Yellow plate shift** goes from 0 to 2px, **Magenta plate shift** from 0 to 4px, and **Plate opacity** applies to both (the
 page ships at 2px, 4px and 20%; 0% switches the effect off). They write the tokens `--riso-yellow-shift`,
 `--riso-magenta-shift` and `--riso-text`, and the two colours (`--riso-yellow`, `--riso-magenta`) are in **Design tokens**.
+=======
+same paper grain as the page.
+
+- **Style: Classic | Overprint** is a live, hot-swappable preview. *Classic* is what the page ships: black text with the two
+  copies behind it at 20%. *Overprint* is the CodePen look: the heading text becomes a cyan ink and the yellow and magenta
+  plates print **over** it with multiply, so overlaps mix like real inks (near-black where all three meet). Each style
+  remembers its own settings while you flip between them (in this editor session only); sliding everything back to the
+  shipped values records nothing, so flipping to Classic leaves the page exactly as it was.
+- **Yellow** and **Magenta** (0 to 8px; the page ships at 2px and 4px) and **Opacity** (the page ships at 20%; Overprint starts at
+  85%; 0% switches the effect off) write `--riso-yellow-shift`, `--riso-magenta-shift` and `--riso-text`.
+- **Inks**: *Text ink* (`--riso-ink`; Classic leaves the text as it is), *Yellow* and *Magenta* (`--riso-yellow`, `--riso-magenta`).
+- **Overprint & grain**: *Blend* (`--riso-blend`, Multiply or Normal), *Grain on the plates* (`--riso-mask`, off = solid ink) and
+  *Grain size* (`--riso-grain-size`, the tile size; the page ships at 1126px). The Style switch also sets `--riso-z`
+  (1 = plates over the text, -1 = behind it).
+- Several headings ship with their **own** plate offsets and opacity (set per heading, below). They win over the sliders, so
+  a note under the controls counts them, and **Clear their own settings** removes them all so the sliders apply to every
+  heading (Ctrl/Cmd+Z brings them back). That is a lot of lines in the pull request, so use it deliberately.
+>>>>>>> origin/main
 
 To change the plates of **one heading**, select it: the **Riso plates (this heading)** section has *Horizontal offset*, *Vertical offset* and *Opacity* for each
 plate (opacity 0 hides a plate). They are written as `--riso-yellow-x / -y / -a` and `--riso-magenta-x / -y / -a` on that
-heading's rule. The **Text shadow** control on a heading adds a separate, flat shadow; it doesn't edit the plates. (The card
+heading's rule. The same section has that heading's *Text ink*, *Blend*, *Plates* (over or behind the text) and *Grain*.
+The **Text shadow** control on a heading adds a separate, flat shadow; it doesn't edit the plates. (The card
 title is the one heading with flat plates instead: its Text shadow control does edit them.)
 
 The grid, grain, glass and riso groups only appear on a page that defines those tokens (the home page does), so another page
