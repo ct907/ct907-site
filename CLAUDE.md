@@ -107,9 +107,11 @@ editor for it (see `editor/README.md`).
 - **Which page.** The top-bar **Page** drop-down switches the page being edited (`settings.path`). `fetchPage` reads a page without
   touching the session, `startPage` begins a clean one, `switchPage` does the check-then-confirm-then-start. The list comes from
   GitHub's file tree (`discoverPages`, one unauthenticated request) with each page probed on the live site. A page that is a
-  `<meta http-equiv="refresh">` stub (every folder except `assets/` and `editor/` today) is refused and shown under *Can't be
-  edited*, since the preview would leave the site. Switching with unsaved changes asks first and clears the saved draft. The
-  home page's own token sliders (grid, grain, glass, riso) only show on a page that defines those tokens.
+  `<meta http-equiv="refresh">` stub (the project folders such as `nhb-games/` and `slow-food-*/`) is refused and shown under
+  *Can't be edited*, since the preview would leave the site; the real pages (`index.html`, `portfolio/`, `preview/*/`) are
+  editable. Folders starting with `_` or `.` (e.g. `_tools/`) are left out. Switching with unsaved changes asks first and clears
+  the saved draft. The home page's own token sliders (grid, grain, glass, riso) only show on a page that defines those tokens
+  (`portfolio/` copies them, so it has them).
 - **Pictures.** `picturesSection` lists every `<img>` that isn't an editor layer, each with its own Replace; a frame holding exactly
   one picture shows that picture's Image controls (`imageSection(img, true)`). Thumbnails are drawn onto a `<canvas>` because the
   editor's Content-Security-Policy only allows `blob:` images.
@@ -124,7 +126,7 @@ editor for it (see `editor/README.md`).
   every other frosted plate (headings, paragraphs, labels, the footer name…). One rule does it:
   `.glass:not(a, button, .release) { --blur: var(--blur-static) }`, set on the plate itself so it also beats a `--blur`
   inherited from a section (`#ux-portfolio { --blur: 2px }` still sets the UX section's links). A per-element `--blur`
-  from the editor (the **Bl** field) still wins. 24 means 24 CSS px; Figma's "background blur 24" would be 12px here.
+  from the editor (the **Frosted glass blur** field) still wins. 24 means 24 CSS px; Figma's "background blur 24" would be 12px here.
   The larger radius costs a little more scroll time in a software-rendered test (more slow frames, same median); the
   grain's overlay blend and the plates themselves are the bigger cost.
 - **The CHRIS TAN title animates its weight** (`h1 { animation: weight 6s infinite }`, 300 ↔ 700, in `index.html`). An
@@ -141,7 +143,7 @@ editor for it (see `editor/README.md`).
   links keep working).
 - **`portfolio/index.html`** was migrated from the Readymag page `hello.ct907.com/portfolio` (the CHRIS TAN landing page
   with the project list and contact details) and then restyled to **look like the homepage**. It is a standalone file with
-  its own inline CSS and no editor support (the editor only manages `index.html`).
+  its own inline CSS. The editor can edit it too: pick it in the **Page** drop-down (tweaks go into a managed block like on the homepage).
   - **It copies the homepage's design system, it does not share it.** From `index.html`, with the homepage's *live* values:
     the `:root` tokens (palette, `--ink-c` #cdf6ff / `--ink-m` #f6ecf5, `--grain` .08, riso and glass tokens), the fluid
     root font size and `--pad`, the grid + grain layers, `.glass` plates and their soft edges, the riso heading plates, the
