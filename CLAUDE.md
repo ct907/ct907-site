@@ -79,8 +79,24 @@ editor for it (see `editor/README.md`).
   (offset px, opacity); they are deliberately **not** declared in `:root`, so the plates fall back to the shifts and `--riso-text`.
   Today's tweak block gives the headings (h1, sub-headline, three h2) a yellow-only plate at -2px/-1px by that route (the
   magenta plate is `--riso-magenta-a: 0`); remove that override to bring the magenta plate back.
-- The editor's **Page & background > Header riso shift** has the three global sliders, and selecting a heading shows **Riso
-  plates (this heading)** with X/Y/opacity per plate. A text shadow typed on a heading (the Text shadow control) is an extra
+- **Overprint style (the CodePen "riso" look), switched in the editor.** The plates can also print the way real riso inks do: the
+  heading's own text becomes a third ink (cyan), and the yellow and magenta plates print **over** it with `mix-blend-mode: multiply`,
+  so overlaps mix (yellow x cyan = green, all three = near-black, fringes of each ink at the edges). It is built from five tokens in
+  `:root` whose defaults are exactly the classic look, so nothing changes until the editor writes others: `--riso-z` (-1 plates behind
+  the text, 1 over it), `--riso-blend` (`normal` / `multiply`), `--riso-ink` (`currentColor` = the text keeps its colour; overprint
+  uses `#1a84c4`), `--riso-mask` (the grain tile, or `none` for solid ink) and `--riso-grain-size` (default `var(--grain-size)`).
+  The ghosts are still only `::before` / `::after`, so the third ink *is* the heading text (it is solid: the grain is on the two
+  plates, not the text). The multiply stays inside each heading's own `isolation: isolate` group, so it only mixes the plates with the
+  text and each other, never with the page behind. Increased contrast, print and forced colours hide the plates **and** reset the text
+  to the page's ink (`[data-riso] { color: inherit }`), and `--riso-ink` is reset in the `prefers-contrast: more` block so the editor
+  writes it inside the no-preference guard. The cyan ink alone is ~3.9:1 on the paper (fine for large display text); where the plates
+  overlap it is near-black. A per-heading `--riso-*-x/-y/-a` always wins over the global sliders (the page ships several, tuned for
+  classic), which is why the editor has a **Clear their own settings** button. `portfolio/index.html` carries the same tokens at their
+  classic defaults (no editor there).
+- The editor's **Page & background > Header riso** has a **Style: Classic | Overprint** switch (a live preview: Overprint writes
+  `--riso-z: 1`, `--riso-blend: multiply`, `--riso-ink: #1a84c4`, opacity .85 and 3px/3px shifts; Classic puts the shipped values back,
+  and each style remembers its own settings while you flip), the three global sliders, ink colours, Blend, Grain on/off and size, and
+  selecting a heading shows **Riso plates (this heading)** with X/Y/opacity per plate plus text ink, Blend, Plates over/behind and Grain. A text shadow typed on a heading (the Text shadow control) is an extra
   flat shadow on top. Everything is off for increased contrast, forced colours and print. Browser support: Chrome 120+,
   Safari 16.4+, Firefox 128+ for the textured ghosts.
 

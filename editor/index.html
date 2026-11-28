@@ -237,10 +237,20 @@ const GUARD = '(prefers-contrast: no-preference)';
 const INKS = { '--ink-c': [0x59, 0xe1, 0xff], '--ink-m': [0xe1, 0xc1, 0xdd] };
 // The riso shift on heading text: yellow and magenta ghosts, off-register in opposite directions (see the page's --riso-* tokens).
 const RISO = [
-  { name: '--riso-yellow-shift', label: 'Yellow', aria: 'Riso yellow shift in pixels (up-left)', title: 'How far the yellow plate is off-register, up and to the left (0 to 2px)', min: 0, max: 2, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
-  { name: '--riso-magenta-shift', label: 'Magenta', aria: 'Riso magenta shift in pixels (down-right)', title: 'How far the magenta plate is off-register, down and to the right (0 to 4px)', min: 0, max: 4, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
+  { name: '--riso-yellow-shift', label: 'Yellow', aria: 'Riso yellow shift in pixels (up-left)', title: 'How far the yellow plate is off-register, up and to the left (the page ships at 2px; up to 8px for the overprint look)', min: 0, max: 8, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
+  { name: '--riso-magenta-shift', label: 'Magenta', aria: 'Riso magenta shift in pixels (down-right)', title: 'How far the magenta plate is off-register, down and to the right (the page ships at 4px; up to 8px for the overprint look)', min: 0, max: 8, step: 0.25, unit: 'px', get: (v) => parseFloat(v) || 0, put: (v) => r3(v) + 'px' },
   { name: '--riso-text', label: 'Opacity', aria: 'Riso shift opacity in percent', title: 'Opacity of both plates (the page ships at 20%); 0 switches the effect off', min: 0, max: 100, step: 1, unit: '%', get: (v) => Math.round(100 * (parseFloat(v) || 0)), put: (v) => String(r3(v / 100)) },
 ];
+// The two header-riso STYLES. "Classic" is exactly what the page ships. "Overprint" is the CodePen look: the heading's own text is printed
+// in a third ink (cyan) and the yellow and magenta plates print OVER it with multiply, so overlaps mix like real inks (near-black where all
+// three meet). The switch only writes (or removes) this bundle of site-wide tokens, so it is a live preview and costs nothing to undo.
+const RISO_STYLES = {
+  classic: { '--riso-z': '-1', '--riso-blend': 'normal', '--riso-ink': 'currentColor', '--riso-text': '.2', '--riso-yellow-shift': '2px', '--riso-magenta-shift': '4px' },
+  over:    { '--riso-z': '1', '--riso-blend': 'multiply', '--riso-ink': '#1a84c4', '--riso-text': '.85', '--riso-yellow-shift': '3px', '--riso-magenta-shift': '3px' },
+};
+const RISO_TOKENS = [...Object.keys(RISO_STYLES.classic), '--riso-mask', '--riso-grain-size', '--riso-yellow', '--riso-magenta'];
+const RISO_MASK_URL = 'url("assets/images/paper-texture.webp")';
+const RISO_OWN = /^--riso-(yellow|magenta)-(x|y|a)$/;   // a heading's own plate offsets and opacity: they win over the global sliders
 // How hard the frosted plates blur what is behind them: the page's two tokens (see --blur and --blur-static).
 const BLURS = [
   { name: '--blur', label: 'Clickable', aria: 'Frosted blur of clickable plates in pixels', title: 'Links, buttons and the album card (the page ships at 4px)' },
@@ -397,6 +407,7 @@ const imgOrig = new Map();         // img element -> its original src attribute 
 const assets = new Map();          // repo path -> { blob, url, file, ... }: the replacement files (too big for the undo history)
 let pageFonts = new Map();         // Google fonts the page itself already loads (lower-case name -> weights/italics)
 let guarded = new Set();           // site-wide tokens the page overrides for increased contrast (see GUARD)
+let risoMem = {};                  // each header-riso style's own settings while you flip between them (not saved: it is only a preview aid)
 let tokBase = {};                  // grid / grain token values as the page loads (so sliding back to the shipped value records nothing)
 let push = null;                   // the "move this and everything below" session for the selected element
 let pushAuto = true, pushOpen = true, pushHot = false, gripHover = false;
@@ -701,7 +712,7 @@ async function loadPage() {
     q('#empty').textContent = `Couldn't load ${settings.path} (${err.message}). Open this editor from the live site (…/editor/), not from a file on disk.`; return;
   }
   baseline = parseBlock(source0);
-  state = { css: clone(baseline), text: [], images: [], layers: [], removed: [], deleted: [], renames: [], fonts: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1;
+  state = { css: clone(baseline), text: [], images: [], layers: [], removed: [], deleted: [], renames: [], fonts: [] }; originals.clear(); imgOrig.clear(); history = []; hIndex = -1; risoMem = {};
   for (const a of assets.values()) URL.revokeObjectURL(a.url);
   assets.clear(); push = null;
   sel = null; selMore = []; hover = null; editing = null;
@@ -729,7 +740,7 @@ function onFrameLoad() {
   originals.clear(); imgOrig.clear();
   for (const t of state.text) { const el = safeQuery(t.sel); if (el) originals.set(el, t.before); }
   for (const x of state.images) { const el = safeQuery(x.sel); if (el) imgOrig.set(el, x.was); }
-  renderLive(); tokBase = {}; for (const n of [...Object.keys(INKS), '--grain', ...RISO.map((r) => r.name), ...BLURS.map((b) => b.name)]) tokBase[n] = tokenValue(n);
+  renderLive(); tokBase = {}; for (const n of [...Object.keys(INKS), '--grain', ...RISO.map((r) => r.name), ...RISO_TOKENS, ...BLURS.map((b) => b.name)]) tokBase[n] = tokenValue(n);
   commit(); layoutFrame(); buildPanel();
   if (hasDraft) offerDraft(draft);
 }
@@ -1359,7 +1370,30 @@ function risoSection() {
   return sec('Riso plates (this heading)', false,
     h('p', { class: 'muted', style: 'margin:0 0 4px', text: 'The off-register yellow and magenta copies of this heading, with the paper grain. Opacity 0 hides a plate. The sliders under Page & background set them for every heading.' }),
     h('div', { class: 'sub', text: 'Yellow' }), ...mk('Yellow', '::before', 'yellow'),
-    h('div', { class: 'sub', text: 'Magenta' }), ...mk('Magenta', '::after', 'magenta'));
+    h('div', { class: 'sub', text: 'Magenta' }), ...mk('Magenta', '::after', 'magenta'),
+    h('div', { class: 'sub', text: 'Ink, overprint & grain' }),
+    h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'Overprint: put the plates over the text and set Blend to Multiply, then give the text a cyan ink. The global Style switch under Page & background does all of that at once.' }),
+    colorField('Text ink', '--riso-ink', { read: 'color', write: ['--riso-ink'] }),
+    selectField({ label: 'Blend', aria: 'Heading riso blend mode', title: 'How the plates mix with the text and each other', props: ['--riso-blend'],
+      options: () => [['multiply', 'Multiply (overprint)'], ['normal', 'Normal']], read: () => win.getComputedStyle(sel).getPropertyValue('--riso-blend').trim() || 'normal', write: (v) => setProp('--riso-blend', v) }),
+    selectField({ label: 'Plates', aria: 'Heading riso plates over or behind the text', title: 'Behind the text is the classic look; over it is overprint', props: ['--riso-z'],
+      options: () => [['1', 'Over the text'], ['-1', 'Behind the text']], read: () => win.getComputedStyle(sel).getPropertyValue('--riso-z').trim() || '-1', write: (v) => setProp('--riso-z', v) }),
+    risoGrainTick(true));
+}
+// "Grain on the plates": the paper texture that knocks specks out of the yellow and magenta ink. Off = solid ink.
+function risoGrainTick(perHeading) {
+  const box = h('input', { type: 'checkbox', 'aria-label': perHeading ? 'Grain on this heading’s plates' : 'Grain on the header riso plates' });
+  const now = () => (perHeading ? win.getComputedStyle(sel).getPropertyValue('--riso-mask') : tokenValue('--riso-mask')).trim() !== 'none';
+  box.addEventListener('change', () => {
+    const n = '--riso-mask', b = tokBase[n];
+    if (perHeading) { if (!box.checked) setProp(n, 'none'); else if (tokenValue(n) !== 'none') resetProps([n]); else setProp(n, RISO_MASK_URL); }
+    else if (!box.checked) setTok(n, 'none');
+    else if (b && b !== 'none') setTok(n, b);
+    else { setTweak(state.css, tokScope(n), ':root', n, RISO_MASK_URL); renderLive(); }
+    commit(); syncFields();
+  });
+  fields.push({ sync() { if (perHeading && !sel) return; box.checked = now(); } });
+  return h('label', { class: 'tick' }, box, 'Grain on the plates');
 }
 function typeSection() {
   const cs = () => win.getComputedStyle(sel), tw = () => state.css[scopeKey()]?.[selectorFor(sel)] || {};
@@ -1616,6 +1650,44 @@ function setTok(n, v) {
   else delTweak(state.css, sc, ':root', n);
   renderLive();
 }
+const risoStyle = () => (parseFloat(tokenValue('--riso-z')) > 0 ? 'over' : 'classic');
+function setRisoStyle(next) {
+  const cur = risoStyle(); if (next === cur) return;
+  risoMem[cur] = Object.fromEntries(Object.keys(RISO_STYLES[cur]).map((n) => [n, tokenValue(n)]));   // remember what this style looked like
+  for (const [n, v] of Object.entries(RISO_STYLES[next])) setTok(n, (risoMem[next] && risoMem[next][n]) || v);
+}
+function risoStyleSwitch() {
+  const mk = (key, text, title) => h('button', { type: 'button', 'aria-pressed': 'false', title, text, onclick: () => { setRisoStyle(key); commit(); syncFields(); } });
+  const btns = { classic: mk('classic', 'Classic', 'Black text with a yellow and a magenta copy behind it (what the page ships)'),
+                 over: mk('over', 'Overprint', 'The CodePen look: cyan text with yellow and magenta printed over it using multiply, so the inks mix') };
+  fields.push({ sync() { const m = risoStyle(); for (const [k, b] of Object.entries(btns)) b.setAttribute('aria-pressed', String(k === m)); } });
+  return h('div', { class: 'btnrow' }, h('span', { class: 'muted', style: 'align-self:center', text: 'Style' }), h('div', { class: 'seg' }, btns.classic, btns.over));
+}
+// The settings that only the overprint look needs (they all work in Classic too), plus a way to make the global settings really global.
+function risoExtras() {
+  const tokOn = (n) => state.css[tokScope(n)]?.[':root']?.[n] != null;
+  const clearTok = (n) => { delTweak(state.css, tokScope(n), ':root', n); renderLive(); };
+  const ink = (label, n, shown) => colorField(label, null, { token: { name: n, get value() { const v = tokenValue(n); return /^(#|rgb)/i.test(v) ? v : shown(); } } });
+  const ownRules = () => { const out = []; for (const [sc, rules] of Object.entries(state.css)) for (const [sl, props] of Object.entries(rules)) for (const p of Object.keys(props)) if (RISO_OWN.test(p)) out.push([sc, sl, p]); return out; };
+  const note = h('p', { class: 'muted', style: 'margin:8px 0 0' }), clear = h('button', { type: 'button', text: 'Clear their own settings', title: 'Remove every heading’s own plate offsets and opacity so the sliders above apply to all of them (Ctrl/Cmd+Z brings them back)',
+    onclick: () => { for (const [sc, sl, p] of ownRules()) delTweak(state.css, sc, sl, p); renderLive(); commit(); syncFields(); } });
+  const btnRow = h('div', { class: 'btnrow' }, clear);
+  fields.push({ sync() { const n = new Set(ownRules().map((r) => r[1])).size; note.textContent = n ? `${n} heading${n > 1 ? 's have their' : ' has its'} own plate offsets and opacity, which win over the sliders above (at the widths where they are set).` : 'No heading has its own plate settings, so the sliders above apply to all of them.'; btnRow.style.display = n ? '' : 'none'; } });
+  return [
+    h('div', { class: 'sub', text: 'Inks' }),
+    ink('Text ink', '--riso-ink', () => win.getComputedStyle(doc.body).color),
+    ink('Yellow', '--riso-yellow', () => '#ffe600'),
+    ink('Magenta', '--riso-magenta', () => '#ff3d9a'),
+    h('div', { class: 'sub', text: 'Overprint & grain' }),
+    selectField({ label: 'Blend', aria: 'Header riso blend mode', title: 'How the plates mix with the text and each other: Multiply is real overprint', global: true,
+      options: () => [['multiply', 'Multiply (overprint)'], ['normal', 'Normal']], read: () => tokenValue('--riso-blend') || 'normal',
+      write: (v) => setTok('--riso-blend', v), on: () => tokOn('--riso-blend'), reset: () => clearTok('--riso-blend') }),
+    risoGrainTick(false),
+    rangeField({ label: 'Grain size', aria: 'Header riso grain size in pixels', title: 'One tile of the paper grain on the plates (the page ships at 1126px); smaller is finer', min: 200, max: 2400, step: 10, unit: 'px',
+      read: () => parseFloat(tokenValue('--riso-grain-size')) || 1126, write: (v) => setTok('--riso-grain-size', r3(v) + 'px'), on: () => tokOn('--riso-grain-size'), reset: () => clearTok('--riso-grain-size') }),
+    note, btnRow,
+  ];
+}
 function pageSection(open) {
   const names = Object.keys(INKS);
   const isSet = (ns) => ns.some((n) => diffCss(baseline, state.css).set.some((x) => x[1] === ':root' && x[2] === n) || diffCss(baseline, state.css).del.some((x) => x[1] === ':root' && x[2] === n));
@@ -1635,10 +1707,12 @@ function pageSection(open) {
     h('div', { class: 'sub', text: 'Frosted glass blur' }),
     ...BLURS.map((bl) => rangeField({ label: bl.label, aria: bl.aria, title: bl.title, min: 0, max: 48, step: 1, unit: 'px',
       read: () => parseFloat(tokenValue(bl.name)) || 0, write: (v) => setTok(bl.name, r3(v) + 'px'), on: () => isSet([bl.name]), reset: () => clear([bl.name]) })),
-    h('div', { class: 'sub', text: 'Header riso shift' }),
-    h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'A yellow and a magenta copy of heading text (h1–h3 and the big sub-headline), printed slightly off-register in opposite directions and carrying the paper grain. Every width; skipped for increased contrast and print. Select a heading for its own plates.' }),
+    h('div', { class: 'sub', text: 'Header riso' }),
+    h('p', { class: 'muted', style: 'margin:0 0 2px', text: 'Copies of heading text (h1–h3 and the big sub-headline) printed slightly off-register, carrying the paper grain. Classic: a yellow and a magenta copy behind black text. Overprint: the CodePen look, with the text as a cyan ink and the other two printed over it. Flip between them to compare; each remembers its own settings. Every width; skipped for increased contrast and print. Select a heading for its own plates.' }),
+    risoStyleSwitch(),
     ...RISO.map((r) => rangeField({ label: r.label, aria: r.aria, title: r.title, min: r.min, max: r.max, step: r.step, unit: r.unit,
       read: () => r.get(tokenValue(r.name)), write: (v) => setTok(r.name, r.put(v)), on: () => isSet([r.name]), reset: () => clear([r.name]) })),
+    ...risoExtras(),
     h('div', { class: 'sub', text: `Page length (${rangeFor(frameW).label})` }),
     g2(numField({ label: 'Len', aria: 'Page length in pixels', unit: 'px', global: true, step: 10,
       read: () => pageLen(), on: () => state.css[scopeKey()]?.body?.height != null,
