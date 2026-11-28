@@ -100,10 +100,44 @@ editor for it (see `editor/README.md`).
   flat shadow on top. Everything is off for increased contrast, forced colours and print. Browser support: Chrome 120+,
   Safari 16.4+, Firefox 128+ for the textured ghosts.
 
+## Riso print on pictures (live SVG filter)
+
+- A **live** alternative to baking: an SVG filter, `#riso-photo` (inline `<svg>` right after the footer), applied with CSS `filter` to the existing
+  `<img>`s. Nothing is baked or re-uploaded, and it works on the Readymag-hosted photos as they are: a CSS filter never reads the pixels, whereas
+  a canvas/WebGL version cannot (that host sends no CORS headers, so `getImageData` throws `SecurityError`).
+- **Method** (read from the public bundle of instantrisograph.com, then rebuilt from SVG primitives): `K = min(1-R, 1-G, 1-B)` via `feBlend darken`;
+  the colour plates are `(1-R)-K` etc. via `feBlend difference`; each plate is colourised by an `feColorMatrix` using that ink's densities and the
+  site's gains (C 1.1, M 1.4, Y 1.1, K 0.7), moved by `feOffset`, and the four are multiplied onto a white `feFlood`; `feComposite arithmetic` mixes
+  the print with the original (`--riso-photo-strength`) and `operator="in"` keeps the picture's own alpha. It is an *approximation* of the site:
+  the site divides by `1-K` (not expressible in an SVG filter) and adds per-pixel noise (leave it out: `feTurbulence`/`feDisplacementMap` cost
+  about 5x the frame budget; the page's own grain overlay stands in), so shadows come out greyer than the original method. The ink table (17 inks:
+  name, hex, densities) is the site's own. **No licence was found for that site's own code (only React and lucide notices)**: credit or ask the author
+  before shipping anything closer to it.
+- **Tokens** (all in `:root`, all default to "off / as shipped"): `--riso-photos: url(#riso-photo)` switches it on for the photographs (`.portrait`,
+  `.release`, `.strip figure`; not the album covers, icons, `.art` or decor), `--riso-photo` on one element opts that picture in or out, and
+  `--riso-photo-cyan|magenta|yellow|black` (ink keys), `--riso-photo-shift` (px, plate offsets) and `--riso-photo-strength` (0-1) are the settings.
+  A script at the bottom writes them into the filter's attributes (`window.ct907RisoPhoto()`, which the editor calls after a token changes;
+  `window.ct907RisoInks` is the ink table the editor builds its pickers from). Attributes are used because `feColorMatrix values` and `feOffset dx/dy`
+  cannot read CSS variables.
+- **CSS**: `:where(img) { filter: var(--riso-photo,) }` and `.strip img { filter: var(--riso-photo,) drop-shadow(...) }` (the strip keeps its shadow),
+  inside `@media screen and (prefers-contrast: no-preference)`, so increased contrast and print never get the washed-out look. With nothing set they
+  compute to exactly what the pictures had before (checked: the computed `filter` of all 16 pictures and the rendered page are identical).
+- **Cost** (headless Chromium, software rendering): scrolling the whole page with the filter on for 8 or all 12 pictures was indistinguishable from off
+  (60 fps, no slow frames, also at 4x CPU slowdown). The filter re-runs whenever a picture *repaints*; if 12 pictures repaint every frame it fell to
+  about 15 fps, so do not put hover or resize effects on filtered pictures. **Not measured in Firefox/Zen** (SVG filters on HTML elements are where it
+  is most likely to differ), nor on a real GPU: check there before leaning on it.
+- The editor's own `filter` controls write a literal `filter` that replaces the `var(--riso-photo,)` declaration, so a picture given a blur or
+  brightness tweak loses the riso print.
+- Editor: **Page & background > Photo riso (live filter)** has the **Photos: Off | Riso print** switch, the four plate inks, Shift and Mix; selecting a
+  picture (or a frame holding exactly one) adds **Riso print (this picture)**.
+
 ## Baked riso photos (`tools/riso-bake.py`)
 
-- Photos get the riso look **baked into the file**, not applied live: an SVG-filter version (the displacement-noise CodePen) cost ~5x
-  the frame budget when measured, and masking photos with the grain texture at runtime was also costly. Baking costs nothing at runtime.
+- Photos can get the riso look **baked into the file**: it costs nothing at runtime and can be grainier than the live filter (see the section above for
+  the live version). A *noisy* SVG-filter version (the displacement-noise CodePen) cost ~5x the frame budget when measured, and masking photos with the
+  grain texture at runtime was also costly; the live filter above avoids both. Note this baker's presets are rougher than instantrisograph.com's
+  own look (it uses continuous tone plus fine noise, no dithering): if photos are baked for real, port that method (a plain canvas version
+  matched the site pixel for pixel) rather than using these presets.
 - `python3 tools/riso-bake.py photo.jpg --preset soft|overprint|duo --display-width 300` (Python + numpy + Pillow; a dev tool, the site
   still has no build step). It separates the photo into the heading inks (cyan, magenta, yellow), breaks them up with grain, prints
   yellow up-left and magenta down-right like the heading plates, and multiplies them onto `--paper`. `duo` uses only the wallpaper's

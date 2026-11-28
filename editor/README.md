@@ -184,6 +184,14 @@ same paper grain as the page.
   a note under the controls counts them, and **Clear their own settings** removes them all so the sliders apply to every
   heading (Ctrl/Cmd+Z brings them back). That is a lot of lines in the pull request, so use it deliberately.
 
+**Photo riso (live filter)** prints the pictures in riso inks without touching the files. The **Photos: Off | Riso print** switch turns it on for the
+portrait, the Slow Food card picture and the photo strip (not the album covers, icons or decorations). Each picture is split into cyan, magenta, yellow
+and black plates, each printed in an ink you choose (17 Riso inks, the defaults are Blue, Fluorescent Pink, Yellow and Black), shifted a little (*Shift*,
+0 to 8px; ships at 2px) and multiplied; *Mix* blends the print with the original picture. Select a picture (or a frame holding exactly one) and
+**Riso print (this picture)** switches that picture on or off by itself, including the ones the switch does not cover. These write `--riso-photos`,
+`--riso-photo` and `--riso-photo-cyan|magenta|yellow|black|shift|strength`. The filter runs again whenever a picture repaints, so keep an eye on how the page
+feels (in Firefox too) before you push; a blur or brightness tweak on a picture replaces the riso print on that picture.
+
 To change the plates of **one heading**, select it: the **Riso plates (this heading)** section has X, Y and opacity for each
 plate (opacity 0 hides a plate). They are written as `--riso-yellow-x / -y / -a` and `--riso-magenta-x / -y / -a` on that
 heading's rule. The same section has that heading's *Text ink*, *Blend*, *Plates* (over or behind the text) and *Grain*.

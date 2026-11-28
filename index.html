@@ -132,6 +132,17 @@
       --riso-mask: url("assets/images/paper-texture.webp");
       --riso-grain-size: var(--grain-size);
 
+      /* Riso print on pictures: a live SVG filter (#riso-photo, after the footer), so the pictures stay as they are and the effect can be tweaked in the
+         editor (Page & background > Photo riso). OFF until the editor writes --riso-photos: url(#riso-photo) (the portrait, the Slow Food card
+         picture and the photo strip; not the album covers or icons) or --riso-photo on one picture. The plates print in these inks (keys from the table in the script), shifted by --riso-photo-shift,
+         and mixed back with the original by --riso-photo-strength (1 = all print). */
+      --riso-photo-cyan: blue;
+      --riso-photo-magenta: fluorescent_pink;
+      --riso-photo-yellow: yellow;
+      --riso-photo-black: black;
+      --riso-photo-shift: 2px;
+      --riso-photo-strength: 1;
+
       /* Graph-paper grid. One cell is 2.25rem, so it grows and shrinks with the
          text (the root font-size below is fluid). Line widths are a share of the cell
          (as in the reference); --lv = vertical lines (both plates) and the magenta
@@ -492,6 +503,15 @@
     .strip figure:hover { z-index: 5; position: relative; }
     :root:not([data-motion="reduced"]) .strip figure:hover { transform: translateY(-6px) scale(1.03); }
     .strip img { height: 100%; width: 100%; object-fit: cover; border-radius: .5rem; filter: drop-shadow(1px 5px 1px rgba(0, 14, 37, .58)); }
+    /* Riso print on pictures (--riso-photo*, see :root). Only on screens for people with no contrast preference, so the washed-out look never reaches
+       increased-contrast visitors or a printout. With nothing set the rules below resolve to what the pictures had before (no filter; the strip keeps its
+       drop-shadow). --riso-photos (all photographs) is handed down to the pictures through their frames; --riso-photo on one element wins. */
+    #riso-photo-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+    @media screen and (prefers-contrast: no-preference) {
+      :where(img) { filter: var(--riso-photo,); }
+      .strip img { filter: var(--riso-photo,) drop-shadow(1px 5px 1px rgba(0, 14, 37, .58)); }
+      :is(.portrait, .release, .strip figure) { --riso-photo: var(--riso-photos,); }
+    }
     .strip .rot { transform: rotate(10deg); }
     :root:not([data-motion="reduced"]) .strip .rot:hover { transform: rotate(10deg) translateY(-6px) scale(1.03); }
 
@@ -811,6 +831,40 @@
     <a class="glass" href="mailto:gax907@gmail.com">Email</a>
   </nav>
 </footer>
+
+<!-- Riso print for pictures (the #riso-photo filter). Nothing uses it until the editor's Photo riso switch (--riso-photos) or a picture's own --riso-photo
+     turns it on. It separates a picture into cyan, magenta, yellow and black plates the way instantrisograph.com does, prints each in an ink, shifts the
+     plates a few pixels and multiplies them onto white. The numbers below are the defaults; the script at the bottom keeps them in step with the
+     --riso-photo-* tokens. -->
+<svg id="riso-photo-defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="riso-photo" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+      <feColorMatrix in="SourceGraphic" type="matrix" values="-1 0 0 0 1 -1 0 0 0 1 -1 0 0 0 1 0 0 0 0 1" result="ir"/>
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 -1 0 0 1 0 -1 0 0 1 0 -1 0 0 1 0 0 0 0 1" result="ig"/>
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 -1 0 1 0 0 -1 0 1 0 0 -1 0 1 0 0 0 0 1" result="ib"/>
+      <feBlend in="ir" in2="ig" mode="darken" result="k1"/>
+      <feBlend in="k1" in2="ib" mode="darken" result="K"/>
+      <feBlend in="ir" in2="K" mode="difference" result="C"/>
+      <feBlend in="ig" in2="K" mode="difference" result="M"/>
+      <feBlend in="ib" in2="K" mode="difference" result="Y"/>
+      <feColorMatrix id="rp-mc" in="C" type="matrix" values="-1.089 0 0 0 1 -0.242 0 0 0 1 0 0 0 0 1 0 0 0 0 1" result="pcc"/>
+      <feOffset id="rp-oc" in="pcc" dx="2" dy="-2" result="pc"/>
+      <feColorMatrix id="rp-mm" in="M" type="matrix" values="0 0 0 0 1 -1.008 0 0 0 1 -0.434 0 0 0 1 0 0 0 0 1" result="pmc"/>
+      <feOffset id="rp-om" in="pmc" dx="-2" dy="-2" result="pm"/>
+      <feColorMatrix id="rp-my" in="Y" type="matrix" values="0 0 0 0 1 -0.099 0 0 0 1 -1.1 0 0 0 1 0 0 0 0 1" result="pyc"/>
+      <feOffset id="rp-oy" in="pyc" dx="2" dy="2" result="py"/>
+      <feColorMatrix id="rp-mk" in="K" type="matrix" values="-0.7 0 0 0 1 -0.7 0 0 0 1 -0.7 0 0 0 1 0 0 0 0 1" result="pkc"/>
+      <feOffset id="rp-ok" in="pkc" dx="-2" dy="2" result="pk"/>
+      <feFlood flood-color="#fff" result="paper"/>
+      <feBlend in="pc" in2="paper" mode="multiply" result="b1"/>
+      <feBlend in="pm" in2="b1" mode="multiply" result="b2"/>
+      <feBlend in="py" in2="b2" mode="multiply" result="b3"/>
+      <feBlend in="pk" in2="b3" mode="multiply" result="print"/>
+      <feComposite id="rp-mix" in="SourceGraphic" in2="print" operator="arithmetic" k1="0" k2="0" k3="1" k4="0" result="mix"/>
+      <feComposite in="mix" in2="SourceGraphic" operator="in"/>
+    </filter>
+  </defs>
+</svg>
 
 <script>
   (function () {
@@ -1139,6 +1193,49 @@
         for (var j = 0; j < m.addedNodes.length; j++) if (m.addedNodes[j].nodeType === 1) tagAll(m.addedNodes[j]);
       }
     }).observe(document.body, { childList: true, characterData: true, subtree: true });
+  })();
+
+  /* ---------- riso print on pictures ----------
+     The #riso-photo filter (below the footer) is a live version of the instantrisograph.com look, so pictures stay exactly as they are and the effect
+     can be switched on and tweaked in the editor (Page & background > Photo riso). It costs nothing while nothing uses it. This keeps the filter's
+     numbers in step with the --riso-photo-* tokens: the ink of each plate (names from the table, densities are that site's own), how far the plates
+     are shifted, and how much of the print is mixed with the original picture. The editor calls window.ct907RisoPhoto() after changing a token. */
+  (function () {
+    var INKS = {
+      fluorescent_pink: ['Fluorescent Pink', '#FF48B0', 0, 72, 31],
+      coral: ['Coral', '#FF8E91', 0, 44, 43],
+      fluorescent_orange: ['Fluorescent Orange', '#FF7477', 0, 55, 53],
+      red: ['Red', '#FF665E', 0, 60, 63],
+      orange: ['Orange', '#FF6C2F', 0, 58, 82],
+      sunflower: ['Sunflower', '#FFB511', 0, 29, 93],
+      yellow: ['Yellow', '#FFE800', 0, 9, 100],
+      light_lime: ['Light Lime', '#E3ED55', 10, 0, 60],
+      kelly_green: ['Kelly Green', '#67B346', 52, 0, 86],
+      seafoam: ['Seafoam', '#62C2B1', 53, 0, 33],
+      aqua: ['Aqua', '#5EC8E5', 49, 0, 11],
+      cornflower: ['Cornflower', '#62A8E5', 54, 10, 0],
+      blue: ['Blue', '#0078BF', 99, 22, 0],
+      flat_gold: ['Flat Gold', '#BB8B41', 6, 26, 97],
+      metallic_gold: ['Metallic Gold', '#AC936E', 22, 33, 68],
+      white: ['White', '#FFFFFF', 0, 0, 0],
+      black: ['Black', '#000000', 100, 100, 100]
+    };
+    var GAIN = { cyan: 1.1, magenta: 1.4, yellow: 1.1, black: .7 }, DIR = { cyan: [1, -1], magenta: [-1, -1], yellow: [1, 1], black: [-1, 1] };
+    var ID = { cyan: 'c', magenta: 'm', yellow: 'y', black: 'k' }, root = document.documentElement;
+    function put(id, name, v) { var e = document.getElementById(id); if (e && e.getAttribute(name) !== String(v)) e.setAttribute(name, v); }
+    function num(v) { return Math.round(v * 1e4) / 1e4; }
+    function apply() {
+      var cs = getComputedStyle(root), shift = parseFloat(cs.getPropertyValue('--riso-photo-shift')), mix = parseFloat(cs.getPropertyValue('--riso-photo-strength'));
+      if (!(shift >= 0)) shift = 2; if (!(mix >= 0)) mix = 1; mix = Math.min(1, mix);
+      for (var p in ID) {
+        var d = (INKS[cs.getPropertyValue('--riso-photo-' + p).trim()] || INKS.black).slice(2);
+        put('rp-m' + ID[p], 'values', d.map(function (v) { return num(-v * GAIN[p] / 100) + ' 0 0 0 1'; }).join(' ') + ' 0 0 0 0 1');
+        put('rp-o' + ID[p], 'dx', num(DIR[p][0] * shift)); put('rp-o' + ID[p], 'dy', num(DIR[p][1] * shift));
+      }
+      put('rp-mix', 'k2', num(1 - mix)); put('rp-mix', 'k3', num(mix));
+    }
+    window.ct907RisoInks = INKS; window.ct907RisoPhoto = apply;
+    apply();
   })();
 </script>
 
