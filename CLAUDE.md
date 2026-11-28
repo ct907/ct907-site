@@ -79,10 +79,41 @@ editor for it (see `editor/README.md`).
   (offset px, opacity); they are deliberately **not** declared in `:root`, so the plates fall back to the shifts and `--riso-text`.
   Today's tweak block gives the headings (h1, sub-headline, three h2) a yellow-only plate at -2px/-1px by that route (the
   magenta plate is `--riso-magenta-a: 0`); remove that override to bring the magenta plate back.
-- The editor's **Page & background > Header riso shift** has the three global sliders, and selecting a heading shows **Riso
-  plates (this heading)** with X/Y/opacity per plate. A text shadow typed on a heading (the Text shadow control) is an extra
+- **Overprint style (the CodePen "riso" look), switched in the editor.** The plates can also print the way real riso inks do: the
+  heading's own text becomes a third ink (cyan), and the yellow and magenta plates print **over** it with `mix-blend-mode: multiply`,
+  so overlaps mix (yellow x cyan = green, all three = near-black, fringes of each ink at the edges). It is built from five tokens in
+  `:root` whose defaults are exactly the classic look, so nothing changes until the editor writes others: `--riso-z` (-1 plates behind
+  the text, 1 over it), `--riso-blend` (`normal` / `multiply`), `--riso-ink` (`currentColor` = the text keeps its colour; overprint
+  uses `#1a84c4`), `--riso-mask` (the grain tile, or `none` for solid ink) and `--riso-grain-size` (default `var(--grain-size)`).
+  The ghosts are still only `::before` / `::after`, so the third ink *is* the heading text (it is solid: the grain is on the two
+  plates, not the text). The multiply stays inside each heading's own `isolation: isolate` group, so it only mixes the plates with the
+  text and each other, never with the page behind. Increased contrast, print and forced colours hide the plates **and** reset the text
+  to the page's ink (`[data-riso] { color: inherit }`), and `--riso-ink` is reset in the `prefers-contrast: more` block so the editor
+  writes it inside the no-preference guard. The cyan ink alone is ~3.9:1 on the paper (fine for large display text); where the plates
+  overlap it is near-black. A per-heading `--riso-*-x/-y/-a` always wins over the global sliders (the page ships several, tuned for
+  classic), which is why the editor has a **Clear their own settings** button. `portfolio/index.html` carries the same tokens at their
+  classic defaults (no editor there).
+- The editor's **Page & background > Header riso** has a **Style: Classic | Overprint** switch (a live preview: Overprint writes
+  `--riso-z: 1`, `--riso-blend: multiply`, `--riso-ink: #1a84c4`, opacity .85 and 3px/3px shifts; Classic puts the shipped values back,
+  and each style remembers its own settings while you flip), the three global sliders, ink colours, Blend, Grain on/off and size, and
+  selecting a heading shows **Riso plates (this heading)** with X/Y/opacity per plate plus text ink, Blend, Plates over/behind and Grain. A text shadow typed on a heading (the Text shadow control) is an extra
   flat shadow on top. Everything is off for increased contrast, forced colours and print. Browser support: Chrome 120+,
   Safari 16.4+, Firefox 128+ for the textured ghosts.
+
+## Baked riso photos (`tools/riso-bake.py`)
+
+- Photos get the riso look **baked into the file**, not applied live: an SVG-filter version (the displacement-noise CodePen) cost ~5x
+  the frame budget when measured, and masking photos with the grain texture at runtime was also costly. Baking costs nothing at runtime.
+- `python3 tools/riso-bake.py photo.jpg --preset soft|overprint|duo --display-width 300` (Python + numpy + Pillow; a dev tool, the site
+  still has no build step). It separates the photo into the heading inks (cyan, magenta, yellow), breaks them up with grain, prints
+  yellow up-left and magenta down-right like the heading plates, and multiplies them onto `--paper`. `duo` uses only the wallpaper's
+  blue and pink. Photos use a lighter cyan (`#2aa5df`) than the headings' `#1a84c4`, which goes muddy over a whole picture.
+- **Don't use `paper-texture.webp` as the ink threshold.** It has a regular fine mesh under its speckle: invisible as an 8% overlay,
+  but it prints as a halftone screen. The tool uses synthetic speckle (shared across the three plates, like a real print) instead.
+- Grain compresses badly: baked photos come out roughly 1-3x the size of the originals. Check sizes (LCP, see the texture notes
+  above) and use `--quality` / `--grain` if a file is too heavy. Keep the original as the source; commit only the baked WebP.
+- Not applied to the site yet: the homepage's photos are hosted on Readymag's CDN, so using one means committing the baked file under
+  `assets/images/` and swapping its `src` (the editor's **Replace image...** does both in one pull request).
 
 ## Page editor: structural edits (`editor/index.html`)
 

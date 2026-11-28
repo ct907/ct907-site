@@ -74,6 +74,13 @@
       --riso-yellow-shift: 2px;
       --riso-magenta-shift: 4px;
       --riso-text: .2;
+      /* Overprint (see index.html and the homepage editor's Header riso > Style). These are the CLASSIC values, so nothing changes until one is set:
+         plates behind the text (-1), normal blending, the text keeps its own colour. Overprint = plates over the text (1), multiply, text in a third ink. */
+      --riso-z: -1;
+      --riso-blend: normal;
+      --riso-ink: currentColor;
+      --riso-mask: url("/assets/images/paper-texture.webp");
+      --riso-grain-size: var(--grain-size);
 
       /* Graph-paper grid: one cell is 2.25rem, so it scales with the text */
       --cell: 2.25rem;
@@ -156,12 +163,13 @@
         var(--riso-magenta-x, var(--riso-magenta-shift)) var(--riso-magenta-y, var(--riso-magenta-shift)) 0 rgb(from var(--riso-magenta) r g b / var(--riso-magenta-a, var(--riso-text)));
     }
     @supports (color: rgb(from red r g b)) and ((mask-image: url(x)) or (-webkit-mask-image: url(x))) {
-      [data-riso] { position: relative; isolation: isolate; }
+      [data-riso] { position: relative; isolation: isolate; color: var(--riso-ink); }
       [data-riso]::before, [data-riso]::after {
         content: attr(data-riso); content: attr(data-riso) / "";
-        position: absolute; inset: 0; z-index: -1; box-sizing: border-box; padding: inherit; pointer-events: none; user-select: none;
-        -webkit-mask-image: url("/assets/images/paper-texture.webp"); mask-image: url("/assets/images/paper-texture.webp"); mask-mode: luminance;
-        -webkit-mask-size: var(--grain-size) var(--grain-size); mask-size: var(--grain-size) var(--grain-size);
+        position: absolute; inset: 0; z-index: var(--riso-z); box-sizing: border-box; padding: inherit; pointer-events: none; user-select: none;
+        mix-blend-mode: var(--riso-blend);
+        -webkit-mask-image: var(--riso-mask); mask-image: var(--riso-mask); mask-mode: luminance;
+        -webkit-mask-size: var(--riso-grain-size) var(--riso-grain-size); mask-size: var(--riso-grain-size) var(--riso-grain-size);
       }
       [data-riso]::before {
         color: rgb(from var(--riso-yellow) r g b / var(--riso-yellow-a, var(--riso-text)));
@@ -355,16 +363,18 @@
       .glass { -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask-image: none; mask-image: none; }
     }
     @media (prefers-contrast: more) {
-      :root { --ink-c: #e1f6fd; --ink-m: #f6eef3; --paper: var(--bg); }
+      :root { --ink-c: #e1f6fd; --ink-m: #f6eef3; --paper: var(--bg); --riso-ink: currentColor; }
       body::after { display: none; }
       :root :is(h1, h2, .lede) { text-shadow: none; }
       [data-riso]::before, [data-riso]::after { display: none; }
+      [data-riso] { color: inherit; }
     }
-    @media print { body::after { display: none; } :root { --paper: var(--bg); } :root :is(h1, h2, .lede) { text-shadow: none; } [data-riso]::before, [data-riso]::after { display: none; } }
+    @media print { body::after { display: none; } :root { --paper: var(--bg); } :root :is(h1, h2, .lede) { text-shadow: none; } [data-riso]::before, [data-riso]::after { display: none; } [data-riso] { color: inherit; } }
     @media (forced-colors: active) {
       body::before, body::after { display: none; }
       :root :is(h1, h2, .lede) { text-shadow: none; }
       [data-riso]::before, [data-riso]::after { display: none; }
+      [data-riso] { color: inherit; }
       .glass { -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask-image: none; mask-image: none; }
       a.glass:hover, a.glass:focus-visible { outline: 2px solid Highlight; }
     }

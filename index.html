@@ -121,6 +121,16 @@
       --riso-yellow-shift: 2px;    /* how far the yellow plate is off (0 to 2px) */
       --riso-magenta-shift: 4px;   /* how far the magenta plate is off (0 to 4px) */
       --riso-text: .2;             /* opacity of both plates (20%) */
+      /* Overprint (the editor's "Header riso shift > Style" switch). Every value below is the CLASSIC look, so nothing changes until
+         the editor writes different ones: the plates sit behind the text (-1), blend normally, and the text keeps its own colour.
+         Overprint puts the plates OVER the text (1), blends them with multiply (so yellow x magenta x the text ink mix like real
+         overprinted inks, near-black where all three meet) and prints the heading's own text in a third ink (--riso-ink, cyan).
+         --riso-mask is the grain that knocks specks out of the two plates (none = solid ink); --riso-grain-size is its tile size. */
+      --riso-z: -1;
+      --riso-blend: normal;
+      --riso-ink: currentColor;
+      --riso-mask: url("assets/images/paper-texture.webp");
+      --riso-grain-size: var(--grain-size);
 
       /* Graph-paper grid. One cell is 2.25rem, so it grows and shrinks with the
          text (the root font-size below is fluid). Line widths are a share of the cell
@@ -232,12 +242,13 @@
         var(--riso-magenta-x, var(--riso-magenta-shift)) var(--riso-magenta-y, var(--riso-magenta-shift)) 0 rgb(from var(--riso-magenta) r g b / var(--riso-magenta-a, var(--riso-text)));
     }
     @supports (color: rgb(from red r g b)) and ((mask-image: url(x)) or (-webkit-mask-image: url(x))) {
-      [data-riso] { position: relative; isolation: isolate; }
+      [data-riso] { position: relative; isolation: isolate; color: var(--riso-ink); }
       [data-riso]::before, [data-riso]::after {
         content: attr(data-riso); content: attr(data-riso) / "";   /* the second form tells screen readers to skip it, where supported */
-        position: absolute; inset: 0; z-index: -1; box-sizing: border-box; padding: inherit; pointer-events: none; user-select: none;
-        -webkit-mask-image: url("assets/images/paper-texture.webp"); mask-image: url("assets/images/paper-texture.webp"); mask-mode: luminance;
-        -webkit-mask-size: var(--grain-size) var(--grain-size); mask-size: var(--grain-size) var(--grain-size);
+        position: absolute; inset: 0; z-index: var(--riso-z); box-sizing: border-box; padding: inherit; pointer-events: none; user-select: none;
+        mix-blend-mode: var(--riso-blend);   /* inside the heading's own isolated group, so it only ever mixes the plates with the text */
+        -webkit-mask-image: var(--riso-mask); mask-image: var(--riso-mask); mask-mode: luminance;
+        -webkit-mask-size: var(--riso-grain-size) var(--riso-grain-size); mask-size: var(--riso-grain-size) var(--riso-grain-size);
       }
       [data-riso]::before {
         color: rgb(from var(--riso-yellow) r g b / var(--riso-yellow-a, var(--riso-text)));
@@ -544,18 +555,20 @@
     }
     /* Increased contrast: pale inks, and no grain, so text sits on clean paper. */
     @media (prefers-contrast: more) {
-      :root { --ink-c: #e1f6fd; --ink-m: #f6eef3; --paper: var(--bg); }
+      :root { --ink-c: #e1f6fd; --ink-m: #f6eef3; --paper: var(--bg); --riso-ink: currentColor; }
       body::after { display: none; }
       :root :is(h1, h2, h3, .lede) { text-shadow: none; }   /* no off-register ghosts either: sharp, single-colour text */
       [data-riso]::before, [data-riso]::after { display: none; }
+      [data-riso] { color: inherit; }   /* and no third ink: the heading is plain text in the page's ink */
     }
     /* Paper grain and the riso text shift are for screens: leave them out of printouts. */
-    @media print { body::after { display: none; } :root { --paper: var(--bg); } :root :is(h1, h2, h3, .lede) { text-shadow: none; } [data-riso]::before, [data-riso]::after { display: none; } }
+    @media print { body::after { display: none; } :root { --paper: var(--bg); } :root :is(h1, h2, h3, .lede) { text-shadow: none; } [data-riso]::before, [data-riso]::after { display: none; } [data-riso] { color: inherit; } }
     /* Forced colours (Windows high contrast): system colours; hover/focus get an outline instead of a tint. */
     @media (forced-colors: active) {
       body::before, body::after { display: none; }
       :root :is(h1, h2, h3, .lede) { text-shadow: none; }
       [data-riso]::before, [data-riso]::after { display: none; }
+      [data-riso] { color: inherit; }
       .glass { -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask-image: none; mask-image: none; }
       a.glass:hover, a.glass:focus-visible { outline: 2px solid Highlight; }
     }
